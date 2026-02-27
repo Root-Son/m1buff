@@ -475,46 +475,39 @@ export default function Dashboard() {
               </div>
             </div>
             <div className="bg-white p-6 rounded-lg shadow-sm border">
-              <span className="text-sm font-medium text-gray-600">{selectedMonth}월 C/I</span>
+              <span className="text-sm font-medium text-gray-600">2월 C/I</span>
               <div className="text-2xl font-bold text-gray-900 mt-2">
-                {selectedMonth === 2 && monthlyData?.feb ? 
-                  (monthlyData.feb.ci || 0).toLocaleString('ko-KR') :
-                  selectedMonth === 3 && monthlyData?.mar ?
-                  (monthlyData.mar.ci || 0).toLocaleString('ko-KR') :
-                  selectedMonth === 4 && monthlyData?.apr ?
-                  (monthlyData.apr.ci || 0).toLocaleString('ko-KR') :
-                  '-'}
+                {monthlyData?.feb?.ci?.toLocaleString('ko-KR') || '-'}
               </div>
               <div className="mt-2 flex items-center gap-2">
                 <span className="text-sm text-gray-500">달성률:</span>
                 <span className="text-lg font-bold text-green-600">
-                  {selectedMonth === 2 && monthlyData?.feb?.achievement_rate
+                  {monthlyData?.feb?.achievement_rate
                     ? `${(monthlyData.feb.achievement_rate * 100).toFixed(2)}%`
-                    : selectedMonth === 3 && monthlyData?.mar?.achievement_rate
+                    : '-'}
+                </span>
+              </div>
+            </div>
+            <div className="bg-white p-6 rounded-lg shadow-sm border">
+              <span className="text-sm font-medium text-gray-600">3월 C/I</span>
+              <div className="text-2xl font-bold text-gray-900 mt-2">
+                {monthlyData?.mar?.ci?.toLocaleString('ko-KR') || '-'}
+              </div>
+              <div className="mt-2 flex items-center gap-2">
+                <span className="text-sm text-gray-500">달성률:</span>
+                <span className="text-lg font-bold text-yellow-600">
+                  {monthlyData?.mar?.achievement_rate
                     ? `${(monthlyData.mar.achievement_rate * 100).toFixed(2)}%`
                     : '-'}
                 </span>
               </div>
             </div>
             <div className="bg-white p-6 rounded-lg shadow-sm border">
-              <span className="text-sm font-medium text-gray-600">목표</span>
+              <span className="text-sm font-medium text-gray-600">4월 C/I</span>
               <div className="text-2xl font-bold text-gray-900 mt-2">
-                {selectedMonth === 2 && monthlyData?.feb ?
-                  (monthlyData.feb.target || 0).toLocaleString('ko-KR') :
-                  selectedMonth === 3 && monthlyData?.mar ?
-                  (monthlyData.mar.target || 0).toLocaleString('ko-KR') :
-                  '-'}
+                {monthlyData?.apr?.ci?.toLocaleString('ko-KR') || '-'}
               </div>
-            </div>
-            <div className="bg-white p-6 rounded-lg shadow-sm border">
-              <span className="text-sm font-medium text-gray-600">베이스</span>
-              <div className="text-2xl font-bold text-gray-900 mt-2">
-                {selectedMonth === 2 && monthlyData?.feb ?
-                  (monthlyData.feb.base || 0).toLocaleString('ko-KR') :
-                  selectedMonth === 3 && monthlyData?.mar ?
-                  (monthlyData.mar.base || 0).toLocaleString('ko-KR') :
-                  '-'}
-              </div>
+              <div className="mt-2 text-sm text-gray-500">목표 미설정</div>
             </div>
           </div>
         </div>
