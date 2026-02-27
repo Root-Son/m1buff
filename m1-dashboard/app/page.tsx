@@ -52,7 +52,44 @@ export default function Dashboard() {
   const [selectedBranch, setSelectedBranch] = useState('all')
   const [selectedRoomType, setSelectedRoomType] = useState('all')
   const [selectedMonth, setSelectedMonth] = useState(2)
-  const [weekOffset, setWeekOffset] = useState(0)
+  const [currentWeek, setCurrentWeek] = useState(0) // ISO week offset
+
+  // ISO Week 계산
+  const getISOWeek = (date: Date) => {
+    const target = new Date(date.valueOf())
+    const dayNr = (date.getDay() + 6) % 7
+    target.setDate(target.getDate() - dayNr + 3)
+    const firstThursday = target.valueOf()
+    target.setMonth(0, 1)
+    if (target.getDay() !== 4) {
+      target.setMonth(0, 1 + ((4 - target.getDay()) + 7) % 7)
+    }
+    return 1 + Math.ceil((firstThursday - target.valueOf()) / 604800000)
+  }
+
+  const getWeekRange = (weekOffset: number) => {
+    const today = new Date()
+    const currentISOWeek = getISOWeek(today)
+    const targetWeek = currentISOWeek + weekOffset
+    
+    // 해당 주의 월요일 찾기
+    const jan4 = new Date(today.getFullYear(), 0, 4)
+    const monday = new Date(jan4)
+    monday.setDate(jan4.getDate() - ((jan4.getDay() + 6) % 7) + (targetWeek - 1) * 7)
+    
+    const sunday = new Date(monday)
+    sunday.setDate(monday.getDate() + 6)
+    
+    return {
+      week: targetWeek,
+      year: today.getFullYear(),
+      start: monday,
+      end: sunday,
+      label: `${monday.getMonth() + 1}/${monday.getDate()} ~ ${sunday.getMonth() + 1}/${sunday.getDate()}`
+    }
+  }
+
+  const weekRange = getWeekRange(currentWeek)
 
   const weeklyChartRef = useRef<HTMLCanvasElement>(null)
   const roomTypeChartRef = useRef<HTMLCanvasElement>(null)
@@ -77,7 +114,7 @@ export default function Dashboard() {
     return () => {
       roomTypeChartInstance.current?.destroy()
     }
-  }, [selectedRoomType, weekOffset])
+  }, [selectedRoomType, currentWeek])
 
   const fetchData = async () => {
     setLoading(true)
@@ -352,7 +389,30 @@ export default function Dashboard() {
 
         {/* 주간 실적 */}
         <div className="mb-6">
-          <h2 className="text-sm font-semibold text-gray-500 uppercase mb-3">주간 실적 (최근 7일)</h2>
+          <div className="flex items-center justify-between mb-3">
+            <h2 className="text-sm font-semibold text-gray-500 uppercase">주간 실적</h2>
+            <div className="flex items-center gap-2">
+              <button 
+                onClick={() => setCurrentWeek(currentWeek - 1)}
+                className="p-2 hover:bg-gray-100 rounded-lg border"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                </svg>
+              </button>
+              <span className="text-sm font-medium min-w-[200px] text-center">
+                {weekRange.year}년 W{weekRange.week} ({weekRange.label})
+              </span>
+              <button 
+                onClick={() => setCurrentWeek(currentWeek + 1)}
+                className="p-2 hover:bg-gray-100 rounded-lg border"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                </svg>
+              </button>
+            </div>
+          </div>
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
             <div className="bg-white p-6 rounded-lg shadow-sm border">
               <span className="text-sm font-medium text-gray-600">픽업매출</span>
@@ -383,48 +443,78 @@ export default function Dashboard() {
 
         {/* 월 실적 */}
         <div className="mb-8">
-          <h2 className="text-sm font-semibold text-gray-500 uppercase mb-3">월 실적</h2>
+          <div className="flex items-center justify-between mb-3">
+            <h2 className="text-sm font-semibold text-gray-500 uppercase">월 실적</h2>
+            <div className="flex gap-1 p-1 bg-gray-100 rounded-lg flex-wrap">
+              {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12].map(month => (
+                <button
+                  key={month}
+                  onClick={() => setSelectedMonth(month)}
+                  className={`px-3 py-1.5 text-sm font-medium rounded-md ${
+                    selectedMonth === month
+                      ? 'bg-white text-gray-900 shadow-sm'
+                      : 'text-gray-600 hover:text-gray-900'
+                  }`}
+                >
+                  {month}월
+                </button>
+              ))}
+            </div>
+          </div>
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
             <div className="bg-white p-6 rounded-lg shadow-sm border">
               <span className="text-sm font-medium text-gray-600">픽업매출</span>
               <div className="text-2xl font-bold text-gray-900 mt-2">
-                {((monthlyData?.feb?.ci || 0) + (monthlyData?.mar?.ci || 0) + (monthlyData?.apr?.ci || 0)).toLocaleString('ko-KR')}
+                {selectedMonth === 2 && monthlyData?.feb ? 
+                  (monthlyData.feb.ci || 0).toLocaleString('ko-KR') :
+                  selectedMonth === 3 && monthlyData?.mar ?
+                  (monthlyData.mar.ci || 0).toLocaleString('ko-KR') :
+                  selectedMonth === 4 && monthlyData?.apr ?
+                  (monthlyData.apr.ci || 0).toLocaleString('ko-KR') :
+                  '-'}
               </div>
             </div>
             <div className="bg-white p-6 rounded-lg shadow-sm border">
-              <span className="text-sm font-medium text-gray-600">2월 C/I</span>
+              <span className="text-sm font-medium text-gray-600">{selectedMonth}월 C/I</span>
               <div className="text-2xl font-bold text-gray-900 mt-2">
-                {monthlyData?.feb?.ci?.toLocaleString('ko-KR') || 0}
+                {selectedMonth === 2 && monthlyData?.feb ? 
+                  (monthlyData.feb.ci || 0).toLocaleString('ko-KR') :
+                  selectedMonth === 3 && monthlyData?.mar ?
+                  (monthlyData.mar.ci || 0).toLocaleString('ko-KR') :
+                  selectedMonth === 4 && monthlyData?.apr ?
+                  (monthlyData.apr.ci || 0).toLocaleString('ko-KR') :
+                  '-'}
               </div>
               <div className="mt-2 flex items-center gap-2">
                 <span className="text-sm text-gray-500">달성률:</span>
                 <span className="text-lg font-bold text-green-600">
-                  {monthlyData?.feb?.achievement_rate
+                  {selectedMonth === 2 && monthlyData?.feb?.achievement_rate
                     ? `${(monthlyData.feb.achievement_rate * 100).toFixed(2)}%`
-                    : '-'}
-                </span>
-              </div>
-            </div>
-            <div className="bg-white p-6 rounded-lg shadow-sm border">
-              <span className="text-sm font-medium text-gray-600">3월 C/I</span>
-              <div className="text-2xl font-bold text-gray-900 mt-2">
-                {monthlyData?.mar?.ci?.toLocaleString('ko-KR') || 0}
-              </div>
-              <div className="mt-2 flex items-center gap-2">
-                <span className="text-sm text-gray-500">달성률:</span>
-                <span className="text-lg font-bold text-yellow-600">
-                  {monthlyData?.mar?.achievement_rate
+                    : selectedMonth === 3 && monthlyData?.mar?.achievement_rate
                     ? `${(monthlyData.mar.achievement_rate * 100).toFixed(2)}%`
                     : '-'}
                 </span>
               </div>
             </div>
             <div className="bg-white p-6 rounded-lg shadow-sm border">
-              <span className="text-sm font-medium text-gray-600">4월 C/I</span>
+              <span className="text-sm font-medium text-gray-600">목표</span>
               <div className="text-2xl font-bold text-gray-900 mt-2">
-                {monthlyData?.apr?.ci?.toLocaleString('ko-KR') || 0}
+                {selectedMonth === 2 && monthlyData?.feb ?
+                  (monthlyData.feb.target || 0).toLocaleString('ko-KR') :
+                  selectedMonth === 3 && monthlyData?.mar ?
+                  (monthlyData.mar.target || 0).toLocaleString('ko-KR') :
+                  '-'}
               </div>
-              <div className="mt-2 text-sm text-gray-500">목표 미설정</div>
+            </div>
+            <div className="bg-white p-6 rounded-lg shadow-sm border">
+              <span className="text-sm font-medium text-gray-600">베이스</span>
+              <div className="text-2xl font-bold text-gray-900 mt-2">
+                {selectedMonth === 2 && monthlyData?.feb ?
+                  (monthlyData.feb.base || 0).toLocaleString('ko-KR') :
+                  selectedMonth === 3 && monthlyData?.mar ?
+                  (monthlyData.mar.base || 0).toLocaleString('ko-KR') :
+                  '-'}
+              </div>
             </div>
           </div>
         </div>
@@ -447,7 +537,7 @@ export default function Dashboard() {
             <div className="flex items-center gap-4">
               <div className="flex items-center gap-2">
                 <button 
-                  onClick={() => setWeekOffset(weekOffset - 1)}
+                  onClick={() => setCurrentWeek(currentWeek - 1)}
                   className="p-2 hover:bg-gray-100 rounded-lg border"
                 >
                   <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -455,10 +545,10 @@ export default function Dashboard() {
                   </svg>
                 </button>
                 <span className="text-sm font-medium min-w-[80px] text-center">
-                  {weekOffset === 0 ? '이번주' : weekOffset > 0 ? `+${weekOffset}주` : `${weekOffset}주`}
+                  {currentWeek === 0 ? '이번주' : currentWeek > 0 ? `+${currentWeek}주` : `${currentWeek}주`}
                 </span>
                 <button 
-                  onClick={() => setWeekOffset(weekOffset + 1)}
+                  onClick={() => setCurrentWeek(currentWeek + 1)}
                   className="p-2 hover:bg-gray-100 rounded-lg border"
                 >
                   <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
