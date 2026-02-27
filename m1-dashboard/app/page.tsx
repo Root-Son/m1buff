@@ -350,14 +350,51 @@ export default function Dashboard() {
           </div>
         </div>
 
-        {/* 월 누적 */}
-        <div className="mb-8">
-          <h2 className="text-sm font-semibold text-gray-500 uppercase mb-3">월 누적 실적</h2>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        {/* 주간 실적 */}
+        <div className="mb-6">
+          <h2 className="text-sm font-semibold text-gray-500 uppercase mb-3">주간 실적 (최근 7일)</h2>
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
             <div className="bg-white p-6 rounded-lg shadow-sm border">
-              <span className="text-sm font-medium text-gray-600">2월 C/I 누적</span>
+              <span className="text-sm font-medium text-gray-600">픽업매출</span>
               <div className="text-2xl font-bold text-gray-900 mt-2">
-                {monthlyData?.feb?.cumulative?.toLocaleString('ko-KR') || 0}
+                {weeklyData?.days?.reduce((sum: number, d: any) => sum + (d.pickup || 0), 0).toLocaleString('ko-KR') || 0}
+              </div>
+            </div>
+            <div className="bg-white p-6 rounded-lg shadow-sm border">
+              <span className="text-sm font-medium text-gray-600">2월 C/I</span>
+              <div className="text-2xl font-bold text-gray-900 mt-2">
+                {weeklyData?.days?.reduce((sum: number, d: any) => sum + (d.feb || 0), 0).toLocaleString('ko-KR') || 0}
+              </div>
+            </div>
+            <div className="bg-white p-6 rounded-lg shadow-sm border">
+              <span className="text-sm font-medium text-gray-600">3월 C/I</span>
+              <div className="text-2xl font-bold text-gray-900 mt-2">
+                {weeklyData?.days?.reduce((sum: number, d: any) => sum + (d.mar || 0), 0).toLocaleString('ko-KR') || 0}
+              </div>
+            </div>
+            <div className="bg-white p-6 rounded-lg shadow-sm border">
+              <span className="text-sm font-medium text-gray-600">4월 C/I</span>
+              <div className="text-2xl font-bold text-gray-900 mt-2">
+                {weeklyData?.days?.reduce((sum: number, d: any) => sum + (d.apr || 0), 0).toLocaleString('ko-KR') || 0}
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* 월 실적 */}
+        <div className="mb-8">
+          <h2 className="text-sm font-semibold text-gray-500 uppercase mb-3">월 실적</h2>
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+            <div className="bg-white p-6 rounded-lg shadow-sm border">
+              <span className="text-sm font-medium text-gray-600">픽업매출</span>
+              <div className="text-2xl font-bold text-gray-900 mt-2">
+                {((monthlyData?.feb?.ci || 0) + (monthlyData?.mar?.ci || 0) + (monthlyData?.apr?.ci || 0)).toLocaleString('ko-KR')}
+              </div>
+            </div>
+            <div className="bg-white p-6 rounded-lg shadow-sm border">
+              <span className="text-sm font-medium text-gray-600">2월 C/I</span>
+              <div className="text-2xl font-bold text-gray-900 mt-2">
+                {monthlyData?.feb?.ci?.toLocaleString('ko-KR') || 0}
               </div>
               <div className="mt-2 flex items-center gap-2">
                 <span className="text-sm text-gray-500">달성률:</span>
@@ -369,9 +406,9 @@ export default function Dashboard() {
               </div>
             </div>
             <div className="bg-white p-6 rounded-lg shadow-sm border">
-              <span className="text-sm font-medium text-gray-600">3월 C/I 누적</span>
+              <span className="text-sm font-medium text-gray-600">3월 C/I</span>
               <div className="text-2xl font-bold text-gray-900 mt-2">
-                {monthlyData?.mar?.cumulative?.toLocaleString('ko-KR') || 0}
+                {monthlyData?.mar?.ci?.toLocaleString('ko-KR') || 0}
               </div>
               <div className="mt-2 flex items-center gap-2">
                 <span className="text-sm text-gray-500">달성률:</span>
@@ -383,7 +420,7 @@ export default function Dashboard() {
               </div>
             </div>
             <div className="bg-white p-6 rounded-lg shadow-sm border">
-              <span className="text-sm font-medium text-gray-600">4월 C/I 누적</span>
+              <span className="text-sm font-medium text-gray-600">4월 C/I</span>
               <div className="text-2xl font-bold text-gray-900 mt-2">
                 {monthlyData?.apr?.ci?.toLocaleString('ko-KR') || 0}
               </div>
