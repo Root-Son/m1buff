@@ -6,28 +6,53 @@ export async function GET(request: NextRequest) {
   const branch = searchParams.get('branch') || 'all'
 
   try {
-    // 전체 체크인 매출 집계
-    let query = supabase
+    // 월별 픽업매출 (reservation_created_at 기준)
+    let pickupQuery = supabase
+      .from('raw_bookings')
+      .select('reservation_created_at, payment_amount')
+
+    if (branch !== 'all') {
+      pickupQuery = pickupQuery.eq('branch_name', branch)
+    }
+
+    const { data: pickupData, error: pickupError } = await pickupQuery
+
+    if (pickupError) throw pickupError
+
+    // 월별 픽업 집계
+    const monthlyPickup: Record<number, number> = { 1: 0, 2: 0, 3: 0, 4: 0 }
+
+    pickupData?.forEach((row) => {
+      const createdDate = new Date(row.reservation_created_at)
+      const month = createdDate.getMonth() + 1
+
+      if (month >= 1 && month <= 4) {
+        monthlyPickup[month] += row.payment_amount || 0
+      }
+    })
+
+    // 월별 체크인 매출 (check_in_date 기준, 전체 기간)
+    let ciQuery = supabase
       .from('raw_bookings')
       .select('payment_amount, check_in_date')
 
     if (branch !== 'all') {
-      query = query.eq('branch_name', branch)
+      ciQuery = ciQuery.eq('branch_name', branch)
     }
 
-    const { data, error } = await query
+    const { data: ciData, error: ciError } = await ciQuery
 
-    if (error) throw error
+    if (ciError) throw ciError
 
-    // 월별 집계
-    const monthly = { 2: 0, 3: 0, 4: 0 }
+    // 월별 CI 집계
+    const monthlyCi: Record<number, number> = { 2: 0, 3: 0, 4: 0 }
 
-    data?.forEach((row) => {
+    ciData?.forEach((row) => {
       const checkinDate = new Date(row.check_in_date)
       const month = checkinDate.getMonth() + 1
 
       if (month >= 2 && month <= 4) {
-        monthly[month as 2 | 3 | 4] += row.payment_amount || 0
+        monthlyCi[month] += row.payment_amount || 0
       }
     })
 
@@ -52,25 +77,28 @@ export async function GET(request: NextRequest) {
     const result = {
       branch,
       feb: {
-        ci: monthly[2],
+        pickup: monthlyPickup[2],
+        ci: monthlyCi[2],
         base: targetMap[2]?.base || 0,
-        cumulative: (targetMap[2]?.base || 0) + monthly[2],
+        cumulative: (targetMap[2]?.base || 0) + monthlyCi[2],
         target: targetMap[2]?.target || 0,
         achievement_rate: targetMap[2]?.target
-          ? ((targetMap[2].base + monthly[2]) / targetMap[2].target)
+          ? ((targetMap[2].base + monthlyCi[2]) / targetMap[2].target)
           : 0,
       },
       mar: {
-        ci: monthly[3],
+        pickup: monthlyPickup[3],
+        ci: monthlyCi[3],
         base: targetMap[3]?.base || 0,
-        cumulative: (targetMap[3]?.base || 0) + monthly[3],
+        cumulative: (targetMap[3]?.base || 0) + monthlyCi[3],
         target: targetMap[3]?.target || 0,
         achievement_rate: targetMap[3]?.target
-          ? ((targetMap[3].base + monthly[3]) / targetMap[3].target)
+          ? ((targetMap[3].base + monthlyCi[3]) / targetMap[3].target)
           : 0,
       },
       apr: {
-        ci: monthly[4],
+        pickup: monthlyPickup[4],
+        ci: monthlyCi[4],
       },
     }
 
