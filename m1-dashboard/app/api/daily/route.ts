@@ -4,10 +4,20 @@ import { supabase } from '@/lib/supabase'
 export async function GET(request: NextRequest) {
   const searchParams = request.nextUrl.searchParams
   const branch = searchParams.get('branch') || 'all'
-  const date = searchParams.get('date') || new Date().toISOString().split('T')[0]
-
+  
   try {
-    // 오늘 날짜 예약 데이터
+    // 최신 데이터 날짜 가져오기
+    const { data: latestData } = await supabase
+      .from('raw_bookings')
+      .select('reservation_created_at')
+      .order('reservation_created_at', { ascending: false })
+      .limit(1)
+    
+    const date = latestData && latestData[0] 
+      ? new Date(latestData[0].reservation_created_at).toISOString().split('T')[0]
+      : new Date().toISOString().split('T')[0]
+
+    // 오늘 날짜 예약 데이터 (reservation_created_at 기준)
     let query = supabase
       .from('raw_bookings')
       .select('payment_amount, check_in_date')
