@@ -421,25 +421,25 @@ export default function Dashboard() {
             <div className="bg-white p-6 rounded-lg shadow-sm border">
               <span className="text-sm font-medium text-gray-600">픽업매출</span>
               <div className="text-2xl font-bold text-gray-900 mt-2">
-                {weeklyData?.days?.reduce((sum: number, d: any) => sum + (d.pickup || 0), 0).toLocaleString('ko-KR') || 0}
+                {weeklyData?.total_pickup?.toLocaleString('ko-KR') || 0}
               </div>
             </div>
             <div className="bg-white p-6 rounded-lg shadow-sm border">
               <span className="text-sm font-medium text-gray-600">2월 C/I</span>
               <div className="text-2xl font-bold text-gray-900 mt-2">
-                {weeklyData?.days?.reduce((sum: number, d: any) => sum + (d.feb || 0), 0).toLocaleString('ko-KR') || 0}
+                {weeklyData?.total_feb_ci?.toLocaleString('ko-KR') || 0}
               </div>
             </div>
             <div className="bg-white p-6 rounded-lg shadow-sm border">
               <span className="text-sm font-medium text-gray-600">3월 C/I</span>
               <div className="text-2xl font-bold text-gray-900 mt-2">
-                {weeklyData?.days?.reduce((sum: number, d: any) => sum + (d.mar || 0), 0).toLocaleString('ko-KR') || 0}
+                {weeklyData?.total_mar_ci?.toLocaleString('ko-KR') || 0}
               </div>
             </div>
             <div className="bg-white p-6 rounded-lg shadow-sm border">
               <span className="text-sm font-medium text-gray-600">4월 C/I</span>
               <div className="text-2xl font-bold text-gray-900 mt-2">
-                {weeklyData?.days?.reduce((sum: number, d: any) => sum + (d.apr || 0), 0).toLocaleString('ko-KR') || 0}
+                {weeklyData?.total_apr_ci?.toLocaleString('ko-KR') || 0}
               </div>
             </div>
           </div>
@@ -469,13 +469,10 @@ export default function Dashboard() {
             <div className="bg-white p-6 rounded-lg shadow-sm border">
               <span className="text-sm font-medium text-gray-600">픽업매출</span>
               <div className="text-2xl font-bold text-gray-900 mt-2">
-                {selectedMonth === 2 && monthlyData?.feb ? 
-                  (monthlyData.feb.ci || 0).toLocaleString('ko-KR') :
-                  selectedMonth === 3 && monthlyData?.mar ?
-                  (monthlyData.mar.ci || 0).toLocaleString('ko-KR') :
-                  selectedMonth === 4 && monthlyData?.apr ?
-                  (monthlyData.apr.ci || 0).toLocaleString('ko-KR') :
-                  '-'}
+                {selectedMonth === 2 ? (monthlyData?.feb?.pickup?.toLocaleString('ko-KR') || '-') :
+                 selectedMonth === 3 ? (monthlyData?.mar?.pickup?.toLocaleString('ko-KR') || '-') :
+                 selectedMonth === 4 ? (monthlyData?.apr?.pickup?.toLocaleString('ko-KR') || '-') :
+                 '-'}
               </div>
             </div>
             <div className="bg-white p-6 rounded-lg shadow-sm border">
