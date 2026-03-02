@@ -18,7 +18,7 @@ export async function GET(request: NextRequest) {
       .from('raw_bookings')
       .select('payment_amount')
       .gte('reservation_created_at', '2026-02-01T00:00:00')
-      .lt('reservation_created_at', '2026-03-01T00:00:00')
+      .lte('reservation_created_at', '2026-02-28T23:59:59')
 
     if (branch !== 'all') {
       feb_pickup_query = feb_pickup_query.eq('branch_name', branch)
@@ -32,7 +32,7 @@ export async function GET(request: NextRequest) {
       .from('raw_bookings')
       .select('payment_amount')
       .gte('reservation_created_at', '2026-03-01T00:00:00')
-      .lt('reservation_created_at', '2026-04-01T00:00:00')
+      .lte('reservation_created_at', '2026-03-31T23:59:59')
 
     if (branch !== 'all') {
       mar_pickup_query = mar_pickup_query.eq('branch_name', branch)
@@ -46,7 +46,7 @@ export async function GET(request: NextRequest) {
       .from('raw_bookings')
       .select('payment_amount')
       .gte('reservation_created_at', '2026-04-01T00:00:00')
-      .lt('reservation_created_at', '2026-05-01T00:00:00')
+      .lte('reservation_created_at', '2026-04-30T23:59:59')
 
     if (branch !== 'all') {
       apr_pickup_query = apr_pickup_query.eq('branch_name', branch)
@@ -60,7 +60,7 @@ export async function GET(request: NextRequest) {
       .from('raw_bookings')
       .select('payment_amount')
       .gte('check_in_date', '2026-02-01')
-      .lt('check_in_date', '2026-03-01')
+      .lte('check_in_date', '2026-02-28')
 
     if (branch !== 'all') {
       feb_ci_query = feb_ci_query.eq('branch_name', branch)
@@ -74,7 +74,7 @@ export async function GET(request: NextRequest) {
       .from('raw_bookings')
       .select('payment_amount')
       .gte('check_in_date', '2026-03-01')
-      .lt('check_in_date', '2026-04-01')
+      .lte('check_in_date', '2026-03-31')
 
     if (branch !== 'all') {
       mar_ci_query = mar_ci_query.eq('branch_name', branch)
@@ -88,7 +88,7 @@ export async function GET(request: NextRequest) {
       .from('raw_bookings')
       .select('payment_amount')
       .gte('check_in_date', '2026-04-01')
-      .lt('check_in_date', '2026-05-01')
+      .lte('check_in_date', '2026-04-30')
 
     if (branch !== 'all') {
       apr_ci_query = apr_ci_query.eq('branch_name', branch)
