@@ -13,12 +13,12 @@ export async function GET(request: NextRequest) {
       apr: { pickup: 0, ci: 0 },
     }
 
-    // 2월 픽업매출 (reservation_created_at이 2월인 것)
+    // 2월 픽업매출
     let feb_pickup_query = supabase
       .from('raw_bookings')
       .select('payment_amount')
-      .gte('reservation_created_at', '2026-02-01T00:00:00')
-      .lte('reservation_created_at', '2026-02-28T23:59:59')
+      .gte('reservation_created_at', '2026-02-01')
+      .lt('reservation_created_at', '2026-03-01')
 
     if (branch !== 'all') {
       feb_pickup_query = feb_pickup_query.eq('branch_name', branch)
@@ -27,12 +27,12 @@ export async function GET(request: NextRequest) {
     const { data: febPickupData } = await feb_pickup_query
     result.feb.pickup = febPickupData?.reduce((sum, r) => sum + (r.payment_amount || 0), 0) || 0
 
-    // 3월 픽업매출 (reservation_created_at이 3월인 것)
+    // 3월 픽업매출
     let mar_pickup_query = supabase
       .from('raw_bookings')
       .select('payment_amount')
-      .gte('reservation_created_at', '2026-03-01T00:00:00')
-      .lte('reservation_created_at', '2026-03-31T23:59:59')
+      .gte('reservation_created_at', '2026-03-01')
+      .lt('reservation_created_at', '2026-04-01')
 
     if (branch !== 'all') {
       mar_pickup_query = mar_pickup_query.eq('branch_name', branch)
@@ -41,12 +41,12 @@ export async function GET(request: NextRequest) {
     const { data: marPickupData } = await mar_pickup_query
     result.mar.pickup = marPickupData?.reduce((sum, r) => sum + (r.payment_amount || 0), 0) || 0
 
-    // 4월 픽업매출 (reservation_created_at이 4월인 것)
+    // 4월 픽업매출
     let apr_pickup_query = supabase
       .from('raw_bookings')
       .select('payment_amount')
-      .gte('reservation_created_at', '2026-04-01T00:00:00')
-      .lte('reservation_created_at', '2026-04-30T23:59:59')
+      .gte('reservation_created_at', '2026-04-01')
+      .lt('reservation_created_at', '2026-05-01')
 
     if (branch !== 'all') {
       apr_pickup_query = apr_pickup_query.eq('branch_name', branch)
@@ -55,12 +55,12 @@ export async function GET(request: NextRequest) {
     const { data: aprPickupData } = await apr_pickup_query
     result.apr.pickup = aprPickupData?.reduce((sum, r) => sum + (r.payment_amount || 0), 0) || 0
 
-    // 2월 C/I (check_in_date가 2월인 것, 전체 기간 reservation_created_at)
+    // 2월 C/I
     let feb_ci_query = supabase
       .from('raw_bookings')
       .select('payment_amount')
       .gte('check_in_date', '2026-02-01')
-      .lte('check_in_date', '2026-02-28')
+      .lt('check_in_date', '2026-03-01')
 
     if (branch !== 'all') {
       feb_ci_query = feb_ci_query.eq('branch_name', branch)
@@ -69,12 +69,12 @@ export async function GET(request: NextRequest) {
     const { data: febCiData } = await feb_ci_query
     result.feb.ci = febCiData?.reduce((sum, r) => sum + (r.payment_amount || 0), 0) || 0
 
-    // 3월 C/I (check_in_date가 3월인 것)
+    // 3월 C/I
     let mar_ci_query = supabase
       .from('raw_bookings')
       .select('payment_amount')
       .gte('check_in_date', '2026-03-01')
-      .lte('check_in_date', '2026-03-31')
+      .lt('check_in_date', '2026-04-01')
 
     if (branch !== 'all') {
       mar_ci_query = mar_ci_query.eq('branch_name', branch)
@@ -83,12 +83,12 @@ export async function GET(request: NextRequest) {
     const { data: marCiData } = await mar_ci_query
     result.mar.ci = marCiData?.reduce((sum, r) => sum + (r.payment_amount || 0), 0) || 0
 
-    // 4월 C/I (check_in_date가 4월인 것)
+    // 4월 C/I
     let apr_ci_query = supabase
       .from('raw_bookings')
       .select('payment_amount')
       .gte('check_in_date', '2026-04-01')
-      .lte('check_in_date', '2026-04-30')
+      .lt('check_in_date', '2026-05-01')
 
     if (branch !== 'all') {
       apr_ci_query = apr_ci_query.eq('branch_name', branch)
@@ -114,7 +114,6 @@ export async function GET(request: NextRequest) {
       }
     })
 
-    // 결과에 목표 추가
     result.feb.base = targetMap[2]?.base || 0
     result.feb.cumulative = result.feb.base + result.feb.ci
     result.feb.target = targetMap[2]?.target || 0
