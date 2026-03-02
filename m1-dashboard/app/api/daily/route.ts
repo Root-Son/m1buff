@@ -17,6 +17,11 @@ export async function GET(request: NextRequest) {
       ? new Date(latestData[0].reservation_created_at).toISOString().split('T')[0]
       : new Date().toISOString().split('T')[0]
 
+    // 다음날 계산
+    const nextDay = new Date(date)
+    nextDay.setDate(nextDay.getDate() + 1)
+    const nextDayStr = nextDay.toISOString().split('T')[0]
+
     const result = {
       date,
       branch,
@@ -27,12 +32,12 @@ export async function GET(request: NextRequest) {
       occ_improvement: 0,
     }
 
-    // 오늘 픽업매출 (reservation_created_at = 오늘)
+    // 오늘 픽업매출
     let pickup_query = supabase
       .from('raw_bookings')
       .select('payment_amount')
-      .gte('reservation_created_at', `${date}T00:00:00`)
-      .lte('reservation_created_at', `${date}T23:59:59`)
+      .gte('reservation_created_at', date)
+      .lt('reservation_created_at', nextDayStr)
 
     if (branch !== 'all') {
       pickup_query = pickup_query.eq('branch_name', branch)
@@ -41,14 +46,14 @@ export async function GET(request: NextRequest) {
     const { data: pickupData } = await pickup_query
     result.pickup = pickupData?.reduce((sum, r) => sum + (r.payment_amount || 0), 0) || 0
 
-    // 오늘 2월 C/I (reservation_created_at = 오늘 & check_in_date = 2월)
+    // 오늘 2월 C/I
     let feb_ci_query = supabase
       .from('raw_bookings')
       .select('payment_amount')
-      .gte('reservation_created_at', `${date}T00:00:00`)
-      .lte('reservation_created_at', `${date}T23:59:59`)
+      .gte('reservation_created_at', date)
+      .lt('reservation_created_at', nextDayStr)
       .gte('check_in_date', '2026-02-01')
-      .lte('check_in_date', '2026-02-28')
+      .lt('check_in_date', '2026-03-01')
 
     if (branch !== 'all') {
       feb_ci_query = feb_ci_query.eq('branch_name', branch)
@@ -61,10 +66,10 @@ export async function GET(request: NextRequest) {
     let mar_ci_query = supabase
       .from('raw_bookings')
       .select('payment_amount')
-      .gte('reservation_created_at', `${date}T00:00:00`)
-      .lte('reservation_created_at', `${date}T23:59:59`)
+      .gte('reservation_created_at', date)
+      .lt('reservation_created_at', nextDayStr)
       .gte('check_in_date', '2026-03-01')
-      .lte('check_in_date', '2026-03-31')
+      .lt('check_in_date', '2026-04-01')
 
     if (branch !== 'all') {
       mar_ci_query = mar_ci_query.eq('branch_name', branch)
@@ -77,10 +82,10 @@ export async function GET(request: NextRequest) {
     let apr_ci_query = supabase
       .from('raw_bookings')
       .select('payment_amount')
-      .gte('reservation_created_at', `${date}T00:00:00`)
-      .lte('reservation_created_at', `${date}T23:59:59`)
+      .gte('reservation_created_at', date)
+      .lt('reservation_created_at', nextDayStr)
       .gte('check_in_date', '2026-04-01')
-      .lte('check_in_date', '2026-04-30')
+      .lt('check_in_date', '2026-05-01')
 
     if (branch !== 'all') {
       apr_ci_query = apr_ci_query.eq('branch_name', branch)
