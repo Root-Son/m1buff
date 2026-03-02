@@ -6,7 +6,7 @@ export async function GET(request: NextRequest) {
   const branch = searchParams.get('branch') || 'all'
   
   try {
-    // 최신 데이터 날짜 가져오기
+    // 최신 데이터 날짜
     const { data: latestData } = await supabase
       .from('raw_bookings')
       .select('reservation_created_at')
@@ -17,18 +17,23 @@ export async function GET(request: NextRequest) {
       ? new Date(latestData[0].reservation_created_at).toISOString().split('T')[0]
       : new Date().toISOString().split('T')[0]
 
-    // 7일 전 날짜
+    // 7일 전
     const end = new Date(endDate)
     const start = new Date(end)
     start.setDate(start.getDate() - 6)
     const startStr = start.toISOString().split('T')[0]
 
-    // 7일간 전체 픽업매출
+    // 다음날
+    const nextDay = new Date(end)
+    nextDay.setDate(nextDay.getDate() + 1)
+    const nextDayStr = nextDay.toISOString().split('T')[0]
+
+    // 7일간 픽업매출
     let pickup_query = supabase
       .from('raw_bookings')
       .select('payment_amount')
-      .gte('reservation_created_at', `${startStr}T00:00:00`)
-      .lte('reservation_created_at', `${endDate}T23:59:59`)
+      .gte('reservation_created_at', startStr)
+      .lt('reservation_created_at', nextDayStr)
 
     if (branch !== 'all') {
       pickup_query = pickup_query.eq('branch_name', branch)
@@ -41,10 +46,10 @@ export async function GET(request: NextRequest) {
     let feb_ci_query = supabase
       .from('raw_bookings')
       .select('payment_amount')
-      .gte('reservation_created_at', `${startStr}T00:00:00`)
-      .lte('reservation_created_at', `${endDate}T23:59:59`)
+      .gte('reservation_created_at', startStr)
+      .lt('reservation_created_at', nextDayStr)
       .gte('check_in_date', '2026-02-01')
-      .lte('check_in_date', '2026-02-28')
+      .lt('check_in_date', '2026-03-01')
 
     if (branch !== 'all') {
       feb_ci_query = feb_ci_query.eq('branch_name', branch)
@@ -57,10 +62,10 @@ export async function GET(request: NextRequest) {
     let mar_ci_query = supabase
       .from('raw_bookings')
       .select('payment_amount')
-      .gte('reservation_created_at', `${startStr}T00:00:00`)
-      .lte('reservation_created_at', `${endDate}T23:59:59`)
+      .gte('reservation_created_at', startStr)
+      .lt('reservation_created_at', nextDayStr)
       .gte('check_in_date', '2026-03-01')
-      .lte('check_in_date', '2026-03-31')
+      .lt('check_in_date', '2026-04-01')
 
     if (branch !== 'all') {
       mar_ci_query = mar_ci_query.eq('branch_name', branch)
@@ -73,10 +78,10 @@ export async function GET(request: NextRequest) {
     let apr_ci_query = supabase
       .from('raw_bookings')
       .select('payment_amount')
-      .gte('reservation_created_at', `${startStr}T00:00:00`)
-      .lte('reservation_created_at', `${endDate}T23:59:59`)
+      .gte('reservation_created_at', startStr)
+      .lt('reservation_created_at', nextDayStr)
       .gte('check_in_date', '2026-04-01')
-      .lte('check_in_date', '2026-04-30')
+      .lt('check_in_date', '2026-05-01')
 
     if (branch !== 'all') {
       apr_ci_query = apr_ci_query.eq('branch_name', branch)
@@ -85,12 +90,12 @@ export async function GET(request: NextRequest) {
     const { data: aprCiData } = await apr_ci_query
     const totalAprCi = aprCiData?.reduce((sum, r) => sum + (r.payment_amount || 0), 0) || 0
 
-    // 일별 데이터 (차트용)
+    // 일별 데이터
     let daily_query = supabase
       .from('raw_bookings')
       .select('reservation_created_at, payment_amount, check_in_date')
-      .gte('reservation_created_at', `${startStr}T00:00:00`)
-      .lte('reservation_created_at', `${endDate}T23:59:59`)
+      .gte('reservation_created_at', startStr)
+      .lt('reservation_created_at', nextDayStr)
 
     if (branch !== 'all') {
       daily_query = daily_query.eq('branch_name', branch)
@@ -98,7 +103,6 @@ export async function GET(request: NextRequest) {
 
     const { data: dailyData } = await daily_query
 
-    // 날짜별 집계
     const dailyMap: Record<string, { pickup: number; feb: number; mar: number; apr: number }> = {}
 
     dailyData?.forEach((row) => {
@@ -120,7 +124,6 @@ export async function GET(request: NextRequest) {
       else if (month === 4) dailyMap[dateKey].apr += amount
     })
 
-    // 7일 배열 생성
     const days = []
     for (let i = 6; i >= 0; i--) {
       const date = new Date(end)
