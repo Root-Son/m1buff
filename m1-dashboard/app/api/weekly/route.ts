@@ -17,32 +17,91 @@ export async function GET(request: NextRequest) {
       ? new Date(latestData[0].reservation_created_at).toISOString().split('T')[0]
       : new Date().toISOString().split('T')[0]
 
-    // 7일 전 날짜 계산
+    // 7일 전 날짜
     const end = new Date(endDate)
     const start = new Date(end)
     start.setDate(start.getDate() - 6)
-
     const startStr = start.toISOString().split('T')[0]
 
-    // 데이터 가져오기
-    let query = supabase
+    // 7일간 전체 픽업매출
+    let pickup_query = supabase
+      .from('raw_bookings')
+      .select('payment_amount')
+      .gte('reservation_created_at', `${startStr}T00:00:00`)
+      .lte('reservation_created_at', `${endDate}T23:59:59`)
+
+    if (branch !== 'all') {
+      pickup_query = pickup_query.eq('branch_name', branch)
+    }
+
+    const { data: pickupData } = await pickup_query
+    const totalPickup = pickupData?.reduce((sum, r) => sum + (r.payment_amount || 0), 0) || 0
+
+    // 7일간 2월 C/I
+    let feb_ci_query = supabase
+      .from('raw_bookings')
+      .select('payment_amount')
+      .gte('reservation_created_at', `${startStr}T00:00:00`)
+      .lte('reservation_created_at', `${endDate}T23:59:59`)
+      .gte('check_in_date', '2026-02-01')
+      .lt('check_in_date', '2026-03-01')
+
+    if (branch !== 'all') {
+      feb_ci_query = feb_ci_query.eq('branch_name', branch)
+    }
+
+    const { data: febCiData } = await feb_ci_query
+    const totalFebCi = febCiData?.reduce((sum, r) => sum + (r.payment_amount || 0), 0) || 0
+
+    // 7일간 3월 C/I
+    let mar_ci_query = supabase
+      .from('raw_bookings')
+      .select('payment_amount')
+      .gte('reservation_created_at', `${startStr}T00:00:00`)
+      .lte('reservation_created_at', `${endDate}T23:59:59`)
+      .gte('check_in_date', '2026-03-01')
+      .lt('check_in_date', '2026-04-01')
+
+    if (branch !== 'all') {
+      mar_ci_query = mar_ci_query.eq('branch_name', branch)
+    }
+
+    const { data: marCiData } = await mar_ci_query
+    const totalMarCi = marCiData?.reduce((sum, r) => sum + (r.payment_amount || 0), 0) || 0
+
+    // 7일간 4월 C/I
+    let apr_ci_query = supabase
+      .from('raw_bookings')
+      .select('payment_amount')
+      .gte('reservation_created_at', `${startStr}T00:00:00`)
+      .lte('reservation_created_at', `${endDate}T23:59:59`)
+      .gte('check_in_date', '2026-04-01')
+      .lt('check_in_date', '2026-05-01')
+
+    if (branch !== 'all') {
+      apr_ci_query = apr_ci_query.eq('branch_name', branch)
+    }
+
+    const { data: aprCiData } = await apr_ci_query
+    const totalAprCi = aprCiData?.reduce((sum, r) => sum + (r.payment_amount || 0), 0) || 0
+
+    // 일별 데이터 (차트용)
+    let daily_query = supabase
       .from('raw_bookings')
       .select('reservation_created_at, payment_amount, check_in_date')
       .gte('reservation_created_at', `${startStr}T00:00:00`)
       .lte('reservation_created_at', `${endDate}T23:59:59`)
 
     if (branch !== 'all') {
-      query = query.eq('branch_name', branch)
+      daily_query = daily_query.eq('branch_name', branch)
     }
 
-    const { data, error } = await query
-
-    if (error) throw error
+    const { data: dailyData } = await daily_query
 
     // 날짜별 집계
     const dailyMap: Record<string, { pickup: number; feb: number; mar: number; apr: number }> = {}
 
-    data?.forEach((row) => {
+    dailyData?.forEach((row) => {
       const createdDate = new Date(row.reservation_created_at)
       const dateKey = createdDate.toISOString().split('T')[0]
 
@@ -62,15 +121,14 @@ export async function GET(request: NextRequest) {
     })
 
     // 7일 배열 생성
-    const result = []
+    const days = []
     for (let i = 6; i >= 0; i--) {
       const date = new Date(end)
       date.setDate(date.getDate() - i)
       const dateStr = date.toISOString().split('T')[0]
-
       const dayName = ['일', '월', '화', '수', '목', '금', '토'][date.getDay()]
 
-      result.push({
+      days.push({
         date: dateStr,
         day: dayName,
         ...dailyMap[dateStr] || { pickup: 0, feb: 0, mar: 0, apr: 0 },
@@ -81,7 +139,11 @@ export async function GET(request: NextRequest) {
       branch,
       start_date: startStr,
       end_date: endDate,
-      days: result,
+      total_pickup: totalPickup,
+      total_feb_ci: totalFebCi,
+      total_mar_ci: totalMarCi,
+      total_apr_ci: totalAprCi,
+      days,
     })
   } catch (error: any) {
     return NextResponse.json({ error: error.message }, { status: 500 })
