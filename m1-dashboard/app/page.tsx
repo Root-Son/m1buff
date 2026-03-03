@@ -103,7 +103,7 @@ export default function Dashboard() {
 
   useEffect(() => {
     fetchData()
-  }, [selectedBranch, selectedDate, selectedMonth, toplineMonth])
+  }, [selectedBranch, selectedDate, selectedMonth, toplineMonth, currentWeek])
 
   useEffect(() => {
     if (weeklyData) {
@@ -146,10 +146,16 @@ export default function Dashboard() {
     try {
       const branch = selectedBranch === '전지점' ? 'all' : selectedBranch
       const dateParam = selectedDate ? `&date=${selectedDate}` : ''
+      
+      // 주간 실적 날짜 계산
+      const weekRange = getWeekRange(currentWeek)
+      const weekStartStr = weekRange.start.toISOString().split('T')[0]
+      const weekEndStr = weekRange.end.toISOString().split('T')[0]
+      
       const [daily, monthly, weekly, topline] = await Promise.all([
         fetch(`/api/daily?branch=${branch}${dateParam}`).then(r => r.json()),
         fetch(`/api/monthly?branch=${branch}&month=${selectedMonth}`).then(r => r.json()),
-        fetch(`/api/weekly?branch=${branch}`).then(r => r.json()),
+        fetch(`/api/weekly?branch=${branch}&startDate=${weekStartStr}&endDate=${weekEndStr}`).then(r => r.json()),
         fetch(`/api/topline?branch=${branch}&month=${toplineMonth}`).then(r => r.json()),
       ])
       
