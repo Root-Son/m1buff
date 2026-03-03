@@ -42,8 +42,8 @@ export async function GET(request: NextRequest) {
     let daily_query = supabase
       .from('raw_bookings')
       .select('reservation_created_at, payment_amount, check_in_date')
-      .gte('reservation_created_at', startStr)
-      .lte('reservation_created_at', endDate)
+      .gte('reservation_created_at', startStr + ' 00:00:00')
+      .lte('reservation_created_at', endDate + ' 23:59:59')
 
     if (branch !== 'all') {
       daily_query = daily_query.eq('branch_name', branch)
