@@ -4,24 +4,34 @@ import { supabase } from '@/lib/supabase'
 export async function GET(request: NextRequest) {
   const searchParams = request.nextUrl.searchParams
   const branch = searchParams.get('branch') || 'all'
+  const startDateParam = searchParams.get('startDate')
+  const endDateParam = searchParams.get('endDate')
   
   try {
-    // 최신 데이터 날짜
-    const { data: latestData } = await supabase
-      .from('raw_bookings')
-      .select('reservation_created_at')
-      .order('reservation_created_at', { ascending: false })
-      .limit(1)
+    let startStr: string
+    let endDate: string
     
-    const endDate = latestData && latestData[0]
-      ? new Date(latestData[0].reservation_created_at).toISOString().split('T')[0]
-      : new Date().toISOString().split('T')[0]
+    if (startDateParam && endDateParam) {
+      // 파라미터로 받은 날짜 사용
+      startStr = startDateParam
+      endDate = endDateParam
+    } else {
+      // 기본: 최신 데이터 날짜 기준 최근 7일
+      const { data: latestData } = await supabase
+        .from('raw_bookings')
+        .select('reservation_created_at')
+        .order('reservation_created_at', { ascending: false })
+        .limit(1)
+      
+      endDate = latestData && latestData[0]
+        ? new Date(latestData[0].reservation_created_at).toISOString().split('T')[0]
+        : new Date().toISOString().split('T')[0]
 
-    // 7일 전
-    const end = new Date(endDate)
-    const start = new Date(end)
-    start.setDate(start.getDate() - 6)
-    const startStr = start.toISOString().split('T')[0]
+      const end = new Date(endDate)
+      const start = new Date(end)
+      start.setDate(start.getDate() - 6)
+      startStr = start.toISOString().split('T')[0]
+    }
 
     // RPC 함수 호출
     const { data, error } = await supabase
