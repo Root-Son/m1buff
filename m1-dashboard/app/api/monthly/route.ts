@@ -4,82 +4,53 @@ import { supabase } from '@/lib/supabase'
 export async function GET(request: NextRequest) {
   const searchParams = request.nextUrl.searchParams
   const branch = searchParams.get('branch') || 'all'
+  const month = parseInt(searchParams.get('month') || '2')
 
   try {
-    // 2월 데이터
-    const { data: febData, error: febError } = await supabase
-      .rpc('get_monthly_pickup', {
+    // RPC 함수 호출
+    const { data, error } = await supabase
+      .rpc('get_monthly_stats_dynamic', {
         p_branch: branch,
-        p_month: 2
+        p_month: month
       })
 
-    if (febError) throw febError
+    if (error) {
+      console.error('RPC Error:', error)
+      throw error
+    }
 
-    // 3월 데이터
-    const { data: marData, error: marError } = await supabase
-      .rpc('get_monthly_pickup', {
-        p_branch: branch,
-        p_month: 3
-      })
-
-    if (marError) throw marError
-
-    // 4월 데이터
-    const { data: aprData, error: aprError } = await supabase
-      .rpc('get_monthly_pickup', {
-        p_branch: branch,
-        p_month: 4
-      })
-
-    if (aprError) throw aprError
+    const result = data?.[0]
 
     // 목표 가져오기
     const targetBranch = branch === 'all' ? '전지점' : branch
-
     const { data: targets } = await supabase
       .from('targets')
       .select('*')
       .ilike('branch_name', `%${targetBranch}%`)
-      .in('month', [2, 3])
+      .eq('month', month)
 
-    const targetMap: Record<number, { target: number; base: number }> = {}
-    targets?.forEach((t) => {
-      targetMap[t.month] = {
-        target: t.target_amount || 0,
-        base: t.base_amount || 0,
-      }
-    })
-
-    const result = {
-      branch,
-      feb: {
-        pickup: febData?.[0]?.pickup || 0,
-        ci: febData?.[0]?.ci || 0,
-        base: targetMap[2]?.base || 0,
-        cumulative: (targetMap[2]?.base || 0) + (febData?.[0]?.ci || 0),
-        target: targetMap[2]?.target || 0,
-        achievement_rate: targetMap[2]?.target
-          ? ((targetMap[2].base || 0) + (febData?.[0]?.ci || 0)) / targetMap[2].target
-          : 0,
-      },
-      mar: {
-        pickup: marData?.[0]?.pickup || 0,
-        ci: marData?.[0]?.ci || 0,
-        base: targetMap[3]?.base || 0,
-        cumulative: (targetMap[3]?.base || 0) + (marData?.[0]?.ci || 0),
-        target: targetMap[3]?.target || 0,
-        achievement_rate: targetMap[3]?.target
-          ? ((targetMap[3].base || 0) + (marData?.[0]?.ci || 0)) / targetMap[3].target
-          : 0,
-      },
-      apr: {
-        pickup: aprData?.[0]?.pickup || 0,
-        ci: aprData?.[0]?.ci || 0,
-      },
+    let target = 0
+    let base = 0
+    if (targets && targets.length > 0) {
+      target = targets[0].target_amount || 0
+      base = targets[0].base_amount || 0
     }
 
-    return NextResponse.json(result)
+    return NextResponse.json({
+      branch,
+      month,
+      pickup: result?.pickup || 0,
+      month1: result?.month1 || 0,
+      month1_ci: result?.month1_ci || 0,
+      month2: result?.month2 || 0,
+      month2_ci: result?.month2_ci || 0,
+      month3: result?.month3 || 0,
+      month3_ci: result?.month3_ci || 0,
+      base,
+      target,
+    })
   } catch (error: any) {
+    console.error('Monthly API Error:', error)
     return NextResponse.json({ error: error.message }, { status: 500 })
   }
 }
