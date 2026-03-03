@@ -376,38 +376,14 @@ export default function Dashboard() {
             </div>
           </div>
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-            <div className="bg-white p-6 rounded-lg shadow-sm border">
-              <span className="text-sm font-medium text-gray-600">{toplineData?.prev_month || ''}월 C/I</span>
-              <div className="text-2xl font-bold text-gray-900 mt-2">
-                {toplineData?.prev_month_ci?.toLocaleString('ko-KR') || 0}
-              </div>
-            </div>
-            <div className="bg-white p-6 rounded-lg shadow-sm border">
-              <span className="text-sm font-medium text-gray-600">{toplineData?.current_month || ''}월 C/I</span>
-              <div className="text-2xl font-bold text-gray-900 mt-2">
-                {toplineData?.current_month_ci?.toLocaleString('ko-KR') || 0}
-              </div>
-              {toplineData?.achievement_rate ? (
-                <div className="mt-2 flex items-center gap-2">
-                  <span className="text-sm text-gray-500">달성률:</span>
-                  <span className="text-lg font-bold text-green-600">
-                    {(toplineData.achievement_rate * 100).toFixed(2)}%
-                  </span>
+            {toplineData?.weeks?.map((week: any) => (
+              <div key={week.week_num} className="bg-white p-6 rounded-lg shadow-sm border">
+                <span className="text-sm font-medium text-gray-600">W{week.week_num} ({week.label})</span>
+                <div className="text-2xl font-bold text-gray-900 mt-2">
+                  {week.ci_amount?.toLocaleString('ko-KR') || 0}
                 </div>
-              ) : null}
-            </div>
-            <div className="bg-white p-6 rounded-lg shadow-sm border">
-              <span className="text-sm font-medium text-gray-600">{toplineData?.next_month || ''}월 C/I</span>
-              <div className="text-2xl font-bold text-gray-900 mt-2">
-                {toplineData?.next_month_ci?.toLocaleString('ko-KR') || 0}
               </div>
-            </div>
-            <div className="bg-white p-6 rounded-lg shadow-sm border">
-              <span className="text-sm font-medium text-gray-600">{toplineData?.next_next_month || ''}월 C/I</span>
-              <div className="text-2xl font-bold text-gray-900 mt-2">
-                {toplineData?.next_next_month_ci?.toLocaleString('ko-KR') || 0}
-              </div>
-            </div>
+            ))}
           </div>
         </div>
 
