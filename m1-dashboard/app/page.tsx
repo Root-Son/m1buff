@@ -48,10 +48,12 @@ export default function Dashboard() {
   const [dailyData, setDailyData] = useState<any>(null)
   const [monthlyData, setMonthlyData] = useState<any>(null)
   const [weeklyData, setWeeklyData] = useState<any>(null)
+  const [toplineData, setToplineData] = useState<any>(null)
   const [loading, setLoading] = useState(true)
   const [selectedBranch, setSelectedBranch] = useState('전지점') // 디폴트 전지점
   const [selectedRoomType, setSelectedRoomType] = useState('all')
   const [selectedMonth, setSelectedMonth] = useState(2)
+  const [toplineMonth, setToplineMonth] = useState(3) // Topline 월 필터
   const [currentWeek, setCurrentWeek] = useState(0) // ISO week offset
   const [roomTypeWeekOffset, setRoomTypeWeekOffset] = useState<number | null>(null) // null = 백지상태
   const [selectedDate, setSelectedDate] = useState<string>('') // 일 실적 날짜 선택
@@ -100,7 +102,7 @@ export default function Dashboard() {
 
   useEffect(() => {
     fetchData()
-  }, [selectedBranch, selectedDate])
+  }, [selectedBranch, selectedDate, selectedMonth, toplineMonth])
 
   useEffect(() => {
     if (weeklyData) {
@@ -126,15 +128,17 @@ export default function Dashboard() {
     try {
       const branch = selectedBranch === '전지점' ? 'all' : selectedBranch
       const dateParam = selectedDate ? `&date=${selectedDate}` : ''
-      const [daily, monthly, weekly] = await Promise.all([
+      const [daily, monthly, weekly, topline] = await Promise.all([
         fetch(`/api/daily?branch=${branch}${dateParam}`).then(r => r.json()),
-        fetch(`/api/monthly?branch=${branch}`).then(r => r.json()),
+        fetch(`/api/monthly?branch=${branch}&month=${selectedMonth}`).then(r => r.json()),
         fetch(`/api/weekly?branch=${branch}`).then(r => r.json()),
+        fetch(`/api/topline?branch=${branch}&month=${toplineMonth}`).then(r => r.json()),
       ])
       
       setDailyData(daily)
       setMonthlyData(monthly)
       setWeeklyData(weekly)
+      setToplineData(topline)
     } catch (error) {
       console.error('데이터 로드 실패:', error)
     } finally {
@@ -351,16 +355,98 @@ export default function Dashboard() {
       </div>
 
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        {/* Topline */}
+        <div className="mb-6">
+          <div className="flex items-center justify-between mb-3">
+            <h2 className="text-sm font-semibold text-gray-500 uppercase">Topline (체크인 기준)</h2>
+            <div className="flex gap-1 p-1 bg-gray-100 rounded-lg">
+              {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12].map(month => (
+                <button
+                  key={month}
+                  onClick={() => setToplineMonth(month)}
+                  className={`px-3 py-1.5 text-sm font-medium rounded-md ${
+                    toplineMonth === month
+                      ? 'bg-white text-gray-900 shadow-sm'
+                      : 'text-gray-600 hover:text-gray-900'
+                  }`}
+                >
+                  {month}월
+                </button>
+              ))}
+            </div>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+            <div className="bg-white p-6 rounded-lg shadow-sm border">
+              <span className="text-sm font-medium text-gray-600">{toplineData?.prev_month || ''}월 C/I</span>
+              <div className="text-2xl font-bold text-gray-900 mt-2">
+                {toplineData?.prev_month_ci?.toLocaleString('ko-KR') || 0}
+              </div>
+            </div>
+            <div className="bg-white p-6 rounded-lg shadow-sm border">
+              <span className="text-sm font-medium text-gray-600">{toplineData?.current_month || ''}월 C/I</span>
+              <div className="text-2xl font-bold text-gray-900 mt-2">
+                {toplineData?.current_month_ci?.toLocaleString('ko-KR') || 0}
+              </div>
+              {toplineData?.achievement_rate ? (
+                <div className="mt-2 flex items-center gap-2">
+                  <span className="text-sm text-gray-500">달성률:</span>
+                  <span className="text-lg font-bold text-green-600">
+                    {(toplineData.achievement_rate * 100).toFixed(2)}%
+                  </span>
+                </div>
+              ) : null}
+            </div>
+            <div className="bg-white p-6 rounded-lg shadow-sm border">
+              <span className="text-sm font-medium text-gray-600">{toplineData?.next_month || ''}월 C/I</span>
+              <div className="text-2xl font-bold text-gray-900 mt-2">
+                {toplineData?.next_month_ci?.toLocaleString('ko-KR') || 0}
+              </div>
+            </div>
+            <div className="bg-white p-6 rounded-lg shadow-sm border">
+              <span className="text-sm font-medium text-gray-600">{toplineData?.next_next_month || ''}월 C/I</span>
+              <div className="text-2xl font-bold text-gray-900 mt-2">
+                {toplineData?.next_next_month_ci?.toLocaleString('ko-KR') || 0}
+              </div>
+            </div>
+          </div>
+        </div>
+
         {/* 일 실적 */}
         <div className="mb-6">
           <div className="flex items-center justify-between mb-3">
             <h2 className="text-sm font-semibold text-gray-500 uppercase">일 실적</h2>
-            <input 
-              type="date" 
-              value={selectedDate || dailyData?.date || ''}
-              onChange={(e) => setSelectedDate(e.target.value)}
-              className="px-3 py-2 border rounded-lg text-sm"
-            />
+            <div className="flex items-center gap-2">
+              <button 
+                onClick={() => {
+                  const date = new Date(selectedDate || dailyData?.date || new Date())
+                  date.setDate(date.getDate() - 1)
+                  setSelectedDate(date.toISOString().split('T')[0])
+                }}
+                className="p-2 hover:bg-gray-100 rounded-lg border"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                </svg>
+              </button>
+              <input 
+                type="date" 
+                value={selectedDate || dailyData?.date || ''}
+                onChange={(e) => setSelectedDate(e.target.value)}
+                className="px-3 py-2 border rounded-lg text-sm"
+              />
+              <button 
+                onClick={() => {
+                  const date = new Date(selectedDate || dailyData?.date || new Date())
+                  date.setDate(date.getDate() + 1)
+                  setSelectedDate(date.toISOString().split('T')[0])
+                }}
+                className="p-2 hover:bg-gray-100 rounded-lg border"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                </svg>
+              </button>
+            </div>
           </div>
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
             <div className="bg-white p-6 rounded-lg shadow-sm border">
@@ -425,21 +511,21 @@ export default function Dashboard() {
               </div>
             </div>
             <div className="bg-white p-6 rounded-lg shadow-sm border">
-              <span className="text-sm font-medium text-gray-600">2월 C/I</span>
+              <span className="text-sm font-medium text-gray-600">{weeklyData?.month1 || ''}월 C/I</span>
               <div className="text-2xl font-bold text-gray-900 mt-2">
-                {weeklyData?.total_feb_ci?.toLocaleString('ko-KR') || 0}
+                {weeklyData?.month1_ci?.toLocaleString('ko-KR') || 0}
               </div>
             </div>
             <div className="bg-white p-6 rounded-lg shadow-sm border">
-              <span className="text-sm font-medium text-gray-600">3월 C/I</span>
+              <span className="text-sm font-medium text-gray-600">{weeklyData?.month2 || ''}월 C/I</span>
               <div className="text-2xl font-bold text-gray-900 mt-2">
-                {weeklyData?.total_mar_ci?.toLocaleString('ko-KR') || 0}
+                {weeklyData?.month2_ci?.toLocaleString('ko-KR') || 0}
               </div>
             </div>
             <div className="bg-white p-6 rounded-lg shadow-sm border">
-              <span className="text-sm font-medium text-gray-600">4월 C/I</span>
+              <span className="text-sm font-medium text-gray-600">{weeklyData?.month3 || ''}월 C/I</span>
               <div className="text-2xl font-bold text-gray-900 mt-2">
-                {weeklyData?.total_apr_ci?.toLocaleString('ko-KR') || 0}
+                {weeklyData?.month3_ci?.toLocaleString('ko-KR') || 0}
               </div>
             </div>
           </div>
@@ -468,47 +554,28 @@ export default function Dashboard() {
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
             <div className="bg-white p-6 rounded-lg shadow-sm border">
               <span className="text-sm font-medium text-gray-600">픽업매출</span>
+              <div className="text-sm text-gray-400 mt-1">{selectedMonth}월</div>
               <div className="text-2xl font-bold text-gray-900 mt-2">
-                {selectedMonth === 2 ? (monthlyData?.feb?.pickup?.toLocaleString('ko-KR') || '-') :
-                 selectedMonth === 3 ? (monthlyData?.mar?.pickup?.toLocaleString('ko-KR') || '-') :
-                 selectedMonth === 4 ? (monthlyData?.apr?.pickup?.toLocaleString('ko-KR') || '-') :
-                 '-'}
+                {monthlyData?.pickup?.toLocaleString('ko-KR') || '-'}
               </div>
             </div>
             <div className="bg-white p-6 rounded-lg shadow-sm border">
-              <span className="text-sm font-medium text-gray-600">2월 C/I</span>
+              <span className="text-sm font-medium text-gray-600">{monthlyData?.month1 || ''}월 C/I</span>
               <div className="text-2xl font-bold text-gray-900 mt-2">
-                {monthlyData?.feb?.ci?.toLocaleString('ko-KR') || '-'}
-              </div>
-              <div className="mt-2 flex items-center gap-2">
-                <span className="text-sm text-gray-500">달성률:</span>
-                <span className="text-lg font-bold text-green-600">
-                  {monthlyData?.feb?.achievement_rate
-                    ? `${(monthlyData.feb.achievement_rate * 100).toFixed(2)}%`
-                    : '-'}
-                </span>
+                {monthlyData?.month1_ci?.toLocaleString('ko-KR') || '-'}
               </div>
             </div>
             <div className="bg-white p-6 rounded-lg shadow-sm border">
-              <span className="text-sm font-medium text-gray-600">3월 C/I</span>
+              <span className="text-sm font-medium text-gray-600">{monthlyData?.month2 || ''}월 C/I</span>
               <div className="text-2xl font-bold text-gray-900 mt-2">
-                {monthlyData?.mar?.ci?.toLocaleString('ko-KR') || '-'}
-              </div>
-              <div className="mt-2 flex items-center gap-2">
-                <span className="text-sm text-gray-500">달성률:</span>
-                <span className="text-lg font-bold text-yellow-600">
-                  {monthlyData?.mar?.achievement_rate
-                    ? `${(monthlyData.mar.achievement_rate * 100).toFixed(2)}%`
-                    : '-'}
-                </span>
+                {monthlyData?.month2_ci?.toLocaleString('ko-KR') || '-'}
               </div>
             </div>
             <div className="bg-white p-6 rounded-lg shadow-sm border">
-              <span className="text-sm font-medium text-gray-600">4월 C/I</span>
+              <span className="text-sm font-medium text-gray-600">{monthlyData?.month3 || ''}월 C/I</span>
               <div className="text-2xl font-bold text-gray-900 mt-2">
-                {monthlyData?.apr?.ci?.toLocaleString('ko-KR') || '-'}
+                {monthlyData?.month3_ci?.toLocaleString('ko-KR') || '-'}
               </div>
-              <div className="mt-2 text-sm text-gray-500">목표 미설정</div>
             </div>
           </div>
         </div>
