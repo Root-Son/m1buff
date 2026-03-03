@@ -103,6 +103,7 @@ export default function Dashboard() {
 
   useEffect(() => {
     fetchData()
+    fetchRoomTypeData() // 초기 로드 시에도 실행
   }, [selectedBranch, selectedDate, selectedMonth, toplineMonth, currentWeek])
 
   useEffect(() => {
