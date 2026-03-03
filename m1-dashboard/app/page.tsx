@@ -49,13 +49,14 @@ export default function Dashboard() {
   const [monthlyData, setMonthlyData] = useState<any>(null)
   const [weeklyData, setWeeklyData] = useState<any>(null)
   const [toplineData, setToplineData] = useState<any>(null)
+  const [roomTypeData, setRoomTypeData] = useState<any>(null)
   const [loading, setLoading] = useState(true)
   const [selectedBranch, setSelectedBranch] = useState('전지점') // 디폴트 전지점
   const [selectedRoomType, setSelectedRoomType] = useState('all')
   const [selectedMonth, setSelectedMonth] = useState(2)
   const [toplineMonth, setToplineMonth] = useState(3) // Topline 월 필터
   const [currentWeek, setCurrentWeek] = useState(0) // ISO week offset
-  const [roomTypeWeekOffset, setRoomTypeWeekOffset] = useState<number | null>(null) // null = 백지상태
+  const [roomTypeWeekOffset, setRoomTypeWeekOffset] = useState<number | null>(0) // 0 = 이번주 디폴트
   const [selectedDate, setSelectedDate] = useState<string>('') // 일 실적 날짜 선택
 
   // ISO Week 계산
@@ -114,14 +115,31 @@ export default function Dashboard() {
   }, [weeklyData])
 
   useEffect(() => {
-    // 백지상태(null)가 아닐 때만 렌더링
-    if (roomTypeWeekOffset !== null) {
+    // 이번주가 디폴트이므로 항상 렌더링
+    fetchRoomTypeData()
+  }, [selectedRoomType, roomTypeWeekOffset, selectedBranch])
+
+  const fetchRoomTypeData = async () => {
+    try {
+      const branch = selectedBranch === '전지점' ? 'all' : selectedBranch
+      const response = await fetch(
+        `/api/roomtype?branch=${branch}&weekOffset=${roomTypeWeekOffset}&roomType=${selectedRoomType}`
+      )
+      const data = await response.json()
+      setRoomTypeData(data)
+    } catch (error) {
+      console.error('룸타입 데이터 로드 실패:', error)
+    }
+  }
+
+  useEffect(() => {
+    if (roomTypeData) {
       renderRoomTypeChart()
     }
     return () => {
       roomTypeChartInstance.current?.destroy()
     }
-  }, [selectedRoomType, roomTypeWeekOffset])
+  }, [roomTypeData])
 
   const fetchData = async () => {
     setLoading(true)
@@ -568,19 +586,12 @@ export default function Dashboard() {
         <div className="bg-white p-6 rounded-lg shadow-sm border mb-8">
           <div className="flex items-center justify-between mb-4">
             <div>
-              <h2 className="text-lg font-bold text-gray-900">룸타입별 성과 (1주일)</h2>
-              <p className="text-sm text-gray-500 mt-1">화살표를 눌러 주차를 선택하세요</p>
+              <h2 className="text-lg font-bold text-gray-900">룸타입별 성과</h2>
             </div>
             <div className="flex items-center gap-4">
               <div className="flex items-center gap-2">
                 <button 
-                  onClick={() => {
-                    if (roomTypeWeekOffset === null) {
-                      setRoomTypeWeekOffset(0) // 첫 클릭: 이번주
-                    } else {
-                      setRoomTypeWeekOffset(roomTypeWeekOffset - 1)
-                    }
-                  }}
+                  onClick={() => setRoomTypeWeekOffset((roomTypeWeekOffset || 0) - 1)}
                   className="p-2 hover:bg-gray-100 rounded-lg border"
                 >
                   <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -588,22 +599,14 @@ export default function Dashboard() {
                   </svg>
                 </button>
                 <span className="text-sm font-medium min-w-[80px] text-center">
-                  {roomTypeWeekOffset === null 
-                    ? '-' 
-                    : roomTypeWeekOffset === 0 
+                  {roomTypeWeekOffset === 0 
                     ? '이번주' 
-                    : roomTypeWeekOffset > 0 
+                    : roomTypeWeekOffset && roomTypeWeekOffset > 0 
                     ? `+${roomTypeWeekOffset}주` 
                     : `${roomTypeWeekOffset}주`}
                 </span>
                 <button 
-                  onClick={() => {
-                    if (roomTypeWeekOffset === null) {
-                      setRoomTypeWeekOffset(0) // 첫 클릭: 이번주
-                    } else {
-                      setRoomTypeWeekOffset(roomTypeWeekOffset + 1)
-                    }
-                  }}
+                  onClick={() => setRoomTypeWeekOffset((roomTypeWeekOffset || 0) + 1)}
                   className="p-2 hover:bg-gray-100 rounded-lg border"
                 >
                   <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -641,18 +644,7 @@ export default function Dashboard() {
             </div>
           </div>
           <div className="h-96">
-            {roomTypeWeekOffset === null ? (
-              <div className="h-full flex items-center justify-center text-gray-400">
-                <div className="text-center">
-                  <svg className="w-16 h-16 mx-auto mb-4 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
-                  </svg>
-                  <p className="text-sm">화살표를 눌러 주차를 선택하세요</p>
-                </div>
-              </div>
-            ) : (
-              <canvas ref={roomTypeChartRef}></canvas>
-            )}
+            <canvas ref={roomTypeChartRef}></canvas>
           </div>
         </div>
 
