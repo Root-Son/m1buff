@@ -54,6 +54,7 @@ export default function Dashboard() {
   const [selectedMonth, setSelectedMonth] = useState(2)
   const [currentWeek, setCurrentWeek] = useState(0) // ISO week offset
   const [roomTypeWeekOffset, setRoomTypeWeekOffset] = useState<number | null>(null) // null = 백지상태
+  const [selectedDate, setSelectedDate] = useState<string>('') // 일 실적 날짜 선택
 
   // ISO Week 계산
   const getISOWeek = (date: Date) => {
@@ -99,7 +100,7 @@ export default function Dashboard() {
 
   useEffect(() => {
     fetchData()
-  }, [selectedBranch])
+  }, [selectedBranch, selectedDate])
 
   useEffect(() => {
     if (weeklyData) {
@@ -124,8 +125,9 @@ export default function Dashboard() {
     setLoading(true)
     try {
       const branch = selectedBranch === '전지점' ? 'all' : selectedBranch
+      const dateParam = selectedDate ? `&date=${selectedDate}` : ''
       const [daily, monthly, weekly] = await Promise.all([
-        fetch(`/api/daily?branch=${branch}`).then(r => r.json()),
+        fetch(`/api/daily?branch=${branch}${dateParam}`).then(r => r.json()),
         fetch(`/api/monthly?branch=${branch}`).then(r => r.json()),
         fetch(`/api/weekly?branch=${branch}`).then(r => r.json()),
       ])
@@ -349,44 +351,42 @@ export default function Dashboard() {
       </div>
 
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* 오늘 실적 */}
+        {/* 일 실적 */}
         <div className="mb-6">
-          <h2 className="text-sm font-semibold text-gray-500 uppercase mb-3">
-            오늘 실적 ({dailyData?.date})
-          </h2>
-          <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
+          <div className="flex items-center justify-between mb-3">
+            <h2 className="text-sm font-semibold text-gray-500 uppercase">일 실적</h2>
+            <input 
+              type="date" 
+              value={selectedDate || dailyData?.date || ''}
+              onChange={(e) => setSelectedDate(e.target.value)}
+              className="px-3 py-2 border rounded-lg text-sm"
+            />
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
             <div className="bg-white p-6 rounded-lg shadow-sm border">
               <span className="text-sm font-medium text-gray-600">픽업매출</span>
+              <div className="text-sm text-gray-400 mt-1">{dailyData?.date}</div>
               <div className="text-2xl font-bold text-gray-900 mt-2">
                 {dailyData?.pickup?.toLocaleString('ko-KR') || 0}
               </div>
             </div>
             <div className="bg-white p-6 rounded-lg shadow-sm border">
-              <span className="text-sm font-medium text-gray-600">2월 C/I</span>
+              <span className="text-sm font-medium text-gray-600">{dailyData?.month1 || ''}월 C/I</span>
               <div className="text-2xl font-bold text-gray-900 mt-2">
-                {dailyData?.feb_ci?.toLocaleString('ko-KR') || 0}
+                {dailyData?.month1_ci?.toLocaleString('ko-KR') || 0}
               </div>
             </div>
             <div className="bg-white p-6 rounded-lg shadow-sm border">
-              <span className="text-sm font-medium text-gray-600">3월 C/I</span>
+              <span className="text-sm font-medium text-gray-600">{dailyData?.month2 || ''}월 C/I</span>
               <div className="text-2xl font-bold text-gray-900 mt-2">
-                {dailyData?.mar_ci?.toLocaleString('ko-KR') || 0}
+                {dailyData?.month2_ci?.toLocaleString('ko-KR') || 0}
               </div>
             </div>
             <div className="bg-white p-6 rounded-lg shadow-sm border">
-              <span className="text-sm font-medium text-gray-600">4월 C/I</span>
+              <span className="text-sm font-medium text-gray-600">{dailyData?.month3 || ''}월 C/I</span>
               <div className="text-2xl font-bold text-gray-900 mt-2">
-                {dailyData?.apr_ci?.toLocaleString('ko-KR') || 0}
+                {dailyData?.month3_ci?.toLocaleString('ko-KR') || 0}
               </div>
-            </div>
-            <div className="bg-white p-6 rounded-lg shadow-sm border">
-              <span className="text-sm font-medium text-gray-600">OCC 개선률</span>
-              <div className="text-2xl font-bold text-green-600 mt-2">
-                {dailyData?.occ_improvement 
-                  ? `${(dailyData.occ_improvement * 100).toFixed(1)}%` 
-                  : '-'}
-              </div>
-              <span className="text-xs text-gray-500">D-1 대비</span>
             </div>
           </div>
         </div>
