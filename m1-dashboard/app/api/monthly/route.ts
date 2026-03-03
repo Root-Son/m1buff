@@ -6,96 +6,32 @@ export async function GET(request: NextRequest) {
   const branch = searchParams.get('branch') || 'all'
 
   try {
-    const result: any = {
-      branch,
-      feb: { pickup: 0, ci: 0 },
-      mar: { pickup: 0, ci: 0 },
-      apr: { pickup: 0, ci: 0 },
-    }
+    // 2월 데이터
+    const { data: febData, error: febError } = await supabase
+      .rpc('get_monthly_pickup', {
+        p_branch: branch,
+        p_month: 2
+      })
 
-    // 2월 픽업매출
-    let feb_pickup_query = supabase
-      .from('raw_bookings')
-      .select('payment_amount')
-      .gte('reservation_created_at', '2026-02-01')
-      .lt('reservation_created_at', '2026-03-01')
+    if (febError) throw febError
 
-    if (branch !== 'all') {
-      feb_pickup_query = feb_pickup_query.eq('branch_name', branch)
-    }
+    // 3월 데이터
+    const { data: marData, error: marError } = await supabase
+      .rpc('get_monthly_pickup', {
+        p_branch: branch,
+        p_month: 3
+      })
 
-    const { data: febPickupData } = await feb_pickup_query
-    result.feb.pickup = febPickupData?.reduce((sum, r) => sum + (r.payment_amount || 0), 0) || 0
+    if (marError) throw marError
 
-    // 3월 픽업매출
-    let mar_pickup_query = supabase
-      .from('raw_bookings')
-      .select('payment_amount')
-      .gte('reservation_created_at', '2026-03-01')
-      .lt('reservation_created_at', '2026-04-01')
+    // 4월 데이터
+    const { data: aprData, error: aprError } = await supabase
+      .rpc('get_monthly_pickup', {
+        p_branch: branch,
+        p_month: 4
+      })
 
-    if (branch !== 'all') {
-      mar_pickup_query = mar_pickup_query.eq('branch_name', branch)
-    }
-
-    const { data: marPickupData } = await mar_pickup_query
-    result.mar.pickup = marPickupData?.reduce((sum, r) => sum + (r.payment_amount || 0), 0) || 0
-
-    // 4월 픽업매출
-    let apr_pickup_query = supabase
-      .from('raw_bookings')
-      .select('payment_amount')
-      .gte('reservation_created_at', '2026-04-01')
-      .lt('reservation_created_at', '2026-05-01')
-
-    if (branch !== 'all') {
-      apr_pickup_query = apr_pickup_query.eq('branch_name', branch)
-    }
-
-    const { data: aprPickupData } = await apr_pickup_query
-    result.apr.pickup = aprPickupData?.reduce((sum, r) => sum + (r.payment_amount || 0), 0) || 0
-
-    // 2월 C/I
-    let feb_ci_query = supabase
-      .from('raw_bookings')
-      .select('payment_amount')
-      .gte('check_in_date', '2026-02-01')
-      .lt('check_in_date', '2026-03-01')
-
-    if (branch !== 'all') {
-      feb_ci_query = feb_ci_query.eq('branch_name', branch)
-    }
-
-    const { data: febCiData } = await feb_ci_query
-    result.feb.ci = febCiData?.reduce((sum, r) => sum + (r.payment_amount || 0), 0) || 0
-
-    // 3월 C/I
-    let mar_ci_query = supabase
-      .from('raw_bookings')
-      .select('payment_amount')
-      .gte('check_in_date', '2026-03-01')
-      .lt('check_in_date', '2026-04-01')
-
-    if (branch !== 'all') {
-      mar_ci_query = mar_ci_query.eq('branch_name', branch)
-    }
-
-    const { data: marCiData } = await mar_ci_query
-    result.mar.ci = marCiData?.reduce((sum, r) => sum + (r.payment_amount || 0), 0) || 0
-
-    // 4월 C/I
-    let apr_ci_query = supabase
-      .from('raw_bookings')
-      .select('payment_amount')
-      .gte('check_in_date', '2026-04-01')
-      .lt('check_in_date', '2026-05-01')
-
-    if (branch !== 'all') {
-      apr_ci_query = apr_ci_query.eq('branch_name', branch)
-    }
-
-    const { data: aprCiData } = await apr_ci_query
-    result.apr.ci = aprCiData?.reduce((sum, r) => sum + (r.payment_amount || 0), 0) || 0
+    if (aprError) throw aprError
 
     // 목표 가져오기
     const targetBranch = branch === 'all' ? '전지점' : branch
@@ -114,19 +50,33 @@ export async function GET(request: NextRequest) {
       }
     })
 
-    result.feb.base = targetMap[2]?.base || 0
-    result.feb.cumulative = result.feb.base + result.feb.ci
-    result.feb.target = targetMap[2]?.target || 0
-    result.feb.achievement_rate = result.feb.target
-      ? result.feb.cumulative / result.feb.target
-      : 0
-
-    result.mar.base = targetMap[3]?.base || 0
-    result.mar.cumulative = result.mar.base + result.mar.ci
-    result.mar.target = targetMap[3]?.target || 0
-    result.mar.achievement_rate = result.mar.target
-      ? result.mar.cumulative / result.mar.target
-      : 0
+    const result = {
+      branch,
+      feb: {
+        pickup: febData?.[0]?.pickup || 0,
+        ci: febData?.[0]?.ci || 0,
+        base: targetMap[2]?.base || 0,
+        cumulative: (targetMap[2]?.base || 0) + (febData?.[0]?.ci || 0),
+        target: targetMap[2]?.target || 0,
+        achievement_rate: targetMap[2]?.target
+          ? ((targetMap[2].base || 0) + (febData?.[0]?.ci || 0)) / targetMap[2].target
+          : 0,
+      },
+      mar: {
+        pickup: marData?.[0]?.pickup || 0,
+        ci: marData?.[0]?.ci || 0,
+        base: targetMap[3]?.base || 0,
+        cumulative: (targetMap[3]?.base || 0) + (marData?.[0]?.ci || 0),
+        target: targetMap[3]?.target || 0,
+        achievement_rate: targetMap[3]?.target
+          ? ((targetMap[3].base || 0) + (marData?.[0]?.ci || 0)) / targetMap[3].target
+          : 0,
+      },
+      apr: {
+        pickup: aprData?.[0]?.pickup || 0,
+        ci: aprData?.[0]?.ci || 0,
+      },
+    }
 
     return NextResponse.json(result)
   } catch (error: any) {
