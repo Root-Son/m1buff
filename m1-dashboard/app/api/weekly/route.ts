@@ -25,13 +25,18 @@ export async function GET(request: NextRequest) {
 
     // RPC 함수 호출
     const { data, error } = await supabase
-      .rpc('get_weekly_stats', {
+      .rpc('get_weekly_stats_dynamic', {
         p_branch: branch,
         p_start_date: startStr,
         p_end_date: endDate
       })
 
-    if (error) throw error
+    if (error) {
+      console.error('RPC Error:', error)
+      throw error
+    }
+
+    const result = data?.[0]
 
     // 일별 데이터 (차트용)
     let daily_query = supabase
@@ -46,25 +51,29 @@ export async function GET(request: NextRequest) {
 
     const { data: dailyData } = await daily_query
 
-    const dailyMap: Record<string, { pickup: number; feb: number; mar: number; apr: number }> = {}
+    const dailyMap: Record<string, { pickup: number; month1: number; month2: number; month3: number }> = {}
+    const startMonth = new Date(startStr).getMonth() + 1
 
     dailyData?.forEach((row) => {
       const createdDate = new Date(row.reservation_created_at)
       const dateKey = createdDate.toISOString().split('T')[0]
 
       if (!dailyMap[dateKey]) {
-        dailyMap[dateKey] = { pickup: 0, feb: 0, mar: 0, apr: 0 }
+        dailyMap[dateKey] = { pickup: 0, month1: 0, month2: 0, month3: 0 }
       }
 
       const amount = row.payment_amount || 0
       dailyMap[dateKey].pickup += amount
 
-      const checkinDate = new Date(row.check_in_date)
-      const month = checkinDate.getMonth() + 1
+      const checkinMonth = new Date(row.check_in_date).getMonth() + 1
 
-      if (month === 2) dailyMap[dateKey].feb += amount
-      else if (month === 3) dailyMap[dateKey].mar += amount
-      else if (month === 4) dailyMap[dateKey].apr += amount
+      if (checkinMonth === startMonth) {
+        dailyMap[dateKey].month1 += amount
+      } else if (checkinMonth === (startMonth % 12) + 1) {
+        dailyMap[dateKey].month2 += amount
+      } else if (checkinMonth === ((startMonth + 1) % 12) + 1) {
+        dailyMap[dateKey].month3 += amount
+      }
     })
 
     const days = []
@@ -77,7 +86,7 @@ export async function GET(request: NextRequest) {
       days.push({
         date: dateStr,
         day: dayName,
-        ...dailyMap[dateStr] || { pickup: 0, feb: 0, mar: 0, apr: 0 },
+        ...dailyMap[dateStr] || { pickup: 0, month1: 0, month2: 0, month3: 0 },
       })
     }
 
@@ -85,13 +94,17 @@ export async function GET(request: NextRequest) {
       branch,
       start_date: startStr,
       end_date: endDate,
-      total_pickup: data?.[0]?.total_pickup || 0,
-      total_feb_ci: data?.[0]?.total_feb_ci || 0,
-      total_mar_ci: data?.[0]?.total_mar_ci || 0,
-      total_apr_ci: data?.[0]?.total_apr_ci || 0,
+      total_pickup: result?.total_pickup || 0,
+      month1: result?.month1 || 0,
+      month1_ci: result?.month1_ci || 0,
+      month2: result?.month2 || 0,
+      month2_ci: result?.month2_ci || 0,
+      month3: result?.month3 || 0,
+      month3_ci: result?.month3_ci || 0,
       days,
     })
   } catch (error: any) {
+    console.error('Weekly API Error:', error)
     return NextResponse.json({ error: error.message }, { status: 500 })
   }
 }
