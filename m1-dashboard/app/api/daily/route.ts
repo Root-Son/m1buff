@@ -17,82 +17,14 @@ export async function GET(request: NextRequest) {
       ? new Date(latestData[0].reservation_created_at).toISOString().split('T')[0]
       : new Date().toISOString().split('T')[0]
 
-    // 다음날 계산
-    const nextDay = new Date(date)
-    nextDay.setDate(nextDay.getDate() + 1)
-    const nextDayStr = nextDay.toISOString().split('T')[0]
+    // RPC 함수 호출
+    const { data, error } = await supabase
+      .rpc('get_daily_stats', {
+        p_branch: branch,
+        p_date: date
+      })
 
-    const result = {
-      date,
-      branch,
-      pickup: 0,
-      feb_ci: 0,
-      mar_ci: 0,
-      apr_ci: 0,
-      occ_improvement: 0,
-    }
-
-    // 오늘 픽업매출
-    let pickup_query = supabase
-      .from('raw_bookings')
-      .select('payment_amount')
-      .gte('reservation_created_at', date)
-      .lt('reservation_created_at', nextDayStr)
-
-    if (branch !== 'all') {
-      pickup_query = pickup_query.eq('branch_name', branch)
-    }
-
-    const { data: pickupData } = await pickup_query
-    result.pickup = pickupData?.reduce((sum, r) => sum + (r.payment_amount || 0), 0) || 0
-
-    // 오늘 2월 C/I
-    let feb_ci_query = supabase
-      .from('raw_bookings')
-      .select('payment_amount')
-      .gte('reservation_created_at', date)
-      .lt('reservation_created_at', nextDayStr)
-      .gte('check_in_date', '2026-02-01')
-      .lt('check_in_date', '2026-03-01')
-
-    if (branch !== 'all') {
-      feb_ci_query = feb_ci_query.eq('branch_name', branch)
-    }
-
-    const { data: febCiData } = await feb_ci_query
-    result.feb_ci = febCiData?.reduce((sum, r) => sum + (r.payment_amount || 0), 0) || 0
-
-    // 오늘 3월 C/I
-    let mar_ci_query = supabase
-      .from('raw_bookings')
-      .select('payment_amount')
-      .gte('reservation_created_at', date)
-      .lt('reservation_created_at', nextDayStr)
-      .gte('check_in_date', '2026-03-01')
-      .lt('check_in_date', '2026-04-01')
-
-    if (branch !== 'all') {
-      mar_ci_query = mar_ci_query.eq('branch_name', branch)
-    }
-
-    const { data: marCiData } = await mar_ci_query
-    result.mar_ci = marCiData?.reduce((sum, r) => sum + (r.payment_amount || 0), 0) || 0
-
-    // 오늘 4월 C/I
-    let apr_ci_query = supabase
-      .from('raw_bookings')
-      .select('payment_amount')
-      .gte('reservation_created_at', date)
-      .lt('reservation_created_at', nextDayStr)
-      .gte('check_in_date', '2026-04-01')
-      .lt('check_in_date', '2026-05-01')
-
-    if (branch !== 'all') {
-      apr_ci_query = apr_ci_query.eq('branch_name', branch)
-    }
-
-    const { data: aprCiData } = await apr_ci_query
-    result.apr_ci = aprCiData?.reduce((sum, r) => sum + (r.payment_amount || 0), 0) || 0
+    if (error) throw error
 
     // OCC 개선률
     let occ_query = supabase
@@ -106,13 +38,22 @@ export async function GET(request: NextRequest) {
 
     const { data: occData } = await occ_query
 
+    let occ_improvement = 0
     if (occData && occData.length > 0) {
       const avgOcc = occData.reduce((sum, r) => sum + (r.occ_asof || 0), 0) / occData.length
       const avgOccD1 = occData.reduce((sum, r) => sum + (r.occ_1d_ago || 0), 0) / occData.length
-      result.occ_improvement = avgOcc - avgOccD1
+      occ_improvement = avgOcc - avgOccD1
     }
 
-    return NextResponse.json(result)
+    return NextResponse.json({
+      date,
+      branch,
+      pickup: data?.[0]?.pickup || 0,
+      feb_ci: data?.[0]?.feb_ci || 0,
+      mar_ci: data?.[0]?.mar_ci || 0,
+      apr_ci: data?.[0]?.apr_ci || 0,
+      occ_improvement,
+    })
   } catch (error: any) {
     return NextResponse.json({ error: error.message }, { status: 500 })
   }
