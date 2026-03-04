@@ -468,9 +468,11 @@ export default function Dashboard() {
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
             <div className="bg-white p-6 rounded-lg shadow-sm border">
               <span className="text-sm font-medium text-gray-600">픽업매출</span>
-              <div className="text-sm text-gray-400 mt-1">{dailyData?.date}</div>
               <div className="text-2xl font-bold text-gray-900 mt-2">
                 {dailyData?.pickup?.toLocaleString('ko-KR') || 0}
+              </div>
+              <div className={`text-sm mt-1 ${(dailyData?.pickup_dod || 0) >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                DoD {(dailyData?.pickup_dod || 0) >= 0 ? '+' : ''}{(dailyData?.pickup_dod || 0).toFixed(1)}%
               </div>
             </div>
             <div className="bg-white p-6 rounded-lg shadow-sm border">
@@ -478,17 +480,26 @@ export default function Dashboard() {
               <div className="text-2xl font-bold text-gray-900 mt-2">
                 {dailyData?.month1_ci?.toLocaleString('ko-KR') || 0}
               </div>
+              <div className={`text-sm mt-1 ${(dailyData?.month1_ci_dod || 0) >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                DoD {(dailyData?.month1_ci_dod || 0) >= 0 ? '+' : ''}{(dailyData?.month1_ci_dod || 0).toFixed(1)}%
+              </div>
             </div>
             <div className="bg-white p-6 rounded-lg shadow-sm border">
               <span className="text-sm font-medium text-gray-600">{dailyData?.month2 || ''}월 C/I</span>
               <div className="text-2xl font-bold text-gray-900 mt-2">
                 {dailyData?.month2_ci?.toLocaleString('ko-KR') || 0}
               </div>
+              <div className={`text-sm mt-1 ${(dailyData?.month2_ci_dod || 0) >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                DoD {(dailyData?.month2_ci_dod || 0) >= 0 ? '+' : ''}{(dailyData?.month2_ci_dod || 0).toFixed(1)}%
+              </div>
             </div>
             <div className="bg-white p-6 rounded-lg shadow-sm border">
               <span className="text-sm font-medium text-gray-600">{dailyData?.month3 || ''}월 C/I</span>
               <div className="text-2xl font-bold text-gray-900 mt-2">
                 {dailyData?.month3_ci?.toLocaleString('ko-KR') || 0}
+              </div>
+              <div className={`text-sm mt-1 ${(dailyData?.month3_ci_dod || 0) >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                DoD {(dailyData?.month3_ci_dod || 0) >= 0 ? '+' : ''}{(dailyData?.month3_ci_dod || 0).toFixed(1)}%
               </div>
             </div>
           </div>
@@ -526,11 +537,17 @@ export default function Dashboard() {
               <div className="text-2xl font-bold text-gray-900 mt-2">
                 {weeklyData?.total_pickup?.toLocaleString('ko-KR') || 0}
               </div>
+              <div className={`text-sm mt-1 ${(weeklyData?.total_pickup_wow || 0) >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                WoW {(weeklyData?.total_pickup_wow || 0) >= 0 ? '+' : ''}{(weeklyData?.total_pickup_wow || 0).toFixed(1)}%
+              </div>
             </div>
             <div className="bg-white p-6 rounded-lg shadow-sm border">
               <span className="text-sm font-medium text-gray-600">{weeklyData?.month1 || ''}월 C/I</span>
               <div className="text-2xl font-bold text-gray-900 mt-2">
                 {weeklyData?.month1_ci?.toLocaleString('ko-KR') || 0}
+              </div>
+              <div className={`text-sm mt-1 ${(weeklyData?.month1_ci_wow || 0) >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                WoW {(weeklyData?.month1_ci_wow || 0) >= 0 ? '+' : ''}{(weeklyData?.month1_ci_wow || 0).toFixed(1)}%
               </div>
             </div>
             <div className="bg-white p-6 rounded-lg shadow-sm border">
@@ -538,11 +555,17 @@ export default function Dashboard() {
               <div className="text-2xl font-bold text-gray-900 mt-2">
                 {weeklyData?.month2_ci?.toLocaleString('ko-KR') || 0}
               </div>
+              <div className={`text-sm mt-1 ${(weeklyData?.month2_ci_wow || 0) >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                WoW {(weeklyData?.month2_ci_wow || 0) >= 0 ? '+' : ''}{(weeklyData?.month2_ci_wow || 0).toFixed(1)}%
+              </div>
             </div>
             <div className="bg-white p-6 rounded-lg shadow-sm border">
               <span className="text-sm font-medium text-gray-600">{weeklyData?.month3 || ''}월 C/I</span>
               <div className="text-2xl font-bold text-gray-900 mt-2">
                 {weeklyData?.month3_ci?.toLocaleString('ko-KR') || 0}
+              </div>
+              <div className={`text-sm mt-1 ${(weeklyData?.month3_ci_wow || 0) >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                WoW {(weeklyData?.month3_ci_wow || 0) >= 0 ? '+' : ''}{(weeklyData?.month3_ci_wow || 0).toFixed(1)}%
               </div>
             </div>
           </div>
@@ -571,9 +594,11 @@ export default function Dashboard() {
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
             <div className="bg-white p-6 rounded-lg shadow-sm border">
               <span className="text-sm font-medium text-gray-600">픽업매출</span>
-              <div className="text-sm text-gray-400 mt-1">{selectedMonth}월</div>
               <div className="text-2xl font-bold text-gray-900 mt-2">
                 {monthlyData?.pickup?.toLocaleString('ko-KR') || '-'}
+              </div>
+              <div className={`text-sm mt-1 ${(monthlyData?.pickup_mom || 0) >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                MoM {(monthlyData?.pickup_mom || 0) >= 0 ? '+' : ''}{(monthlyData?.pickup_mom || 0).toFixed(1)}%
               </div>
             </div>
             <div className="bg-white p-6 rounded-lg shadow-sm border">
@@ -581,17 +606,26 @@ export default function Dashboard() {
               <div className="text-2xl font-bold text-gray-900 mt-2">
                 {monthlyData?.month1_ci?.toLocaleString('ko-KR') || '-'}
               </div>
+              <div className={`text-sm mt-1 ${(monthlyData?.month1_ci_mom || 0) >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                MoM {(monthlyData?.month1_ci_mom || 0) >= 0 ? '+' : ''}{(monthlyData?.month1_ci_mom || 0).toFixed(1)}%
+              </div>
             </div>
             <div className="bg-white p-6 rounded-lg shadow-sm border">
               <span className="text-sm font-medium text-gray-600">{monthlyData?.month2 || ''}월 C/I</span>
               <div className="text-2xl font-bold text-gray-900 mt-2">
                 {monthlyData?.month2_ci?.toLocaleString('ko-KR') || '-'}
               </div>
+              <div className={`text-sm mt-1 ${(monthlyData?.month2_ci_mom || 0) >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                MoM {(monthlyData?.month2_ci_mom || 0) >= 0 ? '+' : ''}{(monthlyData?.month2_ci_mom || 0).toFixed(1)}%
+              </div>
             </div>
             <div className="bg-white p-6 rounded-lg shadow-sm border">
               <span className="text-sm font-medium text-gray-600">{monthlyData?.month3 || ''}월 C/I</span>
               <div className="text-2xl font-bold text-gray-900 mt-2">
                 {monthlyData?.month3_ci?.toLocaleString('ko-KR') || '-'}
+              </div>
+              <div className={`text-sm mt-1 ${(monthlyData?.month3_ci_mom || 0) >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                MoM {(monthlyData?.month3_ci_mom || 0) >= 0 ? '+' : ''}{(monthlyData?.month3_ci_mom || 0).toFixed(1)}%
               </div>
             </div>
           </div>
