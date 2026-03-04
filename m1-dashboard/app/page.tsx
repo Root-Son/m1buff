@@ -56,7 +56,7 @@ export default function Dashboard() {
   const [monthlySummaryData, setMonthlySummaryData] = useState<any>(null)
   const [loading, setLoading] = useState(true)
   const [selectedBranch, setSelectedBranch] = useState('전지점') // 디폴트 전지점
-  const [selectedRoomType, setSelectedRoomType] = useState('')
+  const [selectedRoomType, setSelectedRoomType] = useState('all')
   const [selectedMonth, setSelectedMonth] = useState(2)
   const [toplineMonth, setToplineMonth] = useState(3) // Topline 월 필터
   const [currentWeek, setCurrentWeek] = useState(0) // ISO week offset
@@ -306,6 +306,13 @@ export default function Dashboard() {
             order: 1
           },
           {
+            label: 'D-1 OCC',
+            data: roomTypeData.days.map((d: any) => d.occ_1d_ago),
+            backgroundColor: 'rgba(59, 130, 246, 0.6)',
+            yAxisID: 'y',
+            order: 2
+          },
+          {
             label: 'OCC',
             data: roomTypeData.days.map((d: any) => d.occ),
             backgroundColor: 'rgba(16, 185, 129, 0.7)',
@@ -332,16 +339,6 @@ export default function Dashboard() {
             pointRadius: 3,
             yAxisID: 'y1',
             order: 0
-          },
-          {
-            label: 'ADR',
-            data: roomTypeData.days.map((d: any) => d.adr || null),
-            type: 'line',
-            borderColor: 'rgba(99, 102, 241, 1)',
-            borderWidth: 2,
-            pointRadius: 3,
-            yAxisID: 'y1',
-            order: 0
           }
         ],
       },
@@ -359,7 +356,7 @@ export default function Dashboard() {
               if (context.dataset.yAxisID === 'y') {
                 return (value * 100).toFixed(0) + '%'
               } else {
-                return new Intl.NumberFormat('ko-KR').format(value)
+                return new Intl.NumberFormat('ko-KR', { notation: 'compact' }).format(value)
               }
             },
             font: { size: 10 }
@@ -401,13 +398,6 @@ export default function Dashboard() {
   }
 
   const roomTypes = selectedBranch === '전지점' ? [] : (BRANCH_ROOMTYPES[selectedBranch] || [])
-  
-  // 지점 변경시 첫 번째 룸타입 자동 선택
-  React.useEffect(() => {
-    if (roomTypes.length > 0 && (!selectedRoomType || selectedRoomType === 'all')) {
-      setSelectedRoomType(roomTypes[0])
-    }
-  }, [selectedBranch, roomTypes.length, selectedRoomType])
 
   if (loading) {
     return (
@@ -428,7 +418,7 @@ export default function Dashboard() {
       </header>
 
       {/* 지점 필터 */}
-      <div className="bg-white border-b border-gray-200 sticky top-[73px] z-40">
+      <div className="bg-white border-b border-gray-200">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
           <div className="flex flex-wrap gap-2">
             {BRANCHES.map((branch) => (
@@ -530,37 +520,9 @@ export default function Dashboard() {
               </button>
             </div>
           </div>
-          {/* 전일 실적 */}
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-2">
-            <div className="bg-gray-50 p-4 rounded-lg border">
-              <span className="text-xs font-medium text-gray-500">[{prevDailyData?.date ? new Date(prevDailyData.date).toLocaleDateString('ko-KR', {month: 'short', day: 'numeric'}) : '-'}] 픽업매출</span>
-              <div className="text-xl font-bold text-gray-700 mt-1">
-                {prevDailyData?.pickup?.toLocaleString('ko-KR') || 0}
-              </div>
-            </div>
-            <div className="bg-gray-50 p-4 rounded-lg border">
-              <span className="text-xs font-medium text-gray-500">[{prevDailyData?.date ? new Date(prevDailyData.date).toLocaleDateString('ko-KR', {month: 'short', day: 'numeric'}) : '-'}] {prevDailyData?.month1 || ''}월 C/I 매출</span>
-              <div className="text-xl font-bold text-gray-700 mt-1">
-                {prevDailyData?.month1_ci?.toLocaleString('ko-KR') || 0}
-              </div>
-            </div>
-            <div className="bg-gray-50 p-4 rounded-lg border">
-              <span className="text-xs font-medium text-gray-500">[{prevDailyData?.date ? new Date(prevDailyData.date).toLocaleDateString('ko-KR', {month: 'short', day: 'numeric'}) : '-'}] {prevDailyData?.month2 || ''}월 C/I 매출</span>
-              <div className="text-xl font-bold text-gray-700 mt-1">
-                {prevDailyData?.month2_ci?.toLocaleString('ko-KR') || 0}
-              </div>
-            </div>
-            <div className="bg-gray-50 p-4 rounded-lg border">
-              <span className="text-xs font-medium text-gray-500">[{prevDailyData?.date ? new Date(prevDailyData.date).toLocaleDateString('ko-KR', {month: 'short', day: 'numeric'}) : '-'}] {prevDailyData?.month3 || ''}월 C/I 매출</span>
-              <div className="text-xl font-bold text-gray-700 mt-1">
-                {prevDailyData?.month3_ci?.toLocaleString('ko-KR') || 0}
-              </div>
-            </div>
-          </div>
-          {/* 당일 실적 */}
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
             <div className="bg-white p-6 rounded-lg shadow-sm border">
-              <span className="text-sm font-medium text-gray-600">[{dailyData?.date ? new Date(dailyData.date).toLocaleDateString('ko-KR', {month: 'short', day: 'numeric'}) : '-'}] 픽업매출</span>
+              <span className="text-sm font-medium text-gray-600">픽업매출</span>
               <div className="text-2xl font-bold text-gray-900 mt-2">
                 {dailyData?.pickup?.toLocaleString('ko-KR') || 0}
               </div>
@@ -569,7 +531,7 @@ export default function Dashboard() {
               </div>
             </div>
             <div className="bg-white p-6 rounded-lg shadow-sm border">
-              <span className="text-sm font-medium text-gray-600">[{dailyData?.date ? new Date(dailyData.date).toLocaleDateString('ko-KR', {month: 'short', day: 'numeric'}) : '-'}] {dailyData?.month1 || ''}월 C/I 매출</span>
+              <span className="text-sm font-medium text-gray-600">{dailyData?.month1 || ''}월 C/I</span>
               <div className="text-2xl font-bold text-gray-900 mt-2">
                 {dailyData?.month1_ci?.toLocaleString('ko-KR') || 0}
               </div>
@@ -578,7 +540,7 @@ export default function Dashboard() {
               </div>
             </div>
             <div className="bg-white p-6 rounded-lg shadow-sm border">
-              <span className="text-sm font-medium text-gray-600">[{dailyData?.date ? new Date(dailyData.date).toLocaleDateString('ko-KR', {month: 'short', day: 'numeric'}) : '-'}] {dailyData?.month2 || ''}월 C/I 매출</span>
+              <span className="text-sm font-medium text-gray-600">{dailyData?.month2 || ''}월 C/I</span>
               <div className="text-2xl font-bold text-gray-900 mt-2">
                 {dailyData?.month2_ci?.toLocaleString('ko-KR') || 0}
               </div>
@@ -587,7 +549,7 @@ export default function Dashboard() {
               </div>
             </div>
             <div className="bg-white p-6 rounded-lg shadow-sm border">
-              <span className="text-sm font-medium text-gray-600">[{dailyData?.date ? new Date(dailyData.date).toLocaleDateString('ko-KR', {month: 'short', day: 'numeric'}) : '-'}] {dailyData?.month3 || ''}월 C/I 매출</span>
+              <span className="text-sm font-medium text-gray-600">{dailyData?.month3 || ''}월 C/I</span>
               <div className="text-2xl font-bold text-gray-900 mt-2">
                 {dailyData?.month3_ci?.toLocaleString('ko-KR') || 0}
               </div>
@@ -611,8 +573,8 @@ export default function Dashboard() {
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
                 </svg>
               </button>
-              <span className="text-sm font-medium min-w-[120px] text-center">
-                {weekRange.label}
+              <span className="text-sm font-medium min-w-[200px] text-center">
+                {weekRange.year}년 W{weekRange.week} ({weekRange.label})
               </span>
               <button 
                 onClick={() => setCurrentWeek(currentWeek + 1)}
@@ -624,42 +586,14 @@ export default function Dashboard() {
               </button>
             </div>
           </div>
-          {/* 전주 실적 */}
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-2">
-            <div className="bg-gray-50 p-4 rounded-lg border">
-              <span className="text-xs font-medium text-gray-500">[전주] 픽업매출</span>
-              <div className="text-xl font-bold text-gray-700 mt-1">
-                {prevWeeklyData?.total_pickup?.toLocaleString('ko-KR') || 0}
-              </div>
-            </div>
-            <div className="bg-gray-50 p-4 rounded-lg border">
-              <span className="text-xs font-medium text-gray-500">[전주] {prevWeeklyData?.month1 || ''}월 C/I</span>
-              <div className="text-xl font-bold text-gray-700 mt-1">
-                {prevWeeklyData?.month1_ci?.toLocaleString('ko-KR') || 0}
-              </div>
-            </div>
-            <div className="bg-gray-50 p-4 rounded-lg border">
-              <span className="text-xs font-medium text-gray-500">[전주] {prevWeeklyData?.month2 || ''}월 C/I</span>
-              <div className="text-xl font-bold text-gray-700 mt-1">
-                {prevWeeklyData?.month2_ci?.toLocaleString('ko-KR') || 0}
-              </div>
-            </div>
-            <div className="bg-gray-50 p-4 rounded-lg border">
-              <span className="text-xs font-medium text-gray-500">[전주] {prevWeeklyData?.month3 || ''}월 C/I</span>
-              <div className="text-xl font-bold text-gray-700 mt-1">
-                {prevWeeklyData?.month3_ci?.toLocaleString('ko-KR') || 0}
-              </div>
-            </div>
-          </div>
-          {/* 이번주 실적 */}
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
             <div className="bg-white p-6 rounded-lg shadow-sm border">
-              <span className="text-sm font-medium text-gray-600">[{weekRange.label}] 픽업매출</span>
+              <span className="text-sm font-medium text-gray-600">픽업매출</span>
               <div className="text-2xl font-bold text-gray-900 mt-2">
                 {weeklyData?.total_pickup?.toLocaleString('ko-KR') || 0}
               </div>
-              <div className={`text-sm mt-1 ${(weeklyData?.pickup_wow || 0) >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                WoW {(weeklyData?.pickup_wow || 0) >= 0 ? '+' : ''}{(weeklyData?.pickup_wow || 0).toFixed(1)}%
+              <div className={`text-sm mt-1 ${(weeklyData?.total_pickup_wow || 0) >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                WoW {(weeklyData?.total_pickup_wow || 0) >= 0 ? '+' : ''}{(weeklyData?.total_pickup_wow || 0).toFixed(1)}%
               </div>
             </div>
             <div className="bg-white p-6 rounded-lg shadow-sm border">
@@ -751,7 +685,6 @@ export default function Dashboard() {
             </div>
           </div>
         </div>
-        )}
 
         {/* 최근 7일 차트 */}
         <div className="bg-white p-6 rounded-lg shadow-sm border mb-8">
@@ -796,6 +729,16 @@ export default function Dashboard() {
               </div>
               {roomTypes.length > 0 && (
                 <div className="flex gap-1 p-1 bg-gray-100 rounded-lg">
+                  <button
+                    onClick={() => setSelectedRoomType('all')}
+                    className={`px-3 py-1.5 text-sm font-medium rounded-md ${
+                      selectedRoomType === 'all'
+                        ? 'bg-white text-gray-900 shadow-sm'
+                        : 'text-gray-600'
+                    }`}
+                  >
+                    전체
+                  </button>
                   {roomTypes.map(rt => (
                     <button
                       key={rt}
@@ -818,6 +761,74 @@ export default function Dashboard() {
           </div>
         </div>
 
+        {/* 룸타입별 상세 데이터 */}
+        <div className="bg-white rounded-lg shadow-sm border">
+          <div className="p-6 border-b">
+            <div className="flex items-center justify-between">
+              <div>
+                <h2 className="text-lg font-bold text-gray-900">룸타입별 상세 데이터</h2>
+                <p className="text-sm text-gray-500 mt-1">선택한 월의 지표</p>
+              </div>
+              <div className="flex gap-1 p-1 bg-gray-100 rounded-lg">
+                {[2, 3, 4].map(month => (
+                  <button
+                    key={month}
+                    onClick={() => setSelectedMonth(month)}
+                    className={`px-4 py-1.5 text-sm font-medium rounded-md ${
+                      selectedMonth === month
+                        ? 'bg-white text-gray-900 shadow-sm'
+                        : 'text-gray-600'
+                    }`}
+                  >
+                    {month}월
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="w-full">
+              <thead className="bg-gray-50 border-b">
+                <tr>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">룸타입</th>
+                  <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">OCC</th>
+                  <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">가드레일</th>
+                  <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">셋팅가</th>
+                  <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">ADR</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y">
+                {monthlySummaryData?.room_types?.length > 0 ? (
+                  monthlySummaryData.room_types.map((rt: any) => (
+                    <tr key={rt.room_type} className="hover:bg-gray-50">
+                      <td className="px-6 py-4 text-sm font-medium text-gray-900">{rt.room_type}</td>
+                      <td className="px-6 py-4 text-sm text-right font-medium text-green-600">
+                        {rt.occ !== null ? (rt.occ * 100).toFixed(0) + '%' : '-'}
+                      </td>
+                      <td className="px-6 py-4 text-sm text-right text-gray-900">
+                        {rt.guardrail !== null ? rt.guardrail.toLocaleString('ko-KR') : '-'}
+                      </td>
+                      <td className="px-6 py-4 text-sm text-right text-gray-900">
+                        {rt.yolo !== null ? rt.yolo.toLocaleString('ko-KR') : '-'}
+                      </td>
+                      <td className="px-6 py-4 text-sm text-right text-gray-900">
+                        {rt.adr !== null ? rt.adr.toLocaleString('ko-KR') : '-'}
+                      </td>
+                    </tr>
+                  ))
+                ) : (
+                  <tr className="hover:bg-gray-50">
+                    <td className="px-6 py-4 text-sm font-medium text-gray-900">전체</td>
+                    <td className="px-6 py-4 text-sm text-right font-medium text-green-600">-</td>
+                    <td className="px-6 py-4 text-sm text-right text-gray-900">-</td>
+                    <td className="px-6 py-4 text-sm text-right text-gray-900">-</td>
+                    <td className="px-6 py-4 text-sm text-right text-gray-900">-</td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
       </main>
     </div>
   )
