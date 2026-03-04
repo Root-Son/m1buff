@@ -22,28 +22,16 @@ export async function GET(request: NextRequest) {
       throw error
     }
 
-    // 월 전체 체크인 매출
-    let ciQuery = supabase
-      .from('raw_bookings')
-      .select('payment_amount')
-      .gte('check_in_date', `${year}-${month.toString().padStart(2, '0')}-01`)
-      .lt('check_in_date', month === 12 
-        ? `${year + 1}-01-01` 
-        : `${year}-${(month + 1).toString().padStart(2, '0')}-01`)
+    // 월 전체 체크인 매출 (RPC 주차별 합계)
+    const totalCI = (data || []).reduce((sum: number, week: any) => sum + (week.ci_amount || 0), 0)
 
-    if (branch !== 'all') {
-      ciQuery = ciQuery.eq('branch_name', branch)
-    }
-
-    const { data: ciData } = await ciQuery
-    const totalCI = ciData?.reduce((sum, row) => sum + (row.payment_amount || 0), 0) || 0
-
-    // 목표 매출
+    // 목표 매출 (전지점 제외)
     let targetQuery = supabase
       .from('targets')
       .select('target_amount')
       .eq('month', month)
       .eq('year', year)
+      .neq('branch_name', '전지점')
 
     if (branch !== 'all') {
       targetQuery = targetQuery.eq('branch_name', branch)
