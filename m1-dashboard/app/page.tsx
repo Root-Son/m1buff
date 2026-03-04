@@ -306,13 +306,6 @@ export default function Dashboard() {
             order: 1
           },
           {
-            label: 'D-1 OCC',
-            data: roomTypeData.days.map((d: any) => d.occ_1d_ago),
-            backgroundColor: 'rgba(59, 130, 246, 0.6)',
-            yAxisID: 'y',
-            order: 2
-          },
-          {
             label: 'OCC',
             data: roomTypeData.days.map((d: any) => d.occ),
             backgroundColor: 'rgba(16, 185, 129, 0.7)',
@@ -336,6 +329,16 @@ export default function Dashboard() {
             borderColor: 'rgba(239, 68, 68, 1)',
             borderWidth: 2,
             borderDash: [5, 5],
+            pointRadius: 3,
+            yAxisID: 'y1',
+            order: 0
+          },
+          {
+            label: 'ADR',
+            data: roomTypeData.days.map((d: any) => d.adr || null),
+            type: 'line',
+            borderColor: 'rgba(99, 102, 241, 1)',
+            borderWidth: 2,
             pointRadius: 3,
             yAxisID: 'y1',
             order: 0
