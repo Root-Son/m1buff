@@ -359,7 +359,7 @@ export default function Dashboard() {
               if (context.dataset.yAxisID === 'y') {
                 return (value * 100).toFixed(0) + '%'
               } else {
-                return new Intl.NumberFormat('ko-KR', { notation: 'compact' }).format(value)
+                return new Intl.NumberFormat('ko-KR').format(value)
               }
             },
             font: { size: 10 }
