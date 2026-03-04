@@ -56,7 +56,7 @@ export default function Dashboard() {
   const [monthlySummaryData, setMonthlySummaryData] = useState<any>(null)
   const [loading, setLoading] = useState(true)
   const [selectedBranch, setSelectedBranch] = useState('전지점') // 디폴트 전지점
-  const [selectedRoomType, setSelectedRoomType] = useState('all')
+  const [selectedRoomType, setSelectedRoomType] = useState('')
   const [selectedMonth, setSelectedMonth] = useState(2)
   const [toplineMonth, setToplineMonth] = useState(3) // Topline 월 필터
   const [currentWeek, setCurrentWeek] = useState(0) // ISO week offset
@@ -401,6 +401,13 @@ export default function Dashboard() {
   }
 
   const roomTypes = selectedBranch === '전지점' ? [] : (BRANCH_ROOMTYPES[selectedBranch] || [])
+  
+  // 지점 변경시 첫 번째 룸타입 자동 선택
+  useEffect(() => {
+    if (roomTypes.length > 0 && (!selectedRoomType || selectedRoomType === 'all')) {
+      setSelectedRoomType(roomTypes[0])
+    }
+  }, [selectedBranch, roomTypes.length])
 
   if (loading) {
     return (
