@@ -47,8 +47,10 @@ const BRANCH_ROOMTYPES: Record<string, string[]> = {
 
 export default function Dashboard() {
   const [dailyData, setDailyData] = useState<any>(null)
+  const [prevDailyData, setPrevDailyData] = useState<any>(null)
   const [monthlyData, setMonthlyData] = useState<any>(null)
   const [weeklyData, setWeeklyData] = useState<any>(null)
+  const [prevWeeklyData, setPrevWeeklyData] = useState<any>(null)
   const [toplineData, setToplineData] = useState<any>(null)
   const [roomTypeData, setRoomTypeData] = useState<any>(null)
   const [monthlySummaryData, setMonthlySummaryData] = useState<any>(null)
@@ -164,21 +166,36 @@ export default function Dashboard() {
       const branch = selectedBranch === '전지점' ? 'all' : selectedBranch
       const dateParam = selectedDate ? `&date=${selectedDate}` : ''
       
+      // 전일 날짜 계산
+      const currentDate = selectedDate ? new Date(selectedDate) : new Date()
+      const prevDate = new Date(currentDate)
+      prevDate.setDate(currentDate.getDate() - 1)
+      const prevDateStr = prevDate.toISOString().split('T')[0]
+      
       // 주간 실적 날짜 계산
       const weekRange = getWeekRange(currentWeek)
       const weekStartStr = weekRange.start.toISOString().split('T')[0]
       const weekEndStr = weekRange.end.toISOString().split('T')[0]
       
-      const [daily, monthly, weekly, topline] = await Promise.all([
+      // 전주 날짜 계산
+      const prevWeekRange = getWeekRange(currentWeek - 1)
+      const prevWeekStartStr = prevWeekRange.start.toISOString().split('T')[0]
+      const prevWeekEndStr = prevWeekRange.end.toISOString().split('T')[0]
+      
+      const [daily, prevDaily, monthly, weekly, prevWeekly, topline] = await Promise.all([
         fetch(`/api/daily?branch=${branch}${dateParam}`).then(r => r.json()),
+        fetch(`/api/daily?branch=${branch}&date=${prevDateStr}`).then(r => r.json()),
         fetch(`/api/monthly?branch=${branch}&month=${selectedMonth}`).then(r => r.json()),
         fetch(`/api/weekly?branch=${branch}&startDate=${weekStartStr}&endDate=${weekEndStr}`).then(r => r.json()),
+        fetch(`/api/weekly?branch=${branch}&startDate=${prevWeekStartStr}&endDate=${prevWeekEndStr}`).then(r => r.json()),
         fetch(`/api/topline?branch=${branch}&month=${toplineMonth}`).then(r => r.json()),
       ])
       
       setDailyData(daily)
+      setPrevDailyData(prevDaily)
       setMonthlyData(monthly)
       setWeeklyData(weekly)
+      setPrevWeeklyData(prevWeekly)
       setToplineData(topline)
     } catch (error) {
       console.error('데이터 로드 실패:', error)
@@ -503,9 +520,37 @@ export default function Dashboard() {
               </button>
             </div>
           </div>
+          {/* 전일 실적 */}
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-2">
+            <div className="bg-gray-50 p-4 rounded-lg border">
+              <span className="text-xs font-medium text-gray-500">{prevDailyData?.date ? new Date(prevDailyData.date).toLocaleDateString('ko-KR', {month: 'short', day: 'numeric'}) : '-'} 픽업매출</span>
+              <div className="text-xl font-bold text-gray-700 mt-1">
+                {prevDailyData?.pickup?.toLocaleString('ko-KR') || 0}
+              </div>
+            </div>
+            <div className="bg-gray-50 p-4 rounded-lg border">
+              <span className="text-xs font-medium text-gray-500">{prevDailyData?.date ? new Date(prevDailyData.date).toLocaleDateString('ko-KR', {month: 'short', day: 'numeric'}) : '-'} {prevDailyData?.month1 || ''}월 C/I</span>
+              <div className="text-xl font-bold text-gray-700 mt-1">
+                {prevDailyData?.month1_ci?.toLocaleString('ko-KR') || 0}
+              </div>
+            </div>
+            <div className="bg-gray-50 p-4 rounded-lg border">
+              <span className="text-xs font-medium text-gray-500">{prevDailyData?.date ? new Date(prevDailyData.date).toLocaleDateString('ko-KR', {month: 'short', day: 'numeric'}) : '-'} {prevDailyData?.month2 || ''}월 C/I</span>
+              <div className="text-xl font-bold text-gray-700 mt-1">
+                {prevDailyData?.month2_ci?.toLocaleString('ko-KR') || 0}
+              </div>
+            </div>
+            <div className="bg-gray-50 p-4 rounded-lg border">
+              <span className="text-xs font-medium text-gray-500">{prevDailyData?.date ? new Date(prevDailyData.date).toLocaleDateString('ko-KR', {month: 'short', day: 'numeric'}) : '-'} {prevDailyData?.month3 || ''}월 C/I</span>
+              <div className="text-xl font-bold text-gray-700 mt-1">
+                {prevDailyData?.month3_ci?.toLocaleString('ko-KR') || 0}
+              </div>
+            </div>
+          </div>
+          {/* 당일 실적 */}
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
             <div className="bg-white p-6 rounded-lg shadow-sm border">
-              <span className="text-sm font-medium text-gray-600">픽업매출</span>
+              <span className="text-sm font-medium text-gray-600">{dailyData?.date ? new Date(dailyData.date).toLocaleDateString('ko-KR', {month: 'short', day: 'numeric'}) : '-'} 픽업매출</span>
               <div className="text-2xl font-bold text-gray-900 mt-2">
                 {dailyData?.pickup?.toLocaleString('ko-KR') || 0}
               </div>
@@ -514,7 +559,7 @@ export default function Dashboard() {
               </div>
             </div>
             <div className="bg-white p-6 rounded-lg shadow-sm border">
-              <span className="text-sm font-medium text-gray-600">{dailyData?.month1 || ''}월 C/I</span>
+              <span className="text-sm font-medium text-gray-600">{dailyData?.date ? new Date(dailyData.date).toLocaleDateString('ko-KR', {month: 'short', day: 'numeric'}) : '-'} {dailyData?.month1 || ''}월 C/I</span>
               <div className="text-2xl font-bold text-gray-900 mt-2">
                 {dailyData?.month1_ci?.toLocaleString('ko-KR') || 0}
               </div>
@@ -523,7 +568,7 @@ export default function Dashboard() {
               </div>
             </div>
             <div className="bg-white p-6 rounded-lg shadow-sm border">
-              <span className="text-sm font-medium text-gray-600">{dailyData?.month2 || ''}월 C/I</span>
+              <span className="text-sm font-medium text-gray-600">{dailyData?.date ? new Date(dailyData.date).toLocaleDateString('ko-KR', {month: 'short', day: 'numeric'}) : '-'} {dailyData?.month2 || ''}월 C/I</span>
               <div className="text-2xl font-bold text-gray-900 mt-2">
                 {dailyData?.month2_ci?.toLocaleString('ko-KR') || 0}
               </div>
@@ -532,7 +577,7 @@ export default function Dashboard() {
               </div>
             </div>
             <div className="bg-white p-6 rounded-lg shadow-sm border">
-              <span className="text-sm font-medium text-gray-600">{dailyData?.month3 || ''}월 C/I</span>
+              <span className="text-sm font-medium text-gray-600">{dailyData?.date ? new Date(dailyData.date).toLocaleDateString('ko-KR', {month: 'short', day: 'numeric'}) : '-'} {dailyData?.month3 || ''}월 C/I</span>
               <div className="text-2xl font-bold text-gray-900 mt-2">
                 {dailyData?.month3_ci?.toLocaleString('ko-KR') || 0}
               </div>
@@ -556,8 +601,8 @@ export default function Dashboard() {
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
                 </svg>
               </button>
-              <span className="text-sm font-medium min-w-[200px] text-center">
-                {weekRange.year}년 W{weekRange.week} ({weekRange.label})
+              <span className="text-sm font-medium min-w-[120px] text-center">
+                {weekRange.label}
               </span>
               <button 
                 onClick={() => setCurrentWeek(currentWeek + 1)}
@@ -569,14 +614,42 @@ export default function Dashboard() {
               </button>
             </div>
           </div>
+          {/* 전주 실적 */}
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-2">
+            <div className="bg-gray-50 p-4 rounded-lg border">
+              <span className="text-xs font-medium text-gray-500">전주 픽업매출</span>
+              <div className="text-xl font-bold text-gray-700 mt-1">
+                {prevWeeklyData?.pickup?.toLocaleString('ko-KR') || 0}
+              </div>
+            </div>
+            <div className="bg-gray-50 p-4 rounded-lg border">
+              <span className="text-xs font-medium text-gray-500">전주 {prevWeeklyData?.month1 || ''}월 C/I</span>
+              <div className="text-xl font-bold text-gray-700 mt-1">
+                {prevWeeklyData?.month1_ci?.toLocaleString('ko-KR') || 0}
+              </div>
+            </div>
+            <div className="bg-gray-50 p-4 rounded-lg border">
+              <span className="text-xs font-medium text-gray-500">전주 {prevWeeklyData?.month2 || ''}월 C/I</span>
+              <div className="text-xl font-bold text-gray-700 mt-1">
+                {prevWeeklyData?.month2_ci?.toLocaleString('ko-KR') || 0}
+              </div>
+            </div>
+            <div className="bg-gray-50 p-4 rounded-lg border">
+              <span className="text-xs font-medium text-gray-500">전주 {prevWeeklyData?.month3 || ''}월 C/I</span>
+              <div className="text-xl font-bold text-gray-700 mt-1">
+                {prevWeeklyData?.month3_ci?.toLocaleString('ko-KR') || 0}
+              </div>
+            </div>
+          </div>
+          {/* 이번주 실적 */}
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
             <div className="bg-white p-6 rounded-lg shadow-sm border">
               <span className="text-sm font-medium text-gray-600">픽업매출</span>
               <div className="text-2xl font-bold text-gray-900 mt-2">
-                {weeklyData?.total_pickup?.toLocaleString('ko-KR') || 0}
+                {weeklyData?.pickup?.toLocaleString('ko-KR') || 0}
               </div>
-              <div className={`text-sm mt-1 ${(weeklyData?.total_pickup_wow || 0) >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                WoW {(weeklyData?.total_pickup_wow || 0) >= 0 ? '+' : ''}{(weeklyData?.total_pickup_wow || 0).toFixed(1)}%
+              <div className={`text-sm mt-1 ${(weeklyData?.pickup_wow || 0) >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                WoW {(weeklyData?.pickup_wow || 0) >= 0 ? '+' : ''}{(weeklyData?.pickup_wow || 0).toFixed(1)}%
               </div>
             </div>
             <div className="bg-white p-6 rounded-lg shadow-sm border">
