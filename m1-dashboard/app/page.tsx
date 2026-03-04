@@ -751,6 +751,7 @@ export default function Dashboard() {
             </div>
           </div>
         </div>
+        )}
 
         {/* 최근 7일 차트 */}
         <div className="bg-white p-6 rounded-lg shadow-sm border mb-8">
@@ -761,6 +762,7 @@ export default function Dashboard() {
         </div>
 
         {/* 룸타입별 성과 */}
+        {selectedBranch !== '전지점' && (
         <div className="bg-white p-6 rounded-lg shadow-sm border mb-8">
           <div className="flex items-center justify-between mb-4">
             <div>
