@@ -403,11 +403,11 @@ export default function Dashboard() {
   const roomTypes = selectedBranch === '전지점' ? [] : (BRANCH_ROOMTYPES[selectedBranch] || [])
   
   // 지점 변경시 첫 번째 룸타입 자동 선택
-  useEffect(() => {
+  React.useEffect(() => {
     if (roomTypes.length > 0 && (!selectedRoomType || selectedRoomType === 'all')) {
       setSelectedRoomType(roomTypes[0])
     }
-  }, [selectedBranch, roomTypes.length])
+  }, [selectedBranch, roomTypes.length, selectedRoomType])
 
   if (loading) {
     return (
