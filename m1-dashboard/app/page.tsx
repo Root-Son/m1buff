@@ -236,64 +236,45 @@ export default function Dashboard() {
   }
 
   const renderRoomTypeChart = () => {
-    if (!roomTypeChartRef.current) return
+    if (!roomTypeChartRef.current || !roomTypeData?.days) return
 
     roomTypeChartInstance.current?.destroy()
 
     const ctx = roomTypeChartRef.current.getContext('2d')
     if (!ctx) return
 
-    // 샘플 데이터
-    const dates = ['2/27 (금)', '2/28 (토)', '3/1 (일)', '3/2 (월)', '3/3 (화)', '3/4 (수)', '3/5 (목)']
-    const occD7 = [0.65, 0.68, 0.72, 0.70, 0.75, 0.73, 0.78]
-    const occD1 = [0.68, 0.71, 0.75, 0.73, 0.78, 0.76, 0.80]
-    const occ = [0.70, 0.73, 0.77, 0.75, 0.80, 0.78, 0.82]
-    const guardrail = [85000, 85000, 90000, 92000, 95000, 93000, 98000]
-    const yolo = [82000, 82000, 87000, 89000, 92000, 90000, 95000]
+    // 실제 데이터
+    const labels = roomTypeData.days.map((d: any) => {
+      const date = new Date(d.date)
+      const dayName = ['일', '월', '화', '수', '목', '금', '토'][date.getDay()]
+      return `${date.getMonth() + 1}/${date.getDate()} (${dayName})`
+    })
 
     const config: ChartConfiguration = {
       type: 'bar',
       data: {
-        labels: dates,
+        labels,
         datasets: [
           {
             label: 'D-7 OCC',
-            data: occD7,
+            data: roomTypeData.days.map((d: any) => d.occ_7d_ago),
             backgroundColor: 'rgba(156, 163, 175, 0.6)',
             yAxisID: 'y',
             order: 1
           },
           {
             label: 'D-1 OCC',
-            data: occD1,
+            data: roomTypeData.days.map((d: any) => d.occ_1d_ago),
             backgroundColor: 'rgba(59, 130, 246, 0.6)',
             yAxisID: 'y',
             order: 2
           },
           {
             label: 'OCC',
-            data: occ,
+            data: roomTypeData.days.map((d: any) => d.occ),
             backgroundColor: 'rgba(16, 185, 129, 0.7)',
             yAxisID: 'y',
             order: 3
-          },
-          {
-            label: '가드레일',
-            data: guardrail,
-            type: 'line',
-            borderColor: 'rgba(239, 68, 68, 1)',
-            borderWidth: 2,
-            pointRadius: 3,
-            yAxisID: 'y1'
-          },
-          {
-            label: '셋팅가',
-            data: yolo,
-            type: 'line',
-            borderColor: 'rgba(245, 158, 11, 1)',
-            borderWidth: 2,
-            pointRadius: 3,
-            yAxisID: 'y1'
           }
         ]
       },
