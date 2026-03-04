@@ -339,10 +339,10 @@ export default function Dashboard() {
           }
         }
       }
-        ]
-      },
-      options: {
-        responsive: true,
+    }
+
+    roomTypeChartInstance.current = new Chart(ctx, config)
+  }
         maintainAspectRatio: false,
         plugins: {
           legend: { position: 'top' },
