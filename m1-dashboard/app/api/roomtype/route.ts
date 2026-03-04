@@ -134,7 +134,7 @@ export async function GET(request: NextRequest) {
       occ: d.count > 0 ? d.occ / d.count : 0,
       occ_1d_ago: d.count > 0 ? d.occ_1d_ago / d.count : 0,
       occ_7d_ago: d.count > 0 ? d.occ_7d_ago / d.count : 0,
-      adr: d.adr_count > 0 ? Math.round((d.adr / d.adr_count) / 100) : null,
+      adr: d.adr_count > 0 ? Math.round((d.adr / d.adr_count) * 1000) : null,
       yolo_price: d.yolo_count > 0 ? Math.round(d.yolo_price / d.yolo_count) : 0,
       guardrail_price: d.guardrail_count > 0 ? Math.round(d.guardrail_price / d.guardrail_count) : null,
     }))
