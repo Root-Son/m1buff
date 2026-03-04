@@ -1,154 +1,146 @@
-import { NextRequest, NextResponse } from 'next/server'
-import { supabase } from '@/lib/supabase'
+/**
+ * 가드레일(최저판매가이드)만 동기화
+ * 
+ * 참고: 띄어쓰기 차이로 중복이 발생할 수 있으므로
+ * CSV 업로드를 권장합니다!
+ */
 
-export async function GET(request: NextRequest) {
-  const searchParams = request.nextUrl.searchParams
-  const branch = searchParams.get('branch') || 'all'
-  const weekOffset = parseInt(searchParams.get('weekOffset') || '0')
-  const roomType = searchParams.get('roomType') || 'all'
+const CONFIG = {
+  SUPABASE_URL: 'https://ttohmprndoenrxfywmkf.supabase.co',
+  SUPABASE_KEY: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InR0b2htcHJuZG9lbnJ4Znl3bWtmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzIxODMyMzcsImV4cCI6MjA4Nzc1OTIzN30.gHh62pUigjne-WiF-A5AiDswnD2cBIJS2b4oDJuNT6U',
+  SHEET_NAME: '최저판매가이드'
+}
 
-  try {
-    // 기준일 (오늘 + weekOffset)
-    const today = new Date()
-    today.setDate(today.getDate() + (weekOffset * 7))
-    
-    // 해당 주의 일요일(week end)
-    const dayOfWeek = today.getDay()
-    const endDate = new Date(today)
-    endDate.setDate(today.getDate() + (7 - dayOfWeek) % 7)
-    
-    // 시작일 (일요일 - 6일 = 월요일)
-    const startDate = new Date(endDate)
-    startDate.setDate(endDate.getDate() - 6)
-    
-    const startStr = startDate.toISOString().split('T')[0]
-    const endStr = endDate.toISOString().split('T')[0]
-
-    // OCC 데이터 조회
-    let query = supabase
-      .from('branch_room_occ')
-      .select('date, room_type, occ, occ_1d_ago, occ_7d_ago, delta_1d_pp, adr')
-      .gte('date', startStr)
-      .lte('date', endStr)
-      .order('date')
-      .order('room_type')
-
-    if (branch !== 'all') {
-      query = query.eq('branch_name', branch)
-    }
-
-    if (roomType !== 'all') {
-      query = query.eq('room_type', roomType)
-    }
-
-    const { data, error } = await query
-
-    if (error) throw error
-
-    // YOLO 가격 조회
-    let yolo_query = supabase
-      .from('yolo_prices')
-      .select('date, room_type, price')
-      .gte('date', startStr)
-      .lte('date', endStr)
-
-    if (branch !== 'all') {
-      yolo_query = yolo_query.eq('branch_name', branch)
-    }
-
-    if (roomType !== 'all') {
-      yolo_query = yolo_query.eq('room_type', roomType)
-    }
-
-    const { data: yoloData } = await yolo_query
-
-    // 가드레일 가격 조회
-    let guardrail_query = supabase
-      .from('price_guide')
-      .select('date, room_type, min_price')
-      .gte('date', startStr)
-      .lte('date', endStr)
-
-    if (branch !== 'all') {
-      guardrail_query = guardrail_query.eq('branch_name', branch)
-    }
-
-    if (roomType !== 'all') {
-      guardrail_query = guardrail_query.eq('room_type', roomType)
-    }
-
-    const { data: guardrailData } = await guardrail_query
-
-    // 날짜별로 그룹화
-    const dailyData: Record<string, any> = {}
-    
-    data?.forEach((row) => {
-      const date = row.date
-      if (!dailyData[date]) {
-        dailyData[date] = {
-          date,
-          occ: 0,
-          occ_1d_ago: 0,
-          occ_7d_ago: 0,
-          adr: 0,
-          adr_count: 0,
-          yolo_price: 0,
-          yolo_count: 0,
-          guardrail_price: 0,
-          guardrail_count: 0,
-          count: 0
-        }
-      }
-      
-      dailyData[date].occ += (row.occ || 0)
-      dailyData[date].occ_1d_ago += (row.occ_1d_ago || 0)
-      dailyData[date].occ_7d_ago += (row.occ_7d_ago || 0)
-      if (row.adr && row.adr > 0) {
-        dailyData[date].adr += row.adr
-        dailyData[date].adr_count += 1
-      }
-      dailyData[date].count += 1
-    })
-
-    // YOLO 가격 추가
-    yoloData?.forEach((row) => {
-      const date = row.date
-      if (dailyData[date]) {
-        dailyData[date].yolo_price += (row.price || 0)
-        dailyData[date].yolo_count += 1
-      }
-    })
-
-    // 가드레일 가격 추가
-    guardrailData?.forEach((row) => {
-      const date = row.date
-      if (dailyData[date]) {
-        dailyData[date].guardrail_price += (row.min_price || 0)
-        dailyData[date].guardrail_count += 1
-      }
-    })
-
-    // 평균 계산
-    const days = Object.values(dailyData).map((d: any) => ({
-      date: d.date,
-      occ: d.count > 0 ? d.occ / d.count : 0,
-      occ_1d_ago: d.count > 0 ? d.occ_1d_ago / d.count : 0,
-      occ_7d_ago: d.count > 0 ? d.occ_7d_ago / d.count : 0,
-      adr: d.adr_count > 0 ? Math.round((d.adr / d.adr_count) * 1000) : null,
-      yolo_price: d.yolo_count > 0 ? Math.round(d.yolo_price / d.yolo_count) : 0,
-      guardrail_price: d.guardrail_count > 0 ? Math.round(d.guardrail_price / d.guardrail_count) : null,
-    }))
-
-    return NextResponse.json({
-      branch,
-      roomType,
-      weekOffset,
-      startDate: startStr,
-      endDate: endStr,
-      days,
-    })
-  } catch (error: any) {
-    console.error('Roomtype API Error:', error)
-    return NextResponse.json({ error: error.message }, { status: 500 })
+function SYNC_PRICE_GUIDE() {
+  const ui = SpreadsheetApp.getUi()
+  
+  const result = ui.alert(
+    '⚠️ 가드레일 동기화',
+    'Apps Script보다 CSV 업로드를 권장합니다.\n\n계속하시겠습니까?',
+    ui.ButtonSet.YES_NO
+  )
+  
+  if (result !== ui.Button.YES) {
+    return
   }
+  
+  try {
+    Logger.log('=== 가드레일 동기화 시작 ===')
+    
+    // 1. 기존 데이터 삭제
+    deleteAllData('price_guide')
+    Logger.log('기존 가드레일 데이터 삭제 완료')
+    
+    // 2. 새 데이터 가져오기
+    const ss = SpreadsheetApp.getActiveSpreadsheet()
+    const sheet = ss.getSheetByName(CONFIG.SHEET_NAME)
+    
+    if (!sheet) {
+      throw new Error('시트를 찾을 수 없습니다: ' + CONFIG.SHEET_NAME)
+    }
+    
+    const lastRow = sheet.getLastRow()
+    if (lastRow < 2) {
+      throw new Error('데이터가 없습니다')
+    }
+    
+    const values = sheet.getRange(2, 1, lastRow - 1, 4).getValues()
+    
+    const seen = {}
+    const data = []
+    
+    for (let i = 0; i < values.length; i++) {
+      const row = values[i]
+      
+      const date = row[0]
+      let branchName = String(row[1] || '').trim()
+      let roomType = String(row[2] || '').trim()
+      const price = row[3]
+      
+      if (!date) continue
+      if (!branchName || branchName === '-') continue
+      if (!roomType || roomType === '-') continue
+      if (!price || price === '-' || price === 0 || price === '') continue
+      
+      // 띄어쓰기 제거
+      branchName = branchName.replace(/\s+/g, '')
+      roomType = roomType.replace(/\s+/g, '')
+      
+      const dateStr = formatDate(date)
+      const key = dateStr + '|||' + branchName + '|||' + roomType
+      
+      if (seen[key]) continue
+      seen[key] = true
+      
+      data.push({
+        date: dateStr,
+        branch_name: branchName,
+        room_type: roomType,
+        min_price: price
+      })
+    }
+    
+    Logger.log('가드레일 데이터: ' + data.length + '개')
+    
+    // 3. 한 번에 업로드
+    insertData('price_guide', data)
+    
+    Logger.log('=== 가드레일 동기화 완료 ===')
+    ui.alert('✅ 가드레일 동기화 완료!\n\n총 ' + data.length + '개 업로드')
+    
+  } catch (error) {
+    Logger.log('❌ 에러: ' + error.message)
+    ui.alert('❌ 가드레일 동기화 실패!\n\n' + error.message)
+  }
+}
+
+function deleteAllData(tableName) {
+  const url = CONFIG.SUPABASE_URL + '/rest/v1/' + tableName + '?branch_name=neq.IMPOSSIBLE_VALUE'
+  
+  const options = {
+    method: 'delete',
+    headers: {
+      'apikey': CONFIG.SUPABASE_KEY,
+      'Authorization': 'Bearer ' + CONFIG.SUPABASE_KEY
+    },
+    muteHttpExceptions: true
+  }
+  
+  const response = UrlFetchApp.fetch(url, options)
+  const statusCode = response.getResponseCode()
+  
+  if (statusCode !== 204 && statusCode !== 200) {
+    throw new Error('삭제 실패 (' + statusCode + '): ' + response.getContentText())
+  }
+}
+
+function insertData(tableName, data) {
+  const url = CONFIG.SUPABASE_URL + '/rest/v1/' + tableName
+  
+  const options = {
+    method: 'post',
+    contentType: 'application/json',
+    headers: {
+      'apikey': CONFIG.SUPABASE_KEY,
+      'Authorization': 'Bearer ' + CONFIG.SUPABASE_KEY
+    },
+    payload: JSON.stringify(data),
+    muteHttpExceptions: true
+  }
+  
+  const response = UrlFetchApp.fetch(url, options)
+  const statusCode = response.getResponseCode()
+  
+  if (statusCode !== 201 && statusCode !== 200) {
+    throw new Error('업로드 실패 (' + statusCode + '): ' + response.getContentText())
+  }
+}
+
+function formatDate(date) {
+  if (!date) return null
+  const d = new Date(date)
+  const year = d.getFullYear()
+  const month = String(d.getMonth() + 1).padStart(2, '0')
+  const day = String(d.getDate()).padStart(2, '0')
+  return year + '-' + month + '-' + day
 }
