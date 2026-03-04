@@ -27,7 +27,7 @@ export async function GET(request: NextRequest) {
     // OCC 데이터 조회
     let query = supabase
       .from('branch_room_occ')
-      .select('date, room_type, occ, occ_1d_ago, occ_7d_ago, delta_1d_pp')
+      .select('date, room_type, occ, occ_1d_ago, occ_7d_ago, delta_1d_pp, adr')
       .gte('date', startStr)
       .lte('date', endStr)
       .order('date')
@@ -90,6 +90,8 @@ export async function GET(request: NextRequest) {
           occ: 0,
           occ_1d_ago: 0,
           occ_7d_ago: 0,
+          adr: 0,
+          adr_count: 0,
           yolo_price: 0,
           yolo_count: 0,
           guardrail_price: 0,
@@ -101,6 +103,10 @@ export async function GET(request: NextRequest) {
       dailyData[date].occ += (row.occ || 0)
       dailyData[date].occ_1d_ago += (row.occ_1d_ago || 0)
       dailyData[date].occ_7d_ago += (row.occ_7d_ago || 0)
+      if (row.adr && row.adr > 0) {
+        dailyData[date].adr += row.adr
+        dailyData[date].adr_count += 1
+      }
       dailyData[date].count += 1
     })
 
@@ -128,6 +134,7 @@ export async function GET(request: NextRequest) {
       occ: d.count > 0 ? d.occ / d.count : 0,
       occ_1d_ago: d.count > 0 ? d.occ_1d_ago / d.count : 0,
       occ_7d_ago: d.count > 0 ? d.occ_7d_ago / d.count : 0,
+      adr: d.adr_count > 0 ? d.adr / d.adr_count : null,
       yolo_price: d.yolo_count > 0 ? d.yolo_price / d.yolo_count : 0,
       guardrail_price: d.guardrail_count > 0 ? d.guardrail_price / d.guardrail_count : null,
     }))
