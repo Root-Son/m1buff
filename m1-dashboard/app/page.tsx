@@ -296,6 +296,17 @@ export default function Dashboard() {
             pointRadius: 3,
             yAxisID: 'y1',
             order: 0
+          },
+          {
+            label: '가드레일',
+            data: roomTypeData.days.map((d: any) => d.guardrail_price || null),
+            type: 'line',
+            borderColor: 'rgba(239, 68, 68, 1)',
+            borderWidth: 2,
+            borderDash: [5, 5],
+            pointRadius: 3,
+            yAxisID: 'y1',
+            order: 0
           }
         ],
       },
