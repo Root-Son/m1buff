@@ -4,40 +4,64 @@ import { supabase } from '@/lib/supabase'
 export async function GET(request: NextRequest) {
   const searchParams = request.nextUrl.searchParams
   const branch = searchParams.get('branch') || 'all'
-  const month = parseInt(searchParams.get('month') || '3')
-
+  const monthParam = searchParams.get('month')
+  
   try {
-    // RPC 함수 호출
+    const month = monthParam ? parseInt(monthParam) : new Date().getMonth() + 1
+    const year = 2026
+
     const { data, error } = await supabase
       .rpc('get_topline_weekly_checkin', {
         p_branch: branch,
         p_month: month,
-        p_year: 2026
+        p_year: year
       })
 
     if (error) {
-      console.error('RPC Error:', error)
+      console.error('Topline RPC Error:', error)
       throw error
     }
 
-    // 응답 포맷
-    const weeks = data?.map((week: any) => {
-      const start = new Date(week.start_date)
-      const end = new Date(week.end_date)
-      
-      return {
-        week_num: week.week_num,
-        start_date: week.start_date,
-        end_date: week.end_date,
-        label: `${start.getMonth() + 1}/${start.getDate()}~${end.getMonth() + 1}/${end.getDate()}`,
-        ci_amount: week.ci_amount || 0,
-      }
-    }) || []
+    // 월 전체 체크인 매출
+    let ciQuery = supabase
+      .from('raw_bookings')
+      .select('payment_amount')
+      .gte('check_in_date', `${year}-${month.toString().padStart(2, '0')}-01`)
+      .lt('check_in_date', month === 12 
+        ? `${year + 1}-01-01` 
+        : `${year}-${(month + 1).toString().padStart(2, '0')}-01`)
+
+    if (branch !== 'all') {
+      ciQuery = ciQuery.eq('branch_name', branch)
+    }
+
+    const { data: ciData } = await ciQuery
+    const totalCI = ciData?.reduce((sum, row) => sum + (row.payment_amount || 0), 0) || 0
+
+    // 목표 매출
+    let targetQuery = supabase
+      .from('targets')
+      .select('target_amount')
+      .eq('month', month)
+      .eq('year', year)
+
+    if (branch !== 'all') {
+      targetQuery = targetQuery.eq('branch_name', branch)
+    }
+
+    const { data: targetData } = await targetQuery
+    const totalTarget = targetData?.reduce((sum, row) => sum + (row.target_amount || 0), 0) || 0
+
+    const achievement = totalTarget > 0 ? (totalCI / totalTarget) * 100 : 0
 
     return NextResponse.json({
       branch,
       month,
-      weeks,
+      year,
+      total_ci: totalCI,
+      total_target: totalTarget,
+      achievement_rate: achievement,
+      weeks: data || []
     })
   } catch (error: any) {
     console.error('Topline API Error:', error)
