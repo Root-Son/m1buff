@@ -103,12 +103,16 @@ export async function GET(request: NextRequest) {
       start_date: startStr,
       end_date: endDate,
       total_pickup: result?.total_pickup || 0,
+      total_pickup_wow: result?.total_pickup_wow || 0,
       month1: result?.month1 || 0,
       month1_ci: result?.month1_ci || 0,
+      month1_ci_wow: result?.month1_ci_wow || 0,
       month2: result?.month2 || 0,
       month2_ci: result?.month2_ci || 0,
+      month2_ci_wow: result?.month2_ci_wow || 0,
       month3: result?.month3 || 0,
       month3_ci: result?.month3_ci || 0,
+      month3_ci_wow: result?.month3_ci_wow || 0,
       days,
     })
   } catch (error: any) {
