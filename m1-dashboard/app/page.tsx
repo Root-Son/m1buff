@@ -523,25 +523,25 @@ export default function Dashboard() {
           {/* 전일 실적 */}
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-2">
             <div className="bg-gray-50 p-4 rounded-lg border">
-              <span className="text-xs font-medium text-gray-500">{prevDailyData?.date ? new Date(prevDailyData.date).toLocaleDateString('ko-KR', {month: 'short', day: 'numeric'}) : '-'} 픽업매출</span>
+              <span className="text-xs font-medium text-gray-500">[{prevDailyData?.date ? new Date(prevDailyData.date).toLocaleDateString('ko-KR', {month: 'short', day: 'numeric'}) : '-'}] 픽업매출</span>
               <div className="text-xl font-bold text-gray-700 mt-1">
                 {prevDailyData?.pickup?.toLocaleString('ko-KR') || 0}
               </div>
             </div>
             <div className="bg-gray-50 p-4 rounded-lg border">
-              <span className="text-xs font-medium text-gray-500">{prevDailyData?.date ? new Date(prevDailyData.date).toLocaleDateString('ko-KR', {month: 'short', day: 'numeric'}) : '-'} {prevDailyData?.month1 || ''}월 C/I</span>
+              <span className="text-xs font-medium text-gray-500">[{prevDailyData?.date ? new Date(prevDailyData.date).toLocaleDateString('ko-KR', {month: 'short', day: 'numeric'}) : '-'}] {prevDailyData?.month1 || ''}월 C/I 매출</span>
               <div className="text-xl font-bold text-gray-700 mt-1">
                 {prevDailyData?.month1_ci?.toLocaleString('ko-KR') || 0}
               </div>
             </div>
             <div className="bg-gray-50 p-4 rounded-lg border">
-              <span className="text-xs font-medium text-gray-500">{prevDailyData?.date ? new Date(prevDailyData.date).toLocaleDateString('ko-KR', {month: 'short', day: 'numeric'}) : '-'} {prevDailyData?.month2 || ''}월 C/I</span>
+              <span className="text-xs font-medium text-gray-500">[{prevDailyData?.date ? new Date(prevDailyData.date).toLocaleDateString('ko-KR', {month: 'short', day: 'numeric'}) : '-'}] {prevDailyData?.month2 || ''}월 C/I 매출</span>
               <div className="text-xl font-bold text-gray-700 mt-1">
                 {prevDailyData?.month2_ci?.toLocaleString('ko-KR') || 0}
               </div>
             </div>
             <div className="bg-gray-50 p-4 rounded-lg border">
-              <span className="text-xs font-medium text-gray-500">{prevDailyData?.date ? new Date(prevDailyData.date).toLocaleDateString('ko-KR', {month: 'short', day: 'numeric'}) : '-'} {prevDailyData?.month3 || ''}월 C/I</span>
+              <span className="text-xs font-medium text-gray-500">[{prevDailyData?.date ? new Date(prevDailyData.date).toLocaleDateString('ko-KR', {month: 'short', day: 'numeric'}) : '-'}] {prevDailyData?.month3 || ''}월 C/I 매출</span>
               <div className="text-xl font-bold text-gray-700 mt-1">
                 {prevDailyData?.month3_ci?.toLocaleString('ko-KR') || 0}
               </div>
@@ -550,7 +550,7 @@ export default function Dashboard() {
           {/* 당일 실적 */}
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
             <div className="bg-white p-6 rounded-lg shadow-sm border">
-              <span className="text-sm font-medium text-gray-600">{dailyData?.date ? new Date(dailyData.date).toLocaleDateString('ko-KR', {month: 'short', day: 'numeric'}) : '-'} 픽업매출</span>
+              <span className="text-sm font-medium text-gray-600">[{dailyData?.date ? new Date(dailyData.date).toLocaleDateString('ko-KR', {month: 'short', day: 'numeric'}) : '-'}] 픽업매출</span>
               <div className="text-2xl font-bold text-gray-900 mt-2">
                 {dailyData?.pickup?.toLocaleString('ko-KR') || 0}
               </div>
@@ -559,7 +559,7 @@ export default function Dashboard() {
               </div>
             </div>
             <div className="bg-white p-6 rounded-lg shadow-sm border">
-              <span className="text-sm font-medium text-gray-600">{dailyData?.date ? new Date(dailyData.date).toLocaleDateString('ko-KR', {month: 'short', day: 'numeric'}) : '-'} {dailyData?.month1 || ''}월 C/I</span>
+              <span className="text-sm font-medium text-gray-600">[{dailyData?.date ? new Date(dailyData.date).toLocaleDateString('ko-KR', {month: 'short', day: 'numeric'}) : '-'}] {dailyData?.month1 || ''}월 C/I 매출</span>
               <div className="text-2xl font-bold text-gray-900 mt-2">
                 {dailyData?.month1_ci?.toLocaleString('ko-KR') || 0}
               </div>
@@ -568,7 +568,7 @@ export default function Dashboard() {
               </div>
             </div>
             <div className="bg-white p-6 rounded-lg shadow-sm border">
-              <span className="text-sm font-medium text-gray-600">{dailyData?.date ? new Date(dailyData.date).toLocaleDateString('ko-KR', {month: 'short', day: 'numeric'}) : '-'} {dailyData?.month2 || ''}월 C/I</span>
+              <span className="text-sm font-medium text-gray-600">[{dailyData?.date ? new Date(dailyData.date).toLocaleDateString('ko-KR', {month: 'short', day: 'numeric'}) : '-'}] {dailyData?.month2 || ''}월 C/I 매출</span>
               <div className="text-2xl font-bold text-gray-900 mt-2">
                 {dailyData?.month2_ci?.toLocaleString('ko-KR') || 0}
               </div>
@@ -577,7 +577,7 @@ export default function Dashboard() {
               </div>
             </div>
             <div className="bg-white p-6 rounded-lg shadow-sm border">
-              <span className="text-sm font-medium text-gray-600">{dailyData?.date ? new Date(dailyData.date).toLocaleDateString('ko-KR', {month: 'short', day: 'numeric'}) : '-'} {dailyData?.month3 || ''}월 C/I</span>
+              <span className="text-sm font-medium text-gray-600">[{dailyData?.date ? new Date(dailyData.date).toLocaleDateString('ko-KR', {month: 'short', day: 'numeric'}) : '-'}] {dailyData?.month3 || ''}월 C/I 매출</span>
               <div className="text-2xl font-bold text-gray-900 mt-2">
                 {dailyData?.month3_ci?.toLocaleString('ko-KR') || 0}
               </div>
@@ -617,25 +617,25 @@ export default function Dashboard() {
           {/* 전주 실적 */}
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-2">
             <div className="bg-gray-50 p-4 rounded-lg border">
-              <span className="text-xs font-medium text-gray-500">전주 픽업매출</span>
+              <span className="text-xs font-medium text-gray-500">[전주] 픽업매출</span>
               <div className="text-xl font-bold text-gray-700 mt-1">
-                {prevWeeklyData?.pickup?.toLocaleString('ko-KR') || 0}
+                {prevWeeklyData?.total_pickup?.toLocaleString('ko-KR') || 0}
               </div>
             </div>
             <div className="bg-gray-50 p-4 rounded-lg border">
-              <span className="text-xs font-medium text-gray-500">전주 {prevWeeklyData?.month1 || ''}월 C/I</span>
+              <span className="text-xs font-medium text-gray-500">[전주] {prevWeeklyData?.month1 || ''}월 C/I</span>
               <div className="text-xl font-bold text-gray-700 mt-1">
                 {prevWeeklyData?.month1_ci?.toLocaleString('ko-KR') || 0}
               </div>
             </div>
             <div className="bg-gray-50 p-4 rounded-lg border">
-              <span className="text-xs font-medium text-gray-500">전주 {prevWeeklyData?.month2 || ''}월 C/I</span>
+              <span className="text-xs font-medium text-gray-500">[전주] {prevWeeklyData?.month2 || ''}월 C/I</span>
               <div className="text-xl font-bold text-gray-700 mt-1">
                 {prevWeeklyData?.month2_ci?.toLocaleString('ko-KR') || 0}
               </div>
             </div>
             <div className="bg-gray-50 p-4 rounded-lg border">
-              <span className="text-xs font-medium text-gray-500">전주 {prevWeeklyData?.month3 || ''}월 C/I</span>
+              <span className="text-xs font-medium text-gray-500">[전주] {prevWeeklyData?.month3 || ''}월 C/I</span>
               <div className="text-xl font-bold text-gray-700 mt-1">
                 {prevWeeklyData?.month3_ci?.toLocaleString('ko-KR') || 0}
               </div>
@@ -644,9 +644,9 @@ export default function Dashboard() {
           {/* 이번주 실적 */}
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
             <div className="bg-white p-6 rounded-lg shadow-sm border">
-              <span className="text-sm font-medium text-gray-600">픽업매출</span>
+              <span className="text-sm font-medium text-gray-600">[{weekRange.label}] 픽업매출</span>
               <div className="text-2xl font-bold text-gray-900 mt-2">
-                {weeklyData?.pickup?.toLocaleString('ko-KR') || 0}
+                {weeklyData?.total_pickup?.toLocaleString('ko-KR') || 0}
               </div>
               <div className={`text-sm mt-1 ${(weeklyData?.pickup_wow || 0) >= 0 ? 'text-green-600' : 'text-red-600'}`}>
                 WoW {(weeklyData?.pickup_wow || 0) >= 0 ? '+' : ''}{(weeklyData?.pickup_wow || 0).toFixed(1)}%
