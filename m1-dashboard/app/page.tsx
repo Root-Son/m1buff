@@ -343,54 +343,6 @@ export default function Dashboard() {
 
     roomTypeChartInstance.current = new Chart(ctx, config)
   }
-        maintainAspectRatio: false,
-        plugins: {
-          legend: { position: 'top' },
-          tooltip: {
-            callbacks: {
-              label: function(context) {
-                let label = context.dataset.label || ''
-                if (label) label += ': '
-                if (context.dataset.yAxisID === 'y') {
-                  label += ((context.parsed.y as number) * 100).toFixed(1) + '%'
-                } else {
-                  label += new Intl.NumberFormat('ko-KR').format(context.parsed.y as number)
-                }
-                return label
-              }
-            }
-          }
-        },
-        scales: {
-          y: {
-            position: 'left',
-            title: { display: true, text: 'OCC (%)' },
-            min: 0,
-            max: 1,
-            ticks: { callback: (v) => ((v as number) * 100).toFixed(0) + '%' }
-          },
-          y1: {
-            position: 'right',
-            title: { display: true, text: '가격 (원)' },
-            grid: { drawOnChartArea: false },
-            ticks: { callback: (v) => new Intl.NumberFormat('ko-KR').format(v as number) }
-          }
-        }
-      }
-    }
-
-    roomTypeChartInstance.current = new Chart(ctx, config)
-  }
-
-  const roomTypes = selectedBranch === '전지점' ? [] : (BRANCH_ROOMTYPES[selectedBranch] || [])
-
-  if (loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50">
-        <div className="text-xl">로딩중...</div>
-      </div>
-    )
-  }
 
   return (
     <div className="min-h-screen bg-gray-50">
