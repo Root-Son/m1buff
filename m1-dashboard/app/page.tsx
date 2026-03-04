@@ -2,8 +2,9 @@
 
 import { useEffect, useState, useRef } from 'react'
 import { Chart, ChartConfiguration, registerables } from 'chart.js'
+import ChartDataLabels from 'chartjs-plugin-datalabels'
 
-Chart.register(...registerables)
+Chart.register(...registerables, ChartDataLabels)
 
 const BRANCHES = [
   '전지점', '강남예전로이움점', '강남예전시그니티점', '거북섬점', '낙산해변',
@@ -275,7 +276,69 @@ export default function Dashboard() {
             backgroundColor: 'rgba(16, 185, 129, 0.7)',
             yAxisID: 'y',
             order: 3
+          },
+          {
+            label: '셋팅가',
+            data: roomTypeData.days.map((d: any) => d.yolo_price),
+            type: 'line',
+            borderColor: 'rgba(245, 158, 11, 1)',
+            borderWidth: 2,
+            pointRadius: 3,
+            yAxisID: 'y1',
+            order: 0
           }
+        ],
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: { position: 'top' },
+          datalabels: {
+            display: true,
+            color: '#000',
+            anchor: 'end',
+            align: 'top',
+            formatter: (value: any, context: any) => {
+              if (context.dataset.yAxisID === 'y') {
+                return (value * 100).toFixed(0) + '%'
+              } else {
+                return new Intl.NumberFormat('ko-KR', { notation: 'compact' }).format(value)
+              }
+            },
+            font: { size: 10 }
+          },
+          tooltip: {
+            callbacks: {
+              label: function(context) {
+                let label = context.dataset.label || ''
+                if (label) label += ': '
+                if (context.dataset.yAxisID === 'y') {
+                  label += ((context.parsed.y as number) * 100).toFixed(1) + '%'
+                } else {
+                  label += new Intl.NumberFormat('ko-KR').format(context.parsed.y as number)
+                }
+                return label
+              }
+            }
+          }
+        },
+        scales: {
+          y: {
+            position: 'left',
+            title: { display: true, text: 'OCC (%)' },
+            min: 0,
+            max: 1,
+            ticks: { callback: (v) => ((v as number) * 100).toFixed(0) + '%' }
+          },
+          y1: {
+            position: 'right',
+            title: { display: true, text: '가격 (원)' },
+            grid: { drawOnChartArea: false },
+            ticks: { callback: (v) => new Intl.NumberFormat('ko-KR').format(v as number) }
+          }
+        }
+      }
         ]
       },
       options: {
