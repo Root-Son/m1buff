@@ -51,6 +51,7 @@ export default function Dashboard() {
   const [weeklyData, setWeeklyData] = useState<any>(null)
   const [toplineData, setToplineData] = useState<any>(null)
   const [roomTypeData, setRoomTypeData] = useState<any>(null)
+  const [monthlySummaryData, setMonthlySummaryData] = useState<any>(null)
   const [loading, setLoading] = useState(true)
   const [selectedBranch, setSelectedBranch] = useState('전지점') // 디폴트 전지점
   const [selectedRoomType, setSelectedRoomType] = useState('all')
@@ -105,6 +106,7 @@ export default function Dashboard() {
   useEffect(() => {
     fetchData()
     fetchRoomTypeData() // 초기 로드 시에도 실행
+    fetchMonthlySummary() // 월별 요약 데이터
   }, [selectedBranch, selectedDate, selectedMonth, toplineMonth, currentWeek])
 
   useEffect(() => {
@@ -131,6 +133,19 @@ export default function Dashboard() {
       setRoomTypeData(data)
     } catch (error) {
       console.error('룸타입 데이터 로드 실패:', error)
+    }
+  }
+
+  const fetchMonthlySummary = async () => {
+    try {
+      const branch = selectedBranch === '전지점' ? 'all' : selectedBranch
+      const response = await fetch(
+        `/api/monthly-summary?branch=${branch}&month=${selectedMonth}`
+      )
+      const data = await response.json()
+      setMonthlySummaryData(data)
+    } catch (error) {
+      console.error('월별 요약 데이터 로드 실패:', error)
     }
   }
 
@@ -765,13 +780,33 @@ export default function Dashboard() {
                 </tr>
               </thead>
               <tbody className="divide-y">
-                <tr className="hover:bg-gray-50">
-                  <td className="px-6 py-4 text-sm font-medium text-gray-900">전체</td>
-                  <td className="px-6 py-4 text-sm text-right font-medium text-green-600">-</td>
-                  <td className="px-6 py-4 text-sm text-right text-gray-900">-</td>
-                  <td className="px-6 py-4 text-sm text-right text-gray-900">-</td>
-                  <td className="px-6 py-4 text-sm text-right text-gray-900">-</td>
-                </tr>
+                {monthlySummaryData?.room_types?.length > 0 ? (
+                  monthlySummaryData.room_types.map((rt: any) => (
+                    <tr key={rt.room_type} className="hover:bg-gray-50">
+                      <td className="px-6 py-4 text-sm font-medium text-gray-900">{rt.room_type}</td>
+                      <td className="px-6 py-4 text-sm text-right font-medium text-green-600">
+                        {rt.occ !== null ? (rt.occ * 100).toFixed(0) + '%' : '-'}
+                      </td>
+                      <td className="px-6 py-4 text-sm text-right text-gray-900">
+                        {rt.guardrail !== null ? rt.guardrail.toLocaleString('ko-KR') : '-'}
+                      </td>
+                      <td className="px-6 py-4 text-sm text-right text-gray-900">
+                        {rt.yolo !== null ? rt.yolo.toLocaleString('ko-KR') : '-'}
+                      </td>
+                      <td className="px-6 py-4 text-sm text-right text-gray-900">
+                        {rt.adr !== null ? rt.adr.toLocaleString('ko-KR') : '-'}
+                      </td>
+                    </tr>
+                  ))
+                ) : (
+                  <tr className="hover:bg-gray-50">
+                    <td className="px-6 py-4 text-sm font-medium text-gray-900">전체</td>
+                    <td className="px-6 py-4 text-sm text-right font-medium text-green-600">-</td>
+                    <td className="px-6 py-4 text-sm text-right text-gray-900">-</td>
+                    <td className="px-6 py-4 text-sm text-right text-gray-900">-</td>
+                    <td className="px-6 py-4 text-sm text-right text-gray-900">-</td>
+                  </tr>
+                )}
               </tbody>
             </table>
           </div>
