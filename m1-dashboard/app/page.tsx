@@ -344,6 +344,16 @@ export default function Dashboard() {
     roomTypeChartInstance.current = new Chart(ctx, config)
   }
 
+  const roomTypes = selectedBranch === '전지점' ? [] : (BRANCH_ROOMTYPES[selectedBranch] || [])
+
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+        <div className="text-xl">로딩중...</div>
+      </div>
+    )
+  }
+
   return (
     <div className="min-h-screen bg-gray-50">
       {/* 헤더 */}
