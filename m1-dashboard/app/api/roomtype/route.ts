@@ -45,6 +45,23 @@ export async function GET(request: NextRequest) {
 
     if (error) throw error
 
+    // YOLO 가격 조회
+    let yolo_query = supabase
+      .from('yolo_prices')
+      .select('date, room_type, price')
+      .gte('date', startStr)
+      .lte('date', endStr)
+
+    if (branch !== 'all') {
+      yolo_query = yolo_query.eq('branch_name', branch)
+    }
+
+    if (roomType !== 'all') {
+      yolo_query = yolo_query.eq('room_type', roomType)
+    }
+
+    const { data: yoloData } = await yolo_query
+
     // 날짜별로 그룹화
     const dailyData: Record<string, any> = {}
     
@@ -56,6 +73,8 @@ export async function GET(request: NextRequest) {
           occ: 0,
           occ_1d_ago: 0,
           occ_7d_ago: 0,
+          yolo_price: 0,
+          yolo_count: 0,
           count: 0
         }
       }
@@ -66,12 +85,22 @@ export async function GET(request: NextRequest) {
       dailyData[date].count += 1
     })
 
+    // YOLO 가격 추가
+    yoloData?.forEach((row) => {
+      const date = row.date
+      if (dailyData[date]) {
+        dailyData[date].yolo_price += (row.price || 0)
+        dailyData[date].yolo_count += 1
+      }
+    })
+
     // 평균 계산
     const days = Object.values(dailyData).map((d: any) => ({
       date: d.date,
       occ: d.count > 0 ? d.occ / d.count : 0,
       occ_1d_ago: d.count > 0 ? d.occ_1d_ago / d.count : 0,
       occ_7d_ago: d.count > 0 ? d.occ_7d_ago / d.count : 0,
+      yolo_price: d.yolo_count > 0 ? d.yolo_price / d.yolo_count : 0,
     }))
 
     return NextResponse.json({
