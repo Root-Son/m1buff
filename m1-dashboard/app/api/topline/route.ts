@@ -54,6 +54,30 @@ export async function GET(request: NextRequest) {
 
     const achievement = totalTarget > 0 ? (totalCI / totalTarget) * 100 : 0
 
+    // 주간 라벨 추가
+    const weeksWithLabels = (data || []).map((week: any) => {
+      // week_num으로 날짜 범위 계산
+      const weekNum = week.week_num
+      const firstDay = new Date(year, month - 1, 1)
+      const startDate = new Date(firstDay)
+      startDate.setDate(1 + (weekNum - 1) * 7)
+      
+      const endDate = new Date(startDate)
+      endDate.setDate(startDate.getDate() + 6)
+      
+      // 월 마지막 날 제한
+      const lastDayOfMonth = new Date(year, month, 0).getDate()
+      if (endDate.getDate() > lastDayOfMonth && endDate.getMonth() > startDate.getMonth()) {
+        endDate.setDate(lastDayOfMonth)
+        endDate.setMonth(month - 1)
+      }
+      
+      return {
+        ...week,
+        label: `${startDate.getDate()}~${endDate.getDate()}`
+      }
+    })
+
     return NextResponse.json({
       branch,
       month,
@@ -61,7 +85,7 @@ export async function GET(request: NextRequest) {
       total_ci: totalCI,
       total_target: totalTarget,
       achievement_rate: achievement,
-      weeks: data || []
+      weeks: weeksWithLabels
     })
   } catch (error: any) {
     console.error('Topline API Error:', error)
