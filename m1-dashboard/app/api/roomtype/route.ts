@@ -62,6 +62,23 @@ export async function GET(request: NextRequest) {
 
     const { data: yoloData } = await yolo_query
 
+    // 가드레일 가격 조회
+    let guardrail_query = supabase
+      .from('price_guide')
+      .select('date, room_type, min_price')
+      .gte('date', startStr)
+      .lte('date', endStr)
+
+    if (branch !== 'all') {
+      guardrail_query = guardrail_query.eq('branch_name', branch)
+    }
+
+    if (roomType !== 'all') {
+      guardrail_query = guardrail_query.eq('room_type', roomType)
+    }
+
+    const { data: guardrailData } = await guardrail_query
+
     // 날짜별로 그룹화
     const dailyData: Record<string, any> = {}
     
@@ -75,6 +92,8 @@ export async function GET(request: NextRequest) {
           occ_7d_ago: 0,
           yolo_price: 0,
           yolo_count: 0,
+          guardrail_price: 0,
+          guardrail_count: 0,
           count: 0
         }
       }
@@ -94,6 +113,15 @@ export async function GET(request: NextRequest) {
       }
     })
 
+    // 가드레일 가격 추가
+    guardrailData?.forEach((row) => {
+      const date = row.date
+      if (dailyData[date]) {
+        dailyData[date].guardrail_price += (row.min_price || 0)
+        dailyData[date].guardrail_count += 1
+      }
+    })
+
     // 평균 계산
     const days = Object.values(dailyData).map((d: any) => ({
       date: d.date,
@@ -101,6 +129,7 @@ export async function GET(request: NextRequest) {
       occ_1d_ago: d.count > 0 ? d.occ_1d_ago / d.count : 0,
       occ_7d_ago: d.count > 0 ? d.occ_7d_ago / d.count : 0,
       yolo_price: d.yolo_count > 0 ? d.yolo_price / d.yolo_count : 0,
+      guardrail_price: d.guardrail_count > 0 ? d.guardrail_price / d.guardrail_count : null,
     }))
 
     return NextResponse.json({
