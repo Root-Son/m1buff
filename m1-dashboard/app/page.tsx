@@ -216,6 +216,16 @@ export default function Dashboard() {
         responsive: true,
         maintainAspectRatio: false,
         plugins: {
+          datalabels: {
+            display: true,
+            color: '#000',
+            anchor: 'end',
+            align: 'top',
+            formatter: (value: any) => {
+              return new Intl.NumberFormat('ko-KR').format(value)
+            },
+            font: { size: 10 }
+          },
           tooltip: {
             callbacks: {
               label: (ctx) => ctx.dataset.label + ': ' + new Intl.NumberFormat('ko-KR').format(ctx.parsed.y as number)
