@@ -1,94 +1,56 @@
-import { NextRequest, NextResponse } from 'next/server'
-import { supabase } from '@/lib/supabase'
-
-export async function GET(request: NextRequest) {
-  const searchParams = request.nextUrl.searchParams
-  const branch = searchParams.get('branch') || 'all'
-  const monthParam = searchParams.get('month')
+-- Topline: 특정 월의 주차별 체크인 매출 (월 기준)
+CREATE OR REPLACE FUNCTION get_topline_weekly_checkin(
+  p_branch TEXT,
+  p_month INTEGER,
+  p_year INTEGER DEFAULT 2026
+)
+RETURNS TABLE(
+  week_num INTEGER,
+  start_date DATE,
+  end_date DATE,
+  ci_amount NUMERIC
+) AS $$
+DECLARE
+  first_day DATE;
+  last_day DATE;
+  week_start DATE;
+  week_end DATE;
+  w INTEGER;
+BEGIN
+  -- 해당 월의 첫날과 마지막날
+  first_day := make_date(p_year, p_month, 1);
+  last_day := (first_day + INTERVAL '1 month - 1 day')::DATE;
   
-  try {
-    const month = monthParam ? parseInt(monthParam) : new Date().getMonth() + 1
-    const year = 2026
-
-    const { data, error } = await supabase
-      .rpc('get_topline_weekly_checkin', {
-        p_branch: branch,
-        p_month: month,
-        p_year: year
-      })
-
-    if (error) {
-      console.error('Topline RPC Error:', error)
-      throw error
-    }
-
-    // 월 전체 체크인 매출
-    let ciQuery = supabase
-      .from('raw_bookings')
-      .select('payment_amount')
-      .gte('check_in_date', `${year}-${month.toString().padStart(2, '0')}-01`)
-      .lt('check_in_date', month === 12 
-        ? `${year + 1}-01-01` 
-        : `${year}-${(month + 1).toString().padStart(2, '0')}-01`)
-
-    if (branch !== 'all') {
-      ciQuery = ciQuery.eq('branch_name', branch)
-    }
-
-    const { data: ciData } = await ciQuery
-    const totalCI = ciData?.reduce((sum, row) => sum + (row.payment_amount || 0), 0) || 0
-
-    // 목표 매출
-    let targetQuery = supabase
-      .from('targets')
-      .select('target_amount')
-      .eq('month', month)
-      .eq('year', year)
-
-    if (branch !== 'all') {
-      targetQuery = targetQuery.eq('branch_name', branch)
-    }
-
-    const { data: targetData } = await targetQuery
-    const totalTarget = targetData?.reduce((sum, row) => sum + (row.target_amount || 0), 0) || 0
-
-    const achievement = totalTarget > 0 ? (totalCI / totalTarget) * 100 : 0
-
-    // 주간 라벨 추가
-    const weeksWithLabels = (data || []).map((week: any) => {
-      // week_num으로 날짜 범위 계산
-      const weekNum = week.week_num
-      const firstDay = new Date(year, month - 1, 1)
-      const startDate = new Date(firstDay)
-      startDate.setDate(1 + (weekNum - 1) * 7)
-      
-      const endDate = new Date(startDate)
-      endDate.setDate(startDate.getDate() + 6)
-      
-      // 월 마지막 날 제한
-      const lastDayOfMonth = new Date(year, month, 0).getDate()
-      if (endDate.getDate() > lastDayOfMonth && endDate.getMonth() > startDate.getMonth()) {
-        endDate.setDate(lastDayOfMonth)
-        endDate.setMonth(month - 1)
-      }
-      
-      return {
-        ...week,
-        label: `${startDate.getDate()}~${endDate.getDate()}`
-      }
-    })
-
-    return NextResponse.json({
-      branch,
-      month,
-      year,
-      total_ci: totalCI,
-      total_target: totalTarget,
-      achievement_rate: achievement,
-      weeks: weeksWithLabels
-    })
-  } catch (error: any) {
-    console.error('Topline API Error:', error)
-    return NextResponse.json({ error: error.message }, { status: 500 })
-  }
-}
+  week_start := first_day;
+  w := 1;
+  
+  -- 해당 월의 모든 주를 반환 (7일씩 나눔)
+  WHILE week_start <= last_day LOOP
+    -- 주의 마지막 날 (시작일 + 6일, 단 월 마지막을 넘지 않음)
+    week_end := week_start + 6;
+    IF week_end > last_day THEN
+      week_end := last_day;
+    END IF;
+    
+    RETURN QUERY
+    SELECT 
+      w as week_num,
+      week_start as start_date,
+      week_end as end_date,
+      COALESCE(
+        (SELECT SUM(rb.payment_amount) 
+         FROM raw_bookings rb
+         WHERE DATE(rb.check_in_date) >= week_start
+           AND DATE(rb.check_in_date) <= week_end
+           AND (CASE WHEN p_branch = 'all' THEN TRUE ELSE rb.branch_name = p_branch END))
+        +
+        (SELECT SUM(hc.ci_amount)
+         FROM historical_ci hc
+         WHERE (CASE WHEN p_branch = 'all' THEN TRUE ELSE hc.branch_name = p_branch END))
+      , 0) as ci_amount;
+    
+    week_start := week_start + 7;
+    w := w + 1;
+  END LOOP;
+END;
+$$ LANGUAGE plpgsql;
