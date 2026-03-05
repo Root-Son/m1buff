@@ -1,35 +1,169 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useRef } from 'react'
+import { Chart, registerables } from 'chart.js'
 
-const BRANCHES = [
-  '전지점', '강남예전로이움점', '강남예전시그니티점', '거북섬점', '낙산해변',
-  '당진터미널점', '동탄점(호텔)', '명동점', '부산기장점', '부산송도해변점',
-  '부산시청점', '부산역점', '부티크남포BIFF점', '부티크익선점', '서면점',
-  '속초등대해변점', '속초자이엘라더비치', '속초중앙점', '속초해변',
-  '속초해변 AB점', '속초해변C점', '송도달빛공원점', '스타즈울산점',
-  '웨이브파크점', '인천차이나타운', '제주공항점', '해운대역', '해운대패러그라프점'
-]
+Chart.register(...registerables)
+
+const BRANCH_ROOMTYPES: Record<string, string[]> = {
+  '강남예전로이움점': ['스튜디오', '스튜디오 랜덤', '스튜디오 배리어프', '패밀리 투룸', '프리미어 스위트'],
+  // ... 나머지 지점들
+}
 
 export default function Dashboard() {
   const [selectedBranch, setSelectedBranch] = useState('전지점')
-  const [selectedMonth, setSelectedMonth] = useState(2)
+  const [selectedRoomType, setSelectedRoomType] = useState('')
   const [loading, setLoading] = useState(true)
   const [toplineData, setToplineData] = useState<any>(null)
+  const [dailyData, setDailyData] = useState<any>(null)
+  const [weeklyData, setWeeklyData] = useState<any>(null)
+  const [monthlyData, setMonthlyData] = useState<any>(null)
+  const [roomTypeData, setRoomTypeData] = useState<any>(null)
+  const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth() + 1)
+  
+  const roomTypeChartRef = useRef<HTMLCanvasElement>(null)
+  const roomTypeChartInstance = useRef<Chart | null>(null)
 
   useEffect(() => {
-    fetchData()
+    fetchAllData()
   }, [selectedBranch, selectedMonth])
 
-  const fetchData = async () => {
+  useEffect(() => {
+    if (selectedBranch !== '전지점' && roomTypeData) {
+      renderRoomTypeChart()
+    }
+  }, [roomTypeData, selectedRoomType])
+
+  const fetchAllData = async () => {
     setLoading(true)
     try {
-      const topline = await fetch(`/api/topline?branch=${selectedBranch}&month=${selectedMonth}`).then(r => r.json())
+      const [topline, daily, weekly, monthly] = await Promise.all([
+        fetch(`/api/topline?branch=${selectedBranch}&month=${selectedMonth}`).then(r => r.json()),
+        fetch(`/api/daily?branch=${selectedBranch}`).then(r => r.json()),
+        fetch(`/api/weekly?branch=${selectedBranch}`).then(r => r.json()),
+        fetch(`/api/monthly?branch=${selectedBranch}`).then(r => r.json())
+      ])
+      
       setToplineData(topline)
+      setDailyData(daily)
+      setWeeklyData(weekly)
+      setMonthlyData(monthly)
+
+      if (selectedBranch !== '전지점') {
+        const roomtype = await fetch(`/api/roomtype?branch=${selectedBranch}`).then(r => r.json())
+        setRoomTypeData(roomtype)
+        
+        const types = BRANCH_ROOMTYPES[selectedBranch] || []
+        if (types.length > 0 && !selectedRoomType) {
+          setSelectedRoomType(types[0])
+        }
+      }
     } catch (error) {
       console.error('데이터 로드 실패:', error)
     }
     setLoading(false)
+  }
+
+  const renderRoomTypeChart = () => {
+    if (!roomTypeChartRef.current || !roomTypeData) return
+    
+    if (roomTypeChartInstance.current) {
+      roomTypeChartInstance.current.destroy()
+    }
+
+    const filtered = selectedRoomType 
+      ? roomTypeData.filter((d: any) => d.room_type === selectedRoomType)
+      : roomTypeData
+
+    const ctx = roomTypeChartRef.current.getContext('2d')
+    if (!ctx) return
+
+    const config: any = {
+      type: 'bar' as const,
+      data: {
+        labels: filtered.map((d: any) => d.date),
+        datasets: [
+          {
+            label: 'D-7 OCC',
+            data: filtered.map((d: any) => d.occ_7d_ago),
+            backgroundColor: 'rgba(156, 163, 175, 0.8)',
+            yAxisID: 'y'
+          },
+          {
+            label: 'OCC',
+            data: filtered.map((d: any) => d.occ),
+            backgroundColor: 'rgba(34, 197, 94, 0.8)',
+            yAxisID: 'y'
+          },
+          {
+            label: '셋팅가',
+            data: filtered.map((d: any) => d.yolo_price),
+            type: 'line',
+            borderColor: 'rgba(249, 115, 22, 1)',
+            borderWidth: 2,
+            fill: false,
+            yAxisID: 'y1'
+          },
+          {
+            label: '가드레일',
+            data: filtered.map((d: any) => d.guardrail_price),
+            type: 'line',
+            borderColor: 'rgba(239, 68, 68, 1)',
+            borderWidth: 2,
+            borderDash: [5, 5],
+            fill: false,
+            yAxisID: 'y1'
+          },
+          {
+            label: 'ADR',
+            data: filtered.map((d: any) => d.adr),
+            type: 'line',
+            borderColor: 'rgba(99, 102, 241, 1)',
+            borderWidth: 2,
+            fill: false,
+            yAxisID: 'y1'
+          }
+        ]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: { display: true, position: 'top' },
+          tooltip: {
+            callbacks: {
+              label: function(context: any) {
+                let label = context.dataset.label || ''
+                if (label) label += ': '
+                if (context.dataset.yAxisID === 'y') {
+                  label += ((context.parsed.y as number) * 100).toFixed(1) + '%'
+                } else {
+                  label += new Intl.NumberFormat('ko-KR').format(context.parsed.y as number)
+                }
+                return label
+              }
+            }
+          }
+        },
+        scales: {
+          y: {
+            position: 'left',
+            title: { display: true, text: 'OCC (%)' },
+            min: 0,
+            max: 1,
+            ticks: { callback: (v: any) => ((v as number) * 100).toFixed(0) + '%' }
+          },
+          y1: {
+            position: 'right',
+            title: { display: true, text: '가격 (원)' },
+            grid: { drawOnChartArea: false },
+            ticks: { callback: (v: any) => new Intl.NumberFormat('ko-KR').format(v as number) }
+          }
+        }
+      }
+    }
+
+    roomTypeChartInstance.current = new Chart(ctx, config)
   }
 
   if (loading) {
@@ -39,6 +173,8 @@ export default function Dashboard() {
       </div>
     )
   }
+
+  const roomTypes = selectedBranch === '전지점' ? [] : (BRANCH_ROOMTYPES[selectedBranch] || [])
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -51,7 +187,17 @@ export default function Dashboard() {
       <div className="bg-white border-b sticky top-[73px] z-40">
         <div className="max-w-7xl mx-auto px-4 py-4">
           <div className="flex gap-2 flex-wrap">
-            {BRANCHES.sort((a, b) => a.localeCompare(b, 'ko')).map(branch => (
+            <button
+              onClick={() => setSelectedBranch('전지점')}
+              className={`px-4 py-2 rounded ${
+                selectedBranch === '전지점'
+                  ? 'bg-blue-600 text-white'
+                  : 'bg-gray-200 text-gray-700'
+              }`}
+            >
+              전지점
+            </button>
+            {Object.keys(BRANCH_ROOMTYPES).sort((a, b) => a.localeCompare(b, 'ko')).map(branch => (
               <button
                 key={branch}
                 onClick={() => setSelectedBranch(branch)}
@@ -69,6 +215,7 @@ export default function Dashboard() {
       </div>
 
       <main className="max-w-7xl mx-auto px-4 py-8">
+        {/* Topline */}
         <div className="mb-8">
           <h2 className="text-xl font-bold mb-4">TOPLINE (체크인 기준)</h2>
           <div className="flex gap-2 mb-4">
@@ -99,6 +246,34 @@ export default function Dashboard() {
             </div>
           )}
         </div>
+
+        {/* 룸타입별 성과 */}
+        {selectedBranch !== '전지점' && (
+        <div className="bg-white p-6 rounded-lg shadow-sm border mb-8">
+          <h2 className="text-xl font-bold mb-4">룸타입별 성과</h2>
+          {roomTypes.length > 0 && (
+            <div className="flex gap-2 mb-4 flex-wrap">
+              {roomTypes.map(rt => (
+                <button
+                  key={rt}
+                  onClick={() => setSelectedRoomType(rt)}
+                  className={`px-4 py-2 rounded ${
+                    selectedRoomType === rt
+                      ? 'bg-white text-gray-900 shadow-sm'
+                      : 'text-gray-600'
+                  }`}
+                >
+                  {rt}
+                </button>
+              ))}
+            </div>
+          )}
+          <div className="h-96">
+            <canvas ref={roomTypeChartRef}></canvas>
+          </div>
+        </div>
+        )}
+
       </main>
     </div>
   )
