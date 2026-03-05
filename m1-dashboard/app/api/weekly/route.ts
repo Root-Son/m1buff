@@ -63,8 +63,12 @@ export async function GET(request: NextRequest) {
     const startMonth = new Date(startStr).getMonth() + 1
 
     dailyData?.forEach((row) => {
+      // ✅ UTC 날짜를 로컬 날짜로 변환
       const createdDate = new Date(row.reservation_created_at)
-      const dateKey = createdDate.toISOString().split('T')[0]
+      const year = createdDate.getFullYear()
+      const month = String(createdDate.getMonth() + 1).padStart(2, '0')
+      const day = String(createdDate.getDate()).padStart(2, '0')
+      const dateKey = `${year}-${month}-${day}`
 
       if (!dailyMap[dateKey]) {
         dailyMap[dateKey] = { pickup: 0, month1: 0, month2: 0, month3: 0 }
