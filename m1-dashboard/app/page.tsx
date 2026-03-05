@@ -362,12 +362,6 @@ export default function Dashboard() {
       options: {
         responsive: true,
         maintainAspectRatio: false,
-        layout: {
-          padding: {
-            top: 20,
-            bottom: 10
-          }
-        },
         plugins: {
           legend: { 
             position: 'top',
@@ -842,7 +836,7 @@ export default function Dashboard() {
               )}
             </div>
           </div>
-          <div className="h-96">
+          <div className="h-96 mt-8">
             <canvas ref={roomTypeChartRef}></canvas>
           </div>
         </div>
