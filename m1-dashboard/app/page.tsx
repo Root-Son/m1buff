@@ -151,13 +151,13 @@ export default function Dashboard() {
             title: { display: true, text: 'OCC (%)' },
             min: 0,
             max: 1,
-            ticks: { callback: (v) => ((v as number) * 100).toFixed(0) + '%' }
+            ticks: { callback: (v: any) => ((v as number) * 100).toFixed(0) + '%' }
           },
           y1: {
             position: 'right',
             title: { display: true, text: '가격 (원)' },
             grid: { drawOnChartArea: false },
-            ticks: { callback: (v) => new Intl.NumberFormat('ko-KR').format(v as number) }
+            ticks: { callback: (v: any) => new Intl.NumberFormat('ko-KR').format(v as number) }
           }
         }
       }
