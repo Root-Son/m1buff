@@ -362,6 +362,11 @@ export default function Dashboard() {
       options: {
         responsive: true,
         maintainAspectRatio: false,
+        layout: {
+          padding: {
+            top: 40  // ← 차트 상단 여백 (라벨이 범례 안 겹치게)
+          }
+        },
         plugins: {
           legend: { 
             position: 'top',
