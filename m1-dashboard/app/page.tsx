@@ -769,7 +769,7 @@ export default function Dashboard() {
               </div>
               {roomTypes.length > 0 && (
                 <div className="flex gap-1 p-1 bg-gray-100 rounded-lg">
-                  {roomTypes.map(rt => (
+                  {roomTypes.map((rt: string) => (
                     <button
                       key={rt}
                       onClick={() => setSelectedRoomType(rt)}
