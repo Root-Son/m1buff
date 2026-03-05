@@ -47,22 +47,20 @@ export async function GET(request: NextRequest) {
 
     const result = data?.[0]
 
+    // ✅ 쿼리 빌더를 먼저 만들고
     let daily_query = supabase
       .from('raw_bookings')
       .select('reservation_created_at, payment_amount, check_in_date')
       .gte('reservation_created_at', startStr + ' 00:00:00')
       .lte('reservation_created_at', endDate + ' 23:59:59')
-      .limit(10000)  // ✅ limit 명시적으로 증가
 
+    // ✅ branch 조건 추가
     if (branch !== 'all') {
       daily_query = daily_query.eq('branch_name', branch)
     }
 
-    const { data: dailyData } = await daily_query
-
-    // 🔍 DEBUG: 데이터 개수 확인
-    console.log('📊 Daily data count:', dailyData?.length)
-    console.log('📅 Date range:', startStr, 'to', endDate)
+    // ✅ limit은 맨 마지막에!
+    const { data: dailyData } = await daily_query.limit(10000)
 
     const dailyMap: Record<string, { pickup: number; month1: number; month2: number; month3: number }> = {}
     const startMonth = new Date(startStr).getMonth() + 1
@@ -73,11 +71,6 @@ export async function GET(request: NextRequest) {
       const month = String(createdDate.getMonth() + 1).padStart(2, '0')
       const day = String(createdDate.getDate()).padStart(2, '0')
       const dateKey = `${year}-${month}-${day}`
-
-      // 🔍 DEBUG: 처음 5개만 로그
-      if (Object.keys(dailyMap).length < 5) {
-        console.log('🔑 Date key:', dateKey, 'Amount:', row.payment_amount)
-      }
 
       if (!dailyMap[dateKey]) {
         dailyMap[dateKey] = { pickup: 0, month1: 0, month2: 0, month3: 0 }
@@ -96,9 +89,6 @@ export async function GET(request: NextRequest) {
         dailyMap[dateKey].month3 += amount
       }
     })
-
-    // 🔍 DEBUG: dailyMap 확인
-    console.log('🗺️ DailyMap keys:', Object.keys(dailyMap))
 
     const days = []
     for (let i = 6; i >= 0; i--) {
@@ -129,9 +119,7 @@ export async function GET(request: NextRequest) {
       month3: result?.month3 || 0,
       month3_ci: result?.month3_ci || 0,
       month3_ci_wow: result?.month3_ci_wow || 0,
-      days,
-      debug_daily_count: dailyData?.length,
-      debug_map_keys: Object.keys(dailyMap)
+      days
     })
   } catch (error: any) {
     console.error('Weekly API Error:', error)
