@@ -59,16 +59,24 @@ export async function GET(request: NextRequest) {
 
     const { data: dailyData } = await daily_query
 
+    // 🔍 DEBUG: 데이터 개수 확인
+    console.log('📊 Daily data count:', dailyData?.length)
+    console.log('📅 Date range:', startStr, 'to', endDate)
+
     const dailyMap: Record<string, { pickup: number; month1: number; month2: number; month3: number }> = {}
     const startMonth = new Date(startStr).getMonth() + 1
 
     dailyData?.forEach((row) => {
-      // ✅ UTC 날짜를 로컬 날짜로 변환
       const createdDate = new Date(row.reservation_created_at)
       const year = createdDate.getFullYear()
       const month = String(createdDate.getMonth() + 1).padStart(2, '0')
       const day = String(createdDate.getDate()).padStart(2, '0')
       const dateKey = `${year}-${month}-${day}`
+
+      // 🔍 DEBUG: 처음 5개만 로그
+      if (Object.keys(dailyMap).length < 5) {
+        console.log('🔑 Date key:', dateKey, 'Amount:', row.payment_amount)
+      }
 
       if (!dailyMap[dateKey]) {
         dailyMap[dateKey] = { pickup: 0, month1: 0, month2: 0, month3: 0 }
@@ -87,6 +95,9 @@ export async function GET(request: NextRequest) {
         dailyMap[dateKey].month3 += amount
       }
     })
+
+    // 🔍 DEBUG: dailyMap 확인
+    console.log('🗺️ DailyMap keys:', Object.keys(dailyMap))
 
     const days = []
     for (let i = 6; i >= 0; i--) {
@@ -118,6 +129,8 @@ export async function GET(request: NextRequest) {
       month3_ci: result?.month3_ci || 0,
       month3_ci_wow: result?.month3_ci_wow || 0,
       days,
+      debug_daily_count: dailyData?.length,
+      debug_map_keys: Object.keys(dailyMap)
     })
   } catch (error: any) {
     console.error('Weekly API Error:', error)
