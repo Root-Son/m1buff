@@ -104,8 +104,8 @@ export default function Dashboard() {
       const data = await response.json()
       setRoomTypeData(data)
       
-      // API에서 받은 roomTypes로 디폴트 선택
-      if (data.roomTypes && data.roomTypes.length > 0 && !selectedRoomType) {
+      // ✅ 항상 첫 번째 룸타입 자동 선택
+      if (data.roomTypes && data.roomTypes.length > 0) {
         setSelectedRoomType(data.roomTypes[0])
       }
     } catch (error) {
@@ -379,7 +379,7 @@ export default function Dashboard() {
   
   // 지점 변경시 첫 번째 룸타입 자동 선택
   useEffect(() => {
-    if (roomTypes.length > 0 && !selectedRoomType) {
+    if (roomTypes.length > 0) {
       setSelectedRoomType(roomTypes[0])
     }
   }, [selectedBranch, roomTypes.length])
