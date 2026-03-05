@@ -1,151 +1,41 @@
-import { NextRequest, NextResponse } from 'next/server'
-import { supabase } from '@/lib/supabase'
+import { createClient } from '@supabase/supabase-js'
+import { NextResponse } from 'next/server'
 
-export async function GET(request: NextRequest) {
-  const searchParams = request.nextUrl.searchParams
-  const branch = searchParams.get('branch') || 'all'
-  const weekOffset = parseInt(searchParams.get('weekOffset') || '0')
-  const roomType = searchParams.get('roomType') || 'all'
+const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+)
+
+export async function GET(request: Request) {
+  const { searchParams } = new URL(request.url)
+  const branch = searchParams.get('branch')
+
+  if (!branch || branch === '전지점') {
+    return NextResponse.json({ error: 'Branch required' }, { status: 400 })
+  }
 
   try {
-    // 기준일 (오늘 + weekOffset)
-    const today = new Date()
-    today.setDate(today.getDate() + (weekOffset * 7))
-    
-    // 해당 주의 일요일(week end)
-    const dayOfWeek = today.getDay()
-    const endDate = new Date(today)
-    endDate.setDate(today.getDate() + (7 - dayOfWeek) % 7)
-    
-    // 시작일 (일요일 - 6일 = 월요일)
-    const startDate = new Date(endDate)
-    startDate.setDate(endDate.getDate() - 6)
-    
-    const startStr = startDate.toISOString().split('T')[0]
-    const endStr = endDate.toISOString().split('T')[0]
-
-    // OCC 데이터 조회
-    let query = supabase
+    // 1. 해당 지점의 실제 룸타입 목록 가져오기
+    const { data: roomTypesData, error: roomTypesError } = await supabase
       .from('branch_room_occ')
-      .select('date, room_type, occ, occ_1d_ago, occ_7d_ago, delta_1d_pp, adr')
-      .gte('date', startStr)
-      .lte('date', endStr)
-      .order('date')
-      .order('room_type')
+      .select('room_type')
+      .eq('branch_name', branch)
+    
+    if (roomTypesError) throw roomTypesError
 
-    if (branch !== 'all') {
-      query = query.eq('branch_name', branch)
-    }
+    // 중복 제거 및 정렬
+    const roomTypes = [...new Set(roomTypesData?.map(d => d.room_type) || [])].sort()
 
-    if (roomType !== 'all') {
-      query = query.eq('room_type', roomType)
-    }
-
-    const { data, error } = await query
+    // 2. 룸타입별 성과 데이터
+    const { data, error } = await supabase.rpc('get_roomtype_performance', {
+      p_branch_name: branch
+    })
 
     if (error) throw error
 
-    // YOLO 가격 조회
-    let yolo_query = supabase
-      .from('yolo_prices')
-      .select('date, room_type, price')
-      .gte('date', startStr)
-      .lte('date', endStr)
-
-    if (branch !== 'all') {
-      yolo_query = yolo_query.eq('branch_name', branch)
-    }
-
-    if (roomType !== 'all') {
-      yolo_query = yolo_query.eq('room_type', roomType)
-    }
-
-    const { data: yoloData } = await yolo_query
-
-    // 가드레일 가격 조회
-    let guardrail_query = supabase
-      .from('price_guide')
-      .select('date, room_type, min_price')
-      .gte('date', startStr)
-      .lte('date', endStr)
-
-    if (branch !== 'all') {
-      guardrail_query = guardrail_query.eq('branch_name', branch)
-    }
-
-    if (roomType !== 'all') {
-      guardrail_query = guardrail_query.eq('room_type', roomType)
-    }
-
-    const { data: guardrailData } = await guardrail_query
-
-    // 날짜별로 그룹화
-    const dailyData: Record<string, any> = {}
-    
-    data?.forEach((row) => {
-      const date = row.date
-      if (!dailyData[date]) {
-        dailyData[date] = {
-          date,
-          occ: 0,
-          occ_1d_ago: 0,
-          occ_7d_ago: 0,
-          adr: 0,
-          adr_count: 0,
-          yolo_price: 0,
-          yolo_count: 0,
-          guardrail_price: 0,
-          guardrail_count: 0,
-          count: 0
-        }
-      }
-      
-      dailyData[date].occ += (row.occ || 0)
-      dailyData[date].occ_1d_ago += (row.occ_1d_ago || 0)
-      dailyData[date].occ_7d_ago += (row.occ_7d_ago || 0)
-      if (row.adr && row.adr > 0) {
-        dailyData[date].adr += row.adr
-        dailyData[date].adr_count += 1
-      }
-      dailyData[date].count += 1
-    })
-
-    // YOLO 가격 추가
-    yoloData?.forEach((row) => {
-      const date = row.date
-      if (dailyData[date]) {
-        dailyData[date].yolo_price += (row.price || 0)
-        dailyData[date].yolo_count += 1
-      }
-    })
-
-    // 가드레일 가격 추가
-    guardrailData?.forEach((row) => {
-      const date = row.date
-      if (dailyData[date]) {
-        dailyData[date].guardrail_price += (row.min_price || 0)
-        dailyData[date].guardrail_count += 1
-      }
-    })
-
-    // 평균 계산
-    const days = Object.values(dailyData).map((d: any) => ({
-      date: d.date,
-      occ: d.count > 0 ? d.occ / d.count : 0,
-      occ_1d_ago: d.count > 0 ? d.occ_1d_ago / d.count : 0,
-      occ_7d_ago: d.count > 0 ? d.occ_7d_ago / d.count : 0,
-      adr: d.adr_count > 0 ? Math.round(d.adr / d.adr_count) : null,
-      yolo_price: d.yolo_count > 0 ? Math.round(d.yolo_price / d.yolo_count) : 0,
-      guardrail_price: d.guardrail_count > 0 ? Math.round(d.guardrail_price / d.guardrail_count) : null,
-    }))
-
     return NextResponse.json({
-      branch,
-      roomType,
-      weekOffset,
-      startDate: startStr,
-      endDate: endStr,
-      days,
+      roomTypes,  // 실제 DB에서 가져온 룸타입 목록
+      days: data || []
     })
   } catch (error: any) {
     console.error('Roomtype API Error:', error)
