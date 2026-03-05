@@ -78,8 +78,8 @@ export default function Dashboard() {
     const ctx = roomTypeChartRef.current.getContext('2d')
     if (!ctx) return
 
-    const config = {
-      type: 'bar',
+    const config: any = {
+      type: 'bar' as const,
       data: {
         labels: filtered.map((d: any) => d.date),
         datasets: [
