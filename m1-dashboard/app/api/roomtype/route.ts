@@ -67,6 +67,7 @@ export async function GET(request: Request) {
         date,
         room_type,
         occ,
+        occ_1d_ago,
         occ_7d_ago,
         adr
       `)
