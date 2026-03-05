@@ -362,20 +362,8 @@ export default function Dashboard() {
       options: {
         responsive: true,
         maintainAspectRatio: false,
-        layout: {
-          padding: {
-            top: 40  // ← 차트 상단 여백 (라벨이 범례 안 겹치게)
-          }
-        },
         plugins: {
-          legend: { 
-            position: 'top',
-            labels: {
-              padding: 15,
-              boxWidth: 15,
-              boxHeight: 15
-            }
-          },
+          legend: { position: 'bottom' },
           datalabels: {
             display: true,
             color: '#000',
@@ -841,7 +829,7 @@ export default function Dashboard() {
               )}
             </div>
           </div>
-          <div className="h-96 mt-8">
+          <div className="h-96">
             <canvas ref={roomTypeChartRef}></canvas>
           </div>
         </div>
