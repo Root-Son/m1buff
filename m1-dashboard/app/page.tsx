@@ -362,8 +362,21 @@ export default function Dashboard() {
       options: {
         responsive: true,
         maintainAspectRatio: false,
+        layout: {
+          padding: {
+            top: 20,
+            bottom: 10
+          }
+        },
         plugins: {
-          legend: { position: 'top' },
+          legend: { 
+            position: 'top',
+            labels: {
+              padding: 15,
+              boxWidth: 15,
+              boxHeight: 15
+            }
+          },
           datalabels: {
             display: true,
             color: '#000',
