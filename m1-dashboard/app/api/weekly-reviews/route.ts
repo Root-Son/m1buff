@@ -60,19 +60,32 @@ export async function GET(request: NextRequest) {
       .lte('reservation_created_at', prevWeekEndStr + ' 23:59:59')
     
     // 6. OCC 데이터 (다음 4주, 28일)
-    const fourWeeksLater = new Date(targetWeekEnd)
-    fourWeeksLater.setDate(targetWeekEnd.getDate() + 28)
+    const nextDayStart = new Date(targetWeekEnd)
+    nextDayStart.setDate(targetWeekEnd.getDate() + 1) // 이번주 다음날부터
+    
+    const fourWeeksLater = new Date(nextDayStart)
+    fourWeeksLater.setDate(nextDayStart.getDate() + 27) // 4주 = 28일
+    
+    const nextDayStr = nextDayStart.toISOString().split('T')[0]
     const fourWeeksStr = fourWeeksLater.toISOString().split('T')[0]
     
-    console.log('OCC Query Range:', { from: weekEndStr, to: fourWeeksStr })
+    console.log('===== OCC Query =====')
+    console.log('Next Day Start:', nextDayStr)
+    console.log('Four Weeks Later:', fourWeeksStr)
+    console.log('Query: date >=', nextDayStr, 'AND date <=', fourWeeksStr)
     
     const { data: occData, error: occError } = await supabase
       .from('branch_room_occ')
       .select('*')
-      .gte('date', weekEndStr) // 이번주 마지막날부터
+      .gte('date', nextDayStr)
       .lte('date', fourWeeksStr)
     
-    console.log('OCC Data:', { count: occData?.length, error: occError })
+    console.log('OCC Data Result:', {
+      count: occData?.length,
+      error: occError,
+      uniqueDates: occData ? [...new Set(occData.map(r => r.date))].sort().slice(0, 10) : [],
+      uniqueBranches: occData ? [...new Set(occData.map(r => r.branch_name))].length : 0
+    })
     
     // 7. 월 목표 데이터
     const targetMonth = targetWeekStart.getMonth() + 1
@@ -96,7 +109,9 @@ export async function GET(request: NextRequest) {
     const monthStart = `${targetYear}-${String(targetMonth).padStart(2, '0')}-01`
     const monthEnd = new Date(targetYear, targetMonth, 0).toISOString().split('T')[0]
     
-    console.log('Monthly Actuals Query:', { monthStart, monthEnd })
+    console.log('===== Monthly Actuals Query =====')
+    console.log('Month:', targetYear, targetMonth)
+    console.log('Date Range:', monthStart, '~', monthEnd)
     
     const { data: monthlyActuals, error: actualsError } = await supabase
       .from('raw_bookings')
@@ -104,12 +119,35 @@ export async function GET(request: NextRequest) {
       .gte('check_in_date', monthStart)
       .lte('check_in_date', monthEnd)
     
-    console.log('Monthly Actuals:', { count: monthlyActuals?.length, error: actualsError })
+    console.log('Monthly Actuals Result:', {
+      count: monthlyActuals?.length,
+      error: actualsError,
+      sampleBranches: monthlyActuals?.slice(0, 3).map(r => ({ branch: r.branch_name, amount: r.payment_amount }))
+    })
     
     // 9. 지점별 집계
     const thisWeekByBranch = aggregateByBranch(thisWeekData || [])
     const prevWeekByBranch = aggregateByBranch(prevWeekData || [])
-    const monthlyActualsByBranch = aggregateByBranch(monthlyActuals || [])
+    
+    // 월별 실적 집계 (간단하게)
+    const monthlyActualsByBranch: Record<string, { pickup: number }> = {}
+    if (monthlyActuals) {
+      monthlyActuals.forEach(row => {
+        const branch = row.branch_name
+        if (!monthlyActualsByBranch[branch]) {
+          monthlyActualsByBranch[branch] = { pickup: 0 }
+        }
+        monthlyActualsByBranch[branch].pickup += (row.payment_amount || 0)
+      })
+    }
+    
+    console.log('Monthly Actuals By Branch:', {
+      totalBranches: Object.keys(monthlyActualsByBranch).length,
+      sample: Object.entries(monthlyActualsByBranch).slice(0, 3).map(([branch, data]) => ({
+        branch,
+        total: data.pickup
+      }))
+    })
     
     // 10. 분석
     const branchIssues = analyzeBranchIssues(occData || [], weekStartStr, weekEndStr)
