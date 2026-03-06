@@ -61,7 +61,7 @@ export default function Dashboard() {
   const [selectedRoomType, setSelectedRoomType] = useState('')
   const [selectedMonth, setSelectedMonth] = useState(2)
   const [toplineMonth, setToplineMonth] = useState(3) // Topline 월 필터
-  const [currentWeek, setCurrentWeek] = useState(0) // ISO week offset
+  const [currentWeek, setCurrentWeek] = useState(1) // 1 = 이번주
   const [roomTypeWeekOffset, setRoomTypeWeekOffset] = useState<number | null>(0) // 0 = 이번주 디폴트
   const [selectedDate, setSelectedDate] = useState<string>('') // 일 실적 날짜 선택
 
@@ -672,8 +672,8 @@ export default function Dashboard() {
               <div className="text-2xl font-bold text-gray-900 mt-2">
                 {weeklyData?.total_pickup?.toLocaleString('ko-KR') || 0}
               </div>
-              <div className={`text-sm mt-1 ${(weeklyData?.pickup_wow || 0) >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                WoW {(weeklyData?.pickup_wow || 0) >= 0 ? '+' : ''}{(weeklyData?.pickup_wow || 0).toFixed(1)}%
+              <div className={`text-sm mt-1 ${(weeklyData?.total_pickup_wow || 0) >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                WoW {(weeklyData?.total_pickup_wow || 0) >= 0 ? '+' : ''}{(weeklyData?.total_pickup_wow || 0).toFixed(1)}%
               </div>
             </div>
             <div className="bg-white p-6 rounded-lg shadow-sm border">
