@@ -135,11 +135,6 @@ export default function Dashboard() {
       )
       const data = await response.json()
       setRoomTypeData(data)
-      
-      // ✅ 항상 첫 번째 룸타입 자동 선택
-      if (data.roomTypes && data.roomTypes.length > 0) {
-        setSelectedRoomType(data.roomTypes[0])
-      }
     } catch (error) {
       console.error('룸타입 데이터 로드 실패:', error)
     }
@@ -416,13 +411,6 @@ export default function Dashboard() {
 
   const roomTypes = roomTypeData?.roomTypes || []
   
-  // 지점 변경시에만 첫 번째 룸타입 자동 선택
-  useEffect(() => {
-    if (roomTypes.length > 0) {
-      setSelectedRoomType(roomTypes[0])
-    }
-  }, [selectedBranch])  // ← roomTypes.length 제거!
-
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50">
