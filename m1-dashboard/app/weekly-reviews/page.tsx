@@ -47,39 +47,85 @@ function formatDateRange(weekStart: string, weekEnd: string) {
 
 // 지점별 이슈 컴포넌트
 function BranchIssuesCard({ issues }: { issues: any[] }) {
-  const [isExpanded, setIsExpanded] = useState(false)
+  const [expandedBranches, setExpandedBranches] = useState<Set<string>>(new Set())
   
   if (!issues || issues.length === 0) {
     return <div className="text-center py-8 text-gray-500">지점별 이슈가 없습니다</div>
   }
   
-  const displayIssues = isExpanded ? issues : issues.slice(0, 5)
+  const toggleBranch = (branch: string) => {
+    const newExpanded = new Set(expandedBranches)
+    if (newExpanded.has(branch)) {
+      newExpanded.delete(branch)
+    } else {
+      newExpanded.add(branch)
+    }
+    setExpandedBranches(newExpanded)
+  }
+  
+  // 심각도 우선순위 계산
+  const getSeverityPriority = (details: any[]) => {
+    if (details.some((d: any) => d.severity === 'high')) return 3
+    if (details.some((d: any) => d.severity === 'opportunity')) return 2
+    if (details.some((d: any) => d.severity === 'medium')) return 1
+    return 0
+  }
+  
+  // 심각도 순 정렬
+  const sortedIssues = [...issues].sort((a, b) => 
+    getSeverityPriority(b.details) - getSeverityPriority(a.details)
+  )
   
   return (
     <div className="space-y-3">
-      {displayIssues.map((item: any, idx: number) => (
-        <div
-          key={idx}
-          className={`p-4 rounded-lg border-l-4 ${
-            item.severity === 'high'
-              ? 'bg-red-50 border-red-500'
-              : item.severity === 'opportunity'
-              ? 'bg-green-50 border-green-500'
-              : 'bg-yellow-50 border-yellow-500'
-          }`}
-        >
-          <div className="font-semibold text-gray-900">{item.branch}</div>
-          <div className="text-sm text-gray-700 mt-1">{item.message}</div>
-        </div>
-      ))}
-      {issues.length > 5 && (
-        <button
-          onClick={() => setIsExpanded(!isExpanded)}
-          className="w-full py-2 text-sm text-blue-600 hover:text-blue-800 font-medium"
-        >
-          {isExpanded ? '▲ 접기' : `▼ ${issues.length - 5}개 더보기`}
-        </button>
-      )}
+      {sortedIssues.map((item: any, idx: number) => {
+        const isExpanded = expandedBranches.has(item.branch)
+        const hasCriticalIssue = item.details.some((d: any) => d.severity === 'high' || d.severity === 'opportunity')
+        const hasIssues = item.details.some((d: any) => d.severity !== 'normal')
+        
+        // 이슈 없으면 표시 안함
+        if (!hasIssues) return null
+        
+        const mainSeverity = item.details.find((d: any) => d.severity === 'high')?.severity ||
+                            item.details.find((d: any) => d.severity === 'opportunity')?.severity ||
+                            item.details.find((d: any) => d.severity === 'medium')?.severity ||
+                            'normal'
+        
+        return (
+          <div
+            key={idx}
+            className={`p-4 rounded-lg border-l-4 ${
+              mainSeverity === 'high'
+                ? 'bg-red-50 border-red-500'
+                : mainSeverity === 'opportunity'
+                ? 'bg-green-50 border-green-500'
+                : mainSeverity === 'medium'
+                ? 'bg-yellow-50 border-yellow-500'
+                : 'bg-gray-50 border-gray-500'
+            }`}
+          >
+            <div className="flex items-center justify-between">
+              <div className="font-semibold text-gray-900 text-lg">{item.branch}</div>
+              {item.details.length > 1 && (
+                <button
+                  onClick={() => toggleBranch(item.branch)}
+                  className="text-xs text-blue-600 hover:text-blue-800 font-semibold"
+                >
+                  {isExpanded ? '▲ 접기' : `▼ ${item.details.length}개 항목 보기`}
+                </button>
+              )}
+            </div>
+            
+            <div className="mt-2 space-y-1">
+              {(isExpanded ? item.details : item.details.slice(0, 2)).map((detail: any, i: number) => (
+                <div key={i} className="text-sm text-gray-700">
+                  <span className="font-medium">{detail.week}:</span> {detail.message}
+                </div>
+              ))}
+            </div>
+          </div>
+        )
+      })}
     </div>
   )
 }
