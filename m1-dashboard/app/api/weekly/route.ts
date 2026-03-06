@@ -33,6 +33,7 @@ export async function GET(request: NextRequest) {
       startStr = start.toISOString().split('T')[0]
     }
 
+    // 주간 통계 (WoW 등)
     const { data, error } = await supabase
       .rpc('get_weekly_stats_dynamic', {
         p_branch: branch,
@@ -47,49 +48,31 @@ export async function GET(request: NextRequest) {
 
     const result = data?.[0]
 
-    // ✅ 전체 기간 데이터를 한 번에 가져오기 (UTC 문제 해결)
-    let daily_query = supabase
-      .from('raw_bookings')
-      .select('reservation_created_at, payment_amount, check_in_date')
-      .gte('reservation_created_at', startStr + ' 00:00:00')
-      .lte('reservation_created_at', endDate + ' 23:59:59')
+    // ✅ 날짜별 집계 함수 사용 (limit 없음!)
+    const { data: dailyData, error: dailyError } = await supabase
+      .rpc('get_daily_pickup', {
+        p_branch: branch,
+        p_start_date: startStr,
+        p_end_date: endDate
+      })
 
-    if (branch !== 'all') {
-      daily_query = daily_query.eq('branch_name', branch)
+    if (dailyError) {
+      console.error('Daily Pickup RPC Error:', dailyError)
+      throw dailyError
     }
 
-    const { data: allData } = await daily_query.limit(100000)
-
-    // ✅ JavaScript에서 로컬 날짜로 분류
-    const dailyMap: Record<string, { pickup: number; month1: number; month2: number; month3: number }> = {}
-    const startMonth = new Date(startStr).getMonth() + 1
-
-    allData?.forEach((row) => {
-      // 로컬 날짜로 변환
-      const createdDate = new Date(row.reservation_created_at)
-      const year = createdDate.getFullYear()
-      const month = String(createdDate.getMonth() + 1).padStart(2, '0')
-      const day = String(createdDate.getDate()).padStart(2, '0')
-      const dateKey = `${year}-${month}-${day}`
-
-      if (!dailyMap[dateKey]) {
-        dailyMap[dateKey] = { pickup: 0, month1: 0, month2: 0, month3: 0 }
-      }
-
-      const amount = row.payment_amount || 0
-      dailyMap[dateKey].pickup += amount
-
-      const checkinMonth = new Date(row.check_in_date).getMonth() + 1
-
-      if (checkinMonth === startMonth) {
-        dailyMap[dateKey].month1 += amount
-      } else if (checkinMonth === (startMonth % 12) + 1) {
-        dailyMap[dateKey].month2 += amount
-      } else if (checkinMonth === ((startMonth + 1) % 12) + 1) {
-        dailyMap[dateKey].month3 += amount
+    // dailyData를 Map으로 변환
+    const dailyMap: Record<string, any> = {}
+    dailyData?.forEach((row: any) => {
+      dailyMap[row.booking_date] = {
+        pickup: row.total_pickup || 0,
+        month1: row.month1_ci || 0,
+        month2: row.month2_ci || 0,
+        month3: row.month3_ci || 0
       }
     })
 
+    // 7일 배열 생성
     const days = []
     for (let i = 6; i >= 0; i--) {
       const date = new Date(end)
