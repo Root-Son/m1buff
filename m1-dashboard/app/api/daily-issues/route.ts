@@ -45,16 +45,16 @@ export async function GET(request: NextRequest) {
       .gte('reservation_created_at', yesterdayStr + ' 00:00:00')
       .lte('reservation_created_at', yesterdayStr + ' 23:59:59')
     
-    // 6. OCC 데이터 가져오기 (분석 대상일부터 7일간)
-    const sevenDaysLater = new Date(targetDate)
-    sevenDaysLater.setDate(targetDate.getDate() + 7)
-    const sevenDaysStr = sevenDaysLater.toISOString().split('T')[0]
+    // 6. OCC 데이터 가져오기 (분석 대상일부터 30일간)
+    const thirtyDaysLater = new Date(targetDate)
+    thirtyDaysLater.setDate(targetDate.getDate() + 30)
+    const thirtyDaysStr = thirtyDaysLater.toISOString().split('T')[0]
     
     const { data: occData } = await supabase
       .from('branch_room_occ')
       .select('*')
       .gte('date', targetDateStr)
-      .lte('date', sevenDaysStr)
+      .lte('date', thirtyDaysStr)
     
     // 7. 지점별 집계
     const todayByBranch = aggregateByBranch(todayData || [])
