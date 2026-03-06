@@ -24,16 +24,17 @@ jobs:
           python-version: '3.11'
 
       - name: Install dependencies
+        working-directory: m1-dashboard
         run: |
-          pip install requests pandas gspread oauth2client
+          pip install requests pandas
 
       - name: Sync Data
+        working-directory: m1-dashboard
         env:
           REDASH_API_KEY: ${{ secrets.REDASH_API_KEY }}
           REDASH_URL: ${{ secrets.REDASH_URL }}
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
-          GOOGLE_CREDENTIALS: ${{ secrets.GOOGLE_CREDENTIALS }}
           SHEET_ID: ${{ secrets.SHEET_ID }}
         run: python scripts/sync_data.py
 
