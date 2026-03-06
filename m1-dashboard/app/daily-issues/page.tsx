@@ -7,6 +7,8 @@ export default function DailyIssuesPage() {
   const [selectedDate, setSelectedDate] = useState<string>('')
   const [availableDates, setAvailableDates] = useState<string[]>([])
   const [loading, setLoading] = useState(true)
+  const [showDatePicker, setShowDatePicker] = useState(false)
+  const [newDate, setNewDate] = useState('')
 
   useEffect(() => {
     fetchAvailableDates()
@@ -54,6 +56,23 @@ export default function DailyIssuesPage() {
     setLoading(true)
     try {
       const response = await fetch('/api/daily-issues')
+      const data = await response.json()
+      setIssuesData(data)
+      setSelectedDate(data.date)
+      // 날짜 목록에 추가
+      setAvailableDates(prev => [data.date, ...prev.filter(d => d !== data.date)])
+    } catch (error) {
+      console.error('Failed to generate issues:', error)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const generateIssuesForDate = async (date: string) => {
+    setLoading(true)
+    setShowDatePicker(false)
+    try {
+      const response = await fetch(`/api/daily-issues?date=${date}`)
       const data = await response.json()
       setIssuesData(data)
       setSelectedDate(data.date)
@@ -120,11 +139,37 @@ export default function DailyIssuesPage() {
               </button>
             ))}
             <button
-              onClick={generateIssues}
-              className="px-4 py-2 text-sm font-medium rounded-lg bg-green-100 text-green-700 hover:bg-green-200 whitespace-nowrap"
+              onClick={() => setShowDatePicker(!showDatePicker)}
+              className="px-4 py-2 text-sm font-medium rounded-lg bg-green-100 text-green-700 hover:bg-green-200 whitespace-nowrap relative"
             >
-              + 새로 생성
+              + 날짜 선택 생성
             </button>
+            {showDatePicker && (
+              <div className="absolute top-full mt-2 bg-white border border-gray-200 rounded-lg shadow-lg p-4 z-50">
+                <div className="text-sm font-medium text-gray-700 mb-2">생성할 날짜 선택:</div>
+                <input
+                  type="date"
+                  value={newDate}
+                  onChange={(e) => setNewDate(e.target.value)}
+                  className="px-3 py-2 border border-gray-300 rounded-lg text-sm mb-2 w-full"
+                />
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => newDate && generateIssuesForDate(newDate)}
+                    disabled={!newDate}
+                    className="px-4 py-2 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700 disabled:bg-gray-300"
+                  >
+                    생성
+                  </button>
+                  <button
+                    onClick={() => setShowDatePicker(false)}
+                    className="px-4 py-2 bg-gray-100 text-gray-700 text-sm rounded-lg hover:bg-gray-200"
+                  >
+                    취소
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
         </div>
       </div>
@@ -143,22 +188,32 @@ export default function DailyIssuesPage() {
                       ? 'bg-red-50 border-red-500'
                       : item.severity === 'opportunity'
                       ? 'bg-green-50 border-green-500'
-                      : 'bg-yellow-50 border-yellow-500'
+                      : item.severity === 'medium'
+                      ? 'bg-yellow-50 border-yellow-500'
+                      : 'bg-gray-50 border-gray-500'
                   }`}
                 >
-                  <div className="flex items-start justify-between">
-                    <div>
-                      <div className="font-semibold text-gray-900">
-                        {item.branch} - {item.room_type}
-                      </div>
-                      <div className="text-sm text-gray-600 mt-1">
-                        {item.date} (D-{item.days_until}) | OCC {(item.occ * 100).toFixed(1)}% | ADR {item.adr?.toLocaleString()}원
-                      </div>
-                      <div className="text-sm font-medium text-gray-700 mt-2">
-                        💡 {item.recommendation}
-                      </div>
-                    </div>
+                  <div className="font-bold text-gray-900 text-lg mb-2">
+                    {item.period} (D-{item.days_until})
                   </div>
+                  <div className="text-sm text-gray-700 mb-2">
+                    평균 OCC: {(item.avg_occ * 100).toFixed(1)}% | 
+                    영향 지점: {item.total_affected}개
+                    {item.affected_branches && ` (${item.affected_branches.join(', ')})`}
+                  </div>
+                  <div className="text-sm font-medium text-blue-700 mb-3">
+                    💡 {item.recommendation}
+                  </div>
+                  {item.details && item.details.length > 0 && (
+                    <div className="mt-2 pt-2 border-t border-gray-200">
+                      <div className="text-xs text-gray-600 font-semibold mb-1">주요 사례:</div>
+                      {item.details.map((detail: any, i: number) => (
+                        <div key={i} className="text-xs text-gray-600 ml-2">
+                          • {detail.branch} {detail.room_type} ({detail.date}): OCC {(detail.occ * 100).toFixed(1)}%, ADR {detail.adr?.toLocaleString()}원
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
               ))
             ) : (
@@ -174,15 +229,27 @@ export default function DailyIssuesPage() {
             {issuesData.pricing_opportunities && issuesData.pricing_opportunities.length > 0 ? (
               issuesData.pricing_opportunities.map((item: any, idx: number) => (
                 <div key={idx} className="bg-blue-50 p-4 rounded-lg border-l-4 border-blue-500">
-                  <div className="font-semibold text-gray-900">
-                    {item.branch} - {item.room_type}
+                  <div className="font-bold text-gray-900 text-lg mb-2">
+                    {item.period}
                   </div>
-                  <div className="text-sm text-gray-600 mt-1">
-                    {item.date} | OCC {(item.occ * 100).toFixed(1)}% (+{(item.occ_change * 100).toFixed(1)}%p) | ADR {item.adr?.toLocaleString()}원
+                  <div className="text-sm text-gray-700 mb-2">
+                    평균 OCC 증가: +{(item.avg_occ_change * 100).toFixed(1)}%p | 
+                    영향 지점: {item.total_affected}개
+                    {item.affected_branches && ` (${item.affected_branches.join(', ')})`}
                   </div>
-                  <div className="text-sm font-medium text-gray-700 mt-2">
+                  <div className="text-sm font-medium text-blue-700 mb-3">
                     💡 {item.recommendation}
                   </div>
+                  {item.details && item.details.length > 0 && (
+                    <div className="mt-2 pt-2 border-t border-gray-200">
+                      <div className="text-xs text-gray-600 font-semibold mb-1">주요 사례:</div>
+                      {item.details.map((detail: any, i: number) => (
+                        <div key={i} className="text-xs text-gray-600 ml-2">
+                          • {detail.branch} {detail.room_type} ({detail.date}): OCC {(detail.occ * 100).toFixed(1)}% (+{(detail.occ_change * 100).toFixed(1)}%p)
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
               ))
             ) : (
