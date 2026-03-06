@@ -59,26 +59,28 @@ export async function GET(request: NextRequest) {
       .gte('reservation_created_at', prevWeekStartStr + ' 00:00:00')
       .lte('reservation_created_at', prevWeekEndStr + ' 23:59:59')
     
-    // 6. OCC 데이터 (이번주 + 30일)
-    const thirtyDaysLater = new Date(targetWeekStart)
-    thirtyDaysLater.setDate(targetWeekStart.getDate() + 30)
-    const thirtyDaysStr = thirtyDaysLater.toISOString().split('T')[0]
+    // 6. OCC 데이터 (다음 4주, 28일)
+    const fourWeeksLater = new Date(targetWeekEnd)
+    fourWeeksLater.setDate(targetWeekEnd.getDate() + 28)
+    const fourWeeksStr = fourWeeksLater.toISOString().split('T')[0]
     
     const { data: occData } = await supabase
       .from('branch_room_occ')
       .select('*')
-      .gte('date', weekStartStr)
-      .lte('date', thirtyDaysStr)
+      .gt('date', weekEndStr) // 이번주 이후부터
+      .lte('date', fourWeeksStr)
     
     // 7. 월 목표 데이터
     const targetMonth = targetWeekStart.getMonth() + 1
     const targetYear = targetWeekStart.getFullYear()
     
-    const { data: monthlyTargets } = await supabase
+    const { data: monthlyTargets, error: targetsError } = await supabase
       .from('targets')
       .select('*')
       .eq('year', targetYear)
       .eq('month', targetMonth)
+    
+    console.log('Monthly Targets:', { targetYear, targetMonth, count: monthlyTargets?.length, error: targetsError })
     
     // 8. 해당 월 전체 실적 (체크인 기준)
     const monthStart = `${targetYear}-${String(targetMonth).padStart(2, '0')}-01`
@@ -178,18 +180,47 @@ function aggregateByBranch(data: any[]) {
   return result
 }
 
-// 지점별 주요 이슈 분석
+// 지점별 주요 이슈 분석 (앞으로 4주)
 function analyzeBranchIssues(occData: any[], weekStart: string, weekEnd: string) {
-  const issues: any[] = []
-  const groupedByBranch: Record<string, any> = {}
+  const issuesByBranch: Record<string, any[]> = {}
   
-  const start = new Date(weekStart)
-  const end = new Date(weekEnd)
+  // 전체 지점 목록 (여수점 제외)
+  const ALL_BRANCHES = [
+    '강남예전로이움점', '강남예전시그니티점', '거북섬점', '낙산해변',
+    '당진터미널점', '동탄점(호텔)', '명동점', '부산기장점', '부산송도해변점',
+    '부산시청점', '부산역점', '부티크남포BIFF점', '부티크익선점', '서면점',
+    '속초등대해변점', '속초자이엘라더비치', '속초중앙점', '속초해변',
+    '속초해변 AB점', '속초해변C점', '송도달빛공원점', '스타즈울산점',
+    '웨이브파크점', '인천차이나타운', '제주공항점', '해운대역', '해운대패러그라프점'
+  ]
   
-  // 지점별로 그룹핑
-  occData.forEach(row => {
-    const rowDate = new Date(row.date)
-    if (rowDate >= start && rowDate <= end) {
+  const endDate = new Date(weekEnd)
+  
+  // 모든 지점 초기화
+  ALL_BRANCHES.forEach(branch => {
+    issuesByBranch[branch] = []
+  })
+  
+  // 앞으로 4주를 주차별로 분석
+  for (let weekOffset = 1; weekOffset <= 4; weekOffset++) {
+    const weekStartDate = new Date(endDate)
+    weekStartDate.setDate(endDate.getDate() + (weekOffset - 1) * 7 + 1)
+    
+    const weekEndDate = new Date(weekStartDate)
+    weekEndDate.setDate(weekStartDate.getDate() + 6)
+    
+    const weekLabel = getWeekLabel(weekStartDate)
+    
+    // 이번 주차의 데이터만 필터링
+    const weekData = occData.filter(row => {
+      const rowDate = new Date(row.date)
+      return rowDate >= weekStartDate && rowDate <= weekEndDate
+    })
+    
+    // 지점별로 그룹핑
+    const groupedByBranch: Record<string, any> = {}
+    
+    weekData.forEach(row => {
       const branch = row.branch_name
       if (!groupedByBranch[branch]) {
         groupedByBranch[branch] = {
@@ -198,60 +229,111 @@ function analyzeBranchIssues(occData: any[], weekStart: string, weekEnd: string)
         }
       }
       
+      const rowDate = new Date(row.date)
       const day = rowDate.getDay()
       if (day === 0 || day === 6) {
         groupedByBranch[branch].weekend.push(row)
       } else {
         groupedByBranch[branch].weekday.push(row)
       }
-    }
-  })
+    })
+    
+    // 모든 지점에 대해 분석
+    ALL_BRANCHES.forEach(branch => {
+      const data = groupedByBranch[branch]
+      
+      if (!data || (data.weekend.length === 0 && data.weekday.length === 0)) {
+        // 데이터 없는 경우
+        issuesByBranch[branch].push({
+          week: weekLabel,
+          issue_type: 'no_data',
+          message: `데이터 없음`,
+          severity: 'info',
+          avg_occ: 0,
+        })
+        return
+      }
+      
+      const weekendAvgOcc = data.weekend.length > 0
+        ? data.weekend.reduce((sum: number, r: any) => sum + r.occ, 0) / data.weekend.length
+        : 0
+      
+      const weekdayAvgOcc = data.weekday.length > 0
+        ? data.weekday.reduce((sum: number, r: any) => sum + r.occ, 0) / data.weekday.length
+        : 0
+      
+      // 주말 OCC 저조
+      if (weekendAvgOcc > 0 && weekendAvgOcc < 0.6 && data.weekend.length > 0) {
+        issuesByBranch[branch].push({
+          week: weekLabel,
+          issue_type: 'low_weekend_occ',
+          message: `주말 OCC 저조 (${(weekendAvgOcc * 100).toFixed(0)}%)`,
+          severity: 'high',
+          avg_occ: weekendAvgOcc,
+        })
+      }
+      // 평일 OCC 저조
+      if (weekdayAvgOcc > 0 && weekdayAvgOcc < 0.5 && data.weekday.length > 0) {
+        issuesByBranch[branch].push({
+          week: weekLabel,
+          issue_type: 'low_weekday_occ',
+          message: `평일 OCC 저조 (${(weekdayAvgOcc * 100).toFixed(0)}%)`,
+          severity: 'medium',
+          avg_occ: weekdayAvgOcc,
+        })
+      }
+      // 가격 상향 기회
+      if (weekendAvgOcc >= 0.95 && data.weekend.length > 0) {
+        issuesByBranch[branch].push({
+          week: weekLabel,
+          issue_type: 'price_increase',
+          message: `주말 가격 상향 검토 필요 (OCC ${(weekendAvgOcc * 100).toFixed(0)}%)`,
+          severity: 'opportunity',
+          avg_occ: weekendAvgOcc,
+        })
+      }
+      // 양호한 경우는 추가하지 않음 (중요한 이슈만 표시)
+    })
+  }
   
-  // 지점별 이슈 도출
-  Object.entries(groupedByBranch).forEach(([branch, data]: [string, any]) => {
-    const weekendAvgOcc = data.weekend.length > 0
-      ? data.weekend.reduce((sum: number, r: any) => sum + r.occ, 0) / data.weekend.length
-      : 0
-    
-    const weekdayAvgOcc = data.weekday.length > 0
-      ? data.weekday.reduce((sum: number, r: any) => sum + r.occ, 0) / data.weekday.length
-      : 0
-    
-    // 주말 OCC 저조
-    if (weekendAvgOcc < 0.6 && data.weekend.length > 0) {
-      issues.push({
-        branch,
-        issue_type: 'low_weekend_occ',
-        message: `주말 OCC 저조 (${(weekendAvgOcc * 100).toFixed(0)}%)`,
-        severity: 'high',
-        avg_occ: weekendAvgOcc,
-      })
-    }
-    
-    // 평일 OCC 저조
-    if (weekdayAvgOcc < 0.5 && data.weekday.length > 0) {
-      issues.push({
-        branch,
-        issue_type: 'low_weekday_occ',
-        message: `평일 OCC 저조 (${(weekdayAvgOcc * 100).toFixed(0)}%)`,
-        severity: 'medium',
-        avg_occ: weekdayAvgOcc,
-      })
-    }
-    
-    // 가격 상향 기회
-    if (weekendAvgOcc >= 0.95 && data.weekend.length > 0) {
-      issues.push({
-        branch,
-        issue_type: 'price_increase',
-        message: `주말 가격 상향 검토 필요 (OCC ${(weekendAvgOcc * 100).toFixed(0)}%)`,
-        severity: 'opportunity',
-        avg_occ: weekendAvgOcc,
-      })
-    }
-  })
+  // 배열로 변환 (지점명 포함)
+  return Object.entries(issuesByBranch).map(([branch, details]) => ({
+    branch,
+    details: details.length > 0 ? details : [{ week: '전체', message: '정상', severity: 'normal' }]
+  }))
+}
+
+// 주차 레이블 생성
+function getWeekLabel(date: Date) {
+  const month = date.getMonth() + 1
+  const firstDay = new Date(date.getFullYear(), date.getMonth(), 1)
+  let firstMonday = new Date(firstDay)
   
-  return issues
+  const dayOfWeek = firstDay.getDay()
+  if (dayOfWeek === 0) {
+    firstMonday.setDate(2)
+  } else if (dayOfWeek !== 1) {
+    firstMonday.setDate(1 + (8 - dayOfWeek))
+  }
+  
+  if (date < firstMonday) {
+    const prevMonth = date.getMonth()
+    const prevMonthFirstDay = new Date(date.getFullYear(), prevMonth, 1)
+    let prevFirstMonday = new Date(prevMonthFirstDay)
+    const prevDayOfWeek = prevMonthFirstDay.getDay()
+    if (prevDayOfWeek === 0) {
+      prevFirstMonday.setDate(2)
+    } else if (prevDayOfWeek !== 1) {
+      prevFirstMonday.setDate(1 + (8 - prevDayOfWeek))
+    }
+    
+    const weekNumber = Math.floor((date.getTime() - prevFirstMonday.getTime()) / (7 * 24 * 60 * 60 * 1000)) + 1
+    return `${prevMonth}월 ${weekNumber}주`
+  }
+  
+  const weekNumber = Math.floor((date.getTime() - firstMonday.getTime()) / (7 * 24 * 60 * 60 * 1000)) + 1
+  
+  return `${month}월 ${weekNumber}주`
 }
 
 // 이상 징후 분석
@@ -346,9 +428,14 @@ function getBottomPerformers(thisWeek: any, prevWeek: any, limit: number) {
 function getTopAchievers(actualsByBranch: any, targets: any[], limit: number) {
   const achievers: any[] = []
   
+  console.log('Top Achievers - Actuals branches:', Object.keys(actualsByBranch).length)
+  console.log('Top Achievers - Targets count:', targets.length)
+  
   Object.keys(actualsByBranch).forEach(branch => {
     const actual = actualsByBranch[branch].pickup
     const target = targets.find((t: any) => t.branch_name === branch)
+    
+    console.log(`Branch: ${branch}, Actual: ${actual}, Target:`, target)
     
     if (!target || !target.monthly_target) return
     
@@ -361,6 +448,8 @@ function getTopAchievers(actualsByBranch: any, targets: any[], limit: number) {
       achievement_pct: achievement,
     })
   })
+  
+  console.log('Top Achievers result:', achievers.length)
   
   return achievers.sort((a, b) => b.achievement_pct - a.achievement_pct).slice(0, limit)
 }
