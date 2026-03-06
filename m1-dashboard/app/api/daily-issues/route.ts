@@ -197,9 +197,9 @@ function analyzeUrgentActions(occData: any[], targetDate: string) {
         severity,
         avg_occ: avgOcc,
         days_until: minDaysUntil,
-        affected_branches: branches.slice(0, 5),
+        affected_branches: branches,
         total_affected: branches.length,
-        details: lowOccItems.slice(0, 3).map(item => ({
+        details: lowOccItems.map(item => ({  // 모든 사례
           branch: item.branch_name,
           room_type: item.room_type,
           date: item.stay_date,
@@ -224,9 +224,9 @@ function analyzeUrgentActions(occData: any[], targetDate: string) {
         severity: 'opportunity',
         avg_occ: avgOcc,
         days_until: minDaysUntil,
-        affected_branches: branches.slice(0, 5),
+        affected_branches: branches,
         total_affected: branches.length,
-        details: highOccItems.slice(0, 3).map(item => ({
+        details: highOccItems.map(item => ({  // 모든 사례
           branch: item.branch_name,
           room_type: item.room_type,
           date: item.stay_date,
@@ -301,9 +301,9 @@ function analyzePricingOpportunities(occData: any[], todayByBranch: any, yesterd
       period,
       type: 'fast_booking',
       avg_occ_change: avgOccChange,
-      affected_branches: branches.slice(0, 5),
+      affected_branches: branches,
       total_affected: branches.length,
-      details: items.slice(0, 3).map(item => ({
+      details: items.map(item => ({  // 모든 사례
         branch: item.branch_name,
         room_type: item.room_type,
         date: item.date,
