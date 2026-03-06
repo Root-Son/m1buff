@@ -144,11 +144,7 @@ export async function GET(request: NextRequest) {
         .insert([reviewData])
     }
     
-    return NextResponse.json({
-      week_start: weekStartStr,
-      week_end: weekEndStr,
-      ...reviewData,
-    })
+    return NextResponse.json(reviewData)
     
   } catch (error: any) {
     console.error('Weekly Reviews API Error:', error)
