@@ -255,19 +255,25 @@ function analyzeBranchIssues(occData: any[], weekStart: string, weekEnd: string)
   
   // 앞으로 4주를 주차별로 분석
   for (let weekOffset = 1; weekOffset <= 4; weekOffset++) {
-    const weekStartDate = new Date(endDate)
-    weekStartDate.setDate(endDate.getDate() + (weekOffset - 1) * 7 + 1)
+    // 이번주 마지막날(일요일) 기준으로 계산
+    const daysFromEnd = (weekOffset - 1) * 7 + 1
+    const weekStartDate = new Date(endDate.getTime())
+    weekStartDate.setDate(weekStartDate.getDate() + daysFromEnd)
     
-    const weekEndDate = new Date(weekStartDate)
-    weekEndDate.setDate(weekStartDate.getDate() + 6)
+    const weekEndDate = new Date(weekStartDate.getTime())
+    weekEndDate.setDate(weekEndDate.getDate() + 6)
     
     const weekLabel = getWeekLabel(weekStartDate)
+    
+    console.log(`Week ${weekOffset}: ${weekStartDate.toISOString().split('T')[0]} ~ ${weekEndDate.toISOString().split('T')[0]} (${weekLabel})`)
     
     // 이번 주차의 데이터만 필터링
     const weekData = occData.filter(row => {
       const rowDate = new Date(row.date)
       return rowDate >= weekStartDate && rowDate <= weekEndDate
     })
+    
+    console.log(`Week ${weekOffset} data count:`, weekData.length)
     
     // 지점별로 그룹핑
     const groupedByBranch: Record<string, any> = {}
@@ -357,8 +363,11 @@ function analyzeBranchIssues(occData: any[], weekStart: string, weekEnd: string)
 
 // 주차 레이블 생성
 function getWeekLabel(date: Date) {
-  const month = date.getMonth() + 1
-  const firstDay = new Date(date.getFullYear(), date.getMonth(), 1)
+  const year = date.getFullYear()
+  const month = date.getMonth() // 0-based
+  
+  // 해당 월의 첫 월요일
+  const firstDay = new Date(year, month, 1)
   let firstMonday = new Date(firstDay)
   
   const dayOfWeek = firstDay.getDay()
@@ -368,9 +377,11 @@ function getWeekLabel(date: Date) {
     firstMonday.setDate(1 + (8 - dayOfWeek))
   }
   
+  // 현재 날짜가 이번 달 첫 월요일보다 이전이면 → 전달로 계산
   if (date < firstMonday) {
-    const prevMonth = date.getMonth()
-    const prevMonthFirstDay = new Date(date.getFullYear(), prevMonth, 1)
+    const prevMonth = month === 0 ? 11 : month - 1
+    const prevYear = month === 0 ? year - 1 : year
+    const prevMonthFirstDay = new Date(prevYear, prevMonth, 1)
     let prevFirstMonday = new Date(prevMonthFirstDay)
     const prevDayOfWeek = prevMonthFirstDay.getDay()
     if (prevDayOfWeek === 0) {
@@ -380,12 +391,30 @@ function getWeekLabel(date: Date) {
     }
     
     const weekNumber = Math.floor((date.getTime() - prevFirstMonday.getTime()) / (7 * 24 * 60 * 60 * 1000)) + 1
-    return `${prevMonth}월 ${weekNumber}주`
+    return `${prevMonth + 1}월 ${weekNumber}주`
   }
   
+  // 현재 날짜가 다음 달 첫 월요일 이후면 → 다음 달로 계산
+  const nextMonth = month === 11 ? 0 : month + 1
+  const nextYear = month === 11 ? year + 1 : year
+  const nextMonthFirstDay = new Date(nextYear, nextMonth, 1)
+  let nextFirstMonday = new Date(nextMonthFirstDay)
+  const nextDayOfWeek = nextMonthFirstDay.getDay()
+  if (nextDayOfWeek === 0) {
+    nextFirstMonday.setDate(2)
+  } else if (nextDayOfWeek !== 1) {
+    nextFirstMonday.setDate(1 + (8 - nextDayOfWeek))
+  }
+  
+  if (date >= nextFirstMonday) {
+    const weekNumber = Math.floor((date.getTime() - nextFirstMonday.getTime()) / (7 * 24 * 60 * 60 * 1000)) + 1
+    return `${nextMonth + 1}월 ${weekNumber}주`
+  }
+  
+  // 이번 달로 계산
   const weekNumber = Math.floor((date.getTime() - firstMonday.getTime()) / (7 * 24 * 60 * 60 * 1000)) + 1
   
-  return `${month}월 ${weekNumber}주`
+  return `${month + 1}월 ${weekNumber}주`
 }
 
 // 이상 징후 분석
