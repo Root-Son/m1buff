@@ -3,59 +3,79 @@ import { supabase } from '@/lib/supabase'
 
 export async function GET(request: NextRequest) {
   const searchParams = request.nextUrl.searchParams
-  const targetDate = searchParams.get('date') || new Date().toISOString().split('T')[0]
+  const requestedDate = searchParams.get('date')
   
   try {
-    // 1. 해당 날짜 데이터 가져오기
-    const { data: todayData } = await supabase
+    // 1. "오늘" 정의: raw_bookings 가장 최근 날짜
+    const { data: latestBooking } = await supabase
       .from('raw_bookings')
-      .select('*')
-      .gte('reservation_created_at', targetDate + ' 00:00:00')
-      .lte('reservation_created_at', targetDate + ' 23:59:59')
+      .select('reservation_created_at')
+      .order('reservation_created_at', { ascending: false })
+      .limit(1)
     
-    // 2. 전날 데이터 가져오기
+    if (!latestBooking || latestBooking.length === 0) {
+      return NextResponse.json({ error: 'No data available' }, { status: 404 })
+    }
+    
+    const today = new Date(latestBooking[0].reservation_created_at)
+    
+    // 2. 분석 대상: 어제 (사용자가 날짜 지정하면 그 날짜)
+    const targetDate = requestedDate 
+      ? new Date(requestedDate)
+      : new Date(today.setDate(today.getDate() - 1))
+    
+    const targetDateStr = targetDate.toISOString().split('T')[0]
+    
+    // 3. 어제 = 분석 대상의 전날
     const yesterday = new Date(targetDate)
     yesterday.setDate(yesterday.getDate() - 1)
     const yesterdayStr = yesterday.toISOString().split('T')[0]
     
+    // 4. 해당 날짜(어제) 데이터 가져오기
+    const { data: todayData } = await supabase
+      .from('raw_bookings')
+      .select('*')
+      .gte('reservation_created_at', targetDateStr + ' 00:00:00')
+      .lte('reservation_created_at', targetDateStr + ' 23:59:59')
+    
+    // 5. 전날(그저께) 데이터 가져오기
     const { data: yesterdayData } = await supabase
       .from('raw_bookings')
       .select('*')
       .gte('reservation_created_at', yesterdayStr + ' 00:00:00')
       .lte('reservation_created_at', yesterdayStr + ' 23:59:59')
     
-    // 3. OCC 데이터 가져오기 (오늘과 내일 7일간)
-    const targetDateObj = new Date(targetDate)
-    const sevenDaysLater = new Date(targetDateObj)
-    sevenDaysLater.setDate(targetDateObj.getDate() + 7)
+    // 6. OCC 데이터 가져오기 (분석 대상일부터 7일간)
+    const sevenDaysLater = new Date(targetDate)
+    sevenDaysLater.setDate(targetDate.getDate() + 7)
     const sevenDaysStr = sevenDaysLater.toISOString().split('T')[0]
     
     const { data: occData } = await supabase
       .from('branch_room_occ')
       .select('*')
-      .gte('date', targetDate)
+      .gte('date', targetDateStr)
       .lte('date', sevenDaysStr)
     
-    // 4. 지점별 집계
+    // 7. 지점별 집계
     const todayByBranch = aggregateByBranch(todayData || [])
     const yesterdayByBranch = aggregateByBranch(yesterdayData || [])
     
-    // 5. 이슈 분석
-    const urgentActions = analyzeUrgentActions(occData || [], targetDate)
+    // 8. 이슈 분석
+    const urgentActions = analyzeUrgentActions(occData || [], targetDateStr)
     const pricingOpportunities = analyzePricingOpportunities(occData || [], todayByBranch, yesterdayByBranch)
     const anomalies = analyzeAnomalies(todayByBranch, yesterdayByBranch)
     const topPerformers = getTopPerformers(todayByBranch, yesterdayByBranch, 5)
     const bottomPerformers = getBottomPerformers(todayByBranch, yesterdayByBranch, 5)
     
-    // 6. DB에 저장
+    // 9. DB에 저장
     const { data: existingIssue } = await supabase
       .from('daily_issues')
       .select('id')
-      .eq('issue_date', targetDate)
+      .eq('issue_date', targetDateStr)
       .single()
     
     const issueData = {
-      issue_date: targetDate,
+      issue_date: targetDateStr,
       urgent_actions: urgentActions,
       pricing_opportunities: pricingOpportunities,
       anomalies: anomalies,
@@ -65,6 +85,7 @@ export async function GET(request: NextRequest) {
       avg_occ: calculateAvgOcc(occData || []),
       data_summary: {
         branches_analyzed: Object.keys(todayByBranch).length,
+        compared_to: yesterdayStr,
         generated_at: new Date().toISOString()
       }
     }
@@ -81,7 +102,8 @@ export async function GET(request: NextRequest) {
     }
     
     return NextResponse.json({
-      date: targetDate,
+      date: targetDateStr,
+      compared_to: yesterdayStr,
       ...issueData
     })
     
