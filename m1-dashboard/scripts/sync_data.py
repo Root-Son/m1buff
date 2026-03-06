@@ -1,6 +1,9 @@
 """
-M1버프 현황판 - 자동 데이터 동기화 스크립트 (파라미터 버전)
-Redash 쿼리 결과 + Google Sheets → Supabase
+M1버프 현황판 - 자동 데이터 동기화 스크립트
+branch_room_occ: Google Sheets
+yolo_prices: Redash
+price_guide: Google Sheets  
+raw_bookings: Redash
 """
 
 import os
@@ -16,19 +19,14 @@ SUPABASE_URL = os.environ['SUPABASE_URL']
 SUPABASE_KEY = os.environ['SUPABASE_KEY']
 SHEET_ID = os.environ['SHEET_ID']
 
-# Redash 쿼리 ID
+# Redash 쿼리 ID (yolo_prices, raw_bookings만 사용)
 QUERIES = {
-    'branch_room_occ': 737,
     'yolo_prices': 728,
     'raw_bookings': 711
 }
 
 # 날짜 범위 설정
 DATE_RANGES = {
-    'branch_room_occ': {
-        'start': '2026-01-01',
-        'end': date.today().strftime('%Y-%m-%d')
-    },
     'yolo_prices': {
         'start': '2026-01-01',
         'end': date.today().strftime('%Y-%m-%d')
@@ -39,11 +37,16 @@ DATE_RANGES = {
     }
 }
 
+# Google Sheets GID
+SHEET_GIDS = {
+    'branch_room_occ': '1130833605',
+    'price_guide': '261469936'
+}
+
 def execute_redash_query(query_id, parameters=None):
-    """Redash 쿼리 실행 및 결과 가져오기 (파라미터 포함)"""
+    """Redash 쿼리 실행 및 결과 가져오기"""
     print(f"🔄 쿼리 {query_id} 실행 중... (파라미터: {parameters})")
     
-    # 쿼리 실행
     refresh_url = f"{REDASH_URL}/api/queries/{query_id}/refresh"
     headers = {'Authorization': f'Key {REDASH_API_KEY}'}
     
@@ -56,40 +59,36 @@ def execute_redash_query(query_id, parameters=None):
     
     job = response.json()['job']
     
-    # 결과 대기
     result_url = f"{REDASH_URL}/api/jobs/{job['id']}"
-    max_attempts = 120  # raw_bookings는 시간 오래 걸릴 수 있음
+    max_attempts = 120
     
     for attempt in range(max_attempts):
         result = requests.get(result_url, headers=headers).json()
         
-        if result['job']['status'] == 3:  # 완료
+        if result['job']['status'] == 3:
             print(f"✅ 쿼리 {query_id} 완료!")
             
-            # 결과 가져오기
             query_result_id = result['job']['query_result_id']
             data_url = f"{REDASH_URL}/api/query_results/{query_result_id}"
             data = requests.get(data_url, headers=headers).json()
             
             return pd.DataFrame(data['query_result']['data']['rows'])
         
-        elif result['job']['status'] == 4:  # 실패
+        elif result['job']['status'] == 4:
             raise Exception(f"쿼리 {query_id} 실행 실패!")
         
         time.sleep(3)
     
     raise Exception(f"쿼리 {query_id} 타임아웃!")
 
-def get_google_sheet_data():
-    """Google Sheets에서 price_guide 데이터 가져오기"""
-    print("🔄 Google Sheets 데이터 가져오는 중...")
+def get_google_sheet_data(gid: str, sheet_name: str):
+    """Google Sheets에서 데이터 가져오기"""
+    print(f"🔄 Google Sheets ({sheet_name}) 데이터 가져오는 중...")
     
-    # CSV export URL
-    gid = '261469936'  # price_guide 시트 GID
     csv_url = f"https://docs.google.com/spreadsheets/d/{SHEET_ID}/export?format=csv&gid={gid}"
     
     df = pd.read_csv(csv_url)
-    print(f"✅ Google Sheets 데이터 {len(df)}개 로드!")
+    print(f"✅ Google Sheets ({sheet_name}) 데이터 {len(df)}개 로드!")
     
     return df
 
@@ -108,9 +107,8 @@ def upload_to_supabase(table_name, data):
     print(f"  - 기존 데이터 삭제 중...")
     delete_url = f"{SUPABASE_URL}/rest/v1/{table_name}"
     
-    # 전체 삭제 (조건 없이)
     delete_response = requests.delete(
-        f"{delete_url}?id=gte.0",  # 모든 레코드
+        f"{delete_url}?id=gte.0",
         headers=headers
     )
     
@@ -146,7 +144,6 @@ def normalize_branch_name(name):
     
     cleaned = str(name).strip()
     
-    # 특수 케이스만 매핑
     mapping = {
         '동탄점': '동탄점(호텔)',
         '호텔동탄': '동탄점(호텔)',
@@ -157,7 +154,7 @@ def normalize_branch_name(name):
     return mapping.get(cleaned, cleaned)
 
 def process_branch_room_occ(df):
-    """branch_room_occ 데이터 처리"""
+    """branch_room_occ 데이터 처리 (Google Sheets)"""
     # 컬럼명 매핑
     column_map = {
         '일자': 'date',
@@ -182,10 +179,10 @@ def process_branch_room_occ(df):
     # 지점명 통일
     df['branch_name'] = df['branch_name'].apply(normalize_branch_name)
     
-    # OCC 값들을 소수로 변환 (100으로 나누기)
+    # OCC 값들을 소수로 변환 (이미 소수면 그대로, 아니면 100으로 나누기)
     for col in ['occ', 'occ_asof', 'occ_1d_ago', 'occ_7d_ago']:
         if col in df.columns:
-            df[col] = df[col] / 100
+            df[col] = df[col].apply(lambda x: x if (pd.isna(x) or x <= 1) else x / 100)
     
     # NULL 처리
     df = df.fillna(0)
@@ -193,8 +190,7 @@ def process_branch_room_occ(df):
     return df.to_dict('records')
 
 def process_yolo_prices(df):
-    """yolo_prices 데이터 처리"""
-    # 컬럼명 매핑
+    """yolo_prices 데이터 처리 (Redash)"""
     column_map = {
         '날짜': 'date',
         '지점': 'branch_name',
@@ -203,11 +199,7 @@ def process_yolo_prices(df):
     }
     
     df = df.rename(columns=column_map)
-    
-    # 지점명 통일
     df['branch_name'] = df['branch_name'].apply(normalize_branch_name)
-    
-    # 불필요한 데이터 제거
     df = df[df['room_type'].notna() & (df['room_type'] != '-')]
     df = df[df['price'] > 0]
     
@@ -215,18 +207,13 @@ def process_yolo_prices(df):
 
 def process_price_guide(df):
     """price_guide 데이터 처리 (Google Sheets)"""
-    # 첫 행이 헤더인지 확인
     if df.columns[0] != 'date':
         df.columns = ['date', 'branch_name', 'room_type', 'min_price']
     
-    # 지점명 통일
     df['branch_name'] = df['branch_name'].apply(normalize_branch_name)
-    
-    # 불필요한 데이터 제거
     df = df[df['room_type'].notna() & (df['room_type'] != '-')]
     df = df[df['min_price'].notna() & (df['min_price'] != '-')]
     
-    # 가격을 숫자로 변환
     df['min_price'] = pd.to_numeric(df['min_price'], errors='coerce')
     df = df.dropna(subset=['min_price'])
     df = df[df['min_price'] > 0]
@@ -234,11 +221,8 @@ def process_price_guide(df):
     return df.to_dict('records')
 
 def process_raw_bookings(df):
-    """raw_bookings 데이터 처리"""
-    # 지점명 통일
+    """raw_bookings 데이터 처리 (Redash)"""
     df['branch_name'] = df['branch_name'].apply(normalize_branch_name)
-    
-    # NULL 처리
     df = df.fillna(0)
     
     return df.to_dict('records')
@@ -251,40 +235,33 @@ def main():
     print(f"{'='*60}\n")
     
     try:
-        # 1. branch_room_occ (2026-01-01 ~ 오늘)
-        print("\n[1/4] branch_room_occ 동기화")
-        params_occ = {
-            'startDate': DATE_RANGES['branch_room_occ']['start'],
-            'endDate': DATE_RANGES['branch_room_occ']['end']
-            # branchId는 쿼리에 디폴트 값 사용
-        }
-        df_occ = execute_redash_query(QUERIES['branch_room_occ'], params_occ)
+        # 1. branch_room_occ (Google Sheets)
+        print("\n[1/4] branch_room_occ 동기화 (Google Sheets)")
+        df_occ = get_google_sheet_data(SHEET_GIDS['branch_room_occ'], 'branch_room_occ')
         data_occ = process_branch_room_occ(df_occ)
         upload_to_supabase('branch_room_occ', data_occ)
         
-        # 2. yolo_prices (2026-01-01 ~ 오늘)
-        print("\n[2/4] yolo_prices 동기화")
+        # 2. yolo_prices (Redash)
+        print("\n[2/4] yolo_prices 동기화 (Redash)")
         params_yolo = {
             'date.start': DATE_RANGES['yolo_prices']['start'],
             'date.end': DATE_RANGES['yolo_prices']['end']
-            # branch는 쿼리 디폴트 값 사용
         }
         df_yolo = execute_redash_query(QUERIES['yolo_prices'], params_yolo)
         data_yolo = process_yolo_prices(df_yolo)
         upload_to_supabase('yolo_prices', data_yolo)
         
-        # 3. price_guide (Google Sheets - 전체)
-        print("\n[3/4] price_guide 동기화")
-        df_guide = get_google_sheet_data()
+        # 3. price_guide (Google Sheets)
+        print("\n[3/4] price_guide 동기화 (Google Sheets)")
+        df_guide = get_google_sheet_data(SHEET_GIDS['price_guide'], 'price_guide')
         data_guide = process_price_guide(df_guide)
         upload_to_supabase('price_guide', data_guide)
         
-        # 4. raw_bookings (2025-01-01 ~ 오늘) - 가장 큼!
-        print("\n[4/4] raw_bookings 동기화 (대용량 - 시간 소요)")
+        # 4. raw_bookings (Redash - 대용량)
+        print("\n[4/4] raw_bookings 동기화 (Redash - 대용량)")
         params_bookings = {
             'startDate': DATE_RANGES['raw_bookings']['start'],
             'endDate': DATE_RANGES['raw_bookings']['end']
-            # branchId는 쿼리 디폴트 값 사용
         }
         df_bookings = execute_redash_query(QUERIES['raw_bookings'], params_bookings)
         data_bookings = process_raw_bookings(df_bookings)
