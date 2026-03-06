@@ -22,16 +22,13 @@ export default function DailyIssuesPage() {
 
   const fetchAvailableDates = async () => {
     try {
-      // 저장된 이슈 날짜 목록 가져오기
       const response = await fetch('/api/daily-issues/list')
       const dates = await response.json()
       setAvailableDates(dates)
       
-      // 가장 최근 날짜 선택
       if (dates.length > 0) {
         setSelectedDate(dates[0])
       }
-      // 날짜 없어도 여기서는 생성 안 함
       setLoading(false)
     } catch (error) {
       console.error('Failed to fetch dates:', error)
@@ -52,22 +49,6 @@ export default function DailyIssuesPage() {
     }
   }
 
-  const generateIssues = async () => {
-    setLoading(true)
-    try {
-      const response = await fetch('/api/daily-issues')
-      const data = await response.json()
-      setIssuesData(data)
-      setSelectedDate(data.date)
-      // 날짜 목록에 추가
-      setAvailableDates(prev => [data.date, ...prev.filter(d => d !== data.date)])
-    } catch (error) {
-      console.error('Failed to generate issues:', error)
-    } finally {
-      setLoading(false)
-    }
-  }
-
   const generateIssuesForDate = async (date: string) => {
     setLoading(true)
     setShowDatePicker(false)
@@ -76,8 +57,7 @@ export default function DailyIssuesPage() {
       const data = await response.json()
       setIssuesData(data)
       setSelectedDate(data.date)
-      // 날짜 목록에 추가
-      setAvailableDates(prev => [data.date, ...prev.filter(d => d !== data.date)])
+      setAvailableDates(prev => [data.date, ...prev.filter(d => d !== data.date)].sort().reverse())
     } catch (error) {
       console.error('Failed to generate issues:', error)
     } finally {
@@ -98,12 +78,21 @@ export default function DailyIssuesPage() {
       <div className="min-h-screen flex items-center justify-center bg-gray-50">
         <div className="text-center">
           <div className="text-xl mb-4">이슈 데이터가 없습니다</div>
-          <button
-            onClick={generateIssues}
-            className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
-          >
-            지금 생성하기
-          </button>
+          <div className="space-y-2">
+            <input
+              type="date"
+              value={newDate}
+              onChange={(e) => setNewDate(e.target.value)}
+              className="px-3 py-2 border border-gray-300 rounded-lg"
+            />
+            <button
+              onClick={() => newDate && generateIssuesForDate(newDate)}
+              disabled={!newDate}
+              className="ml-2 px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-gray-300"
+            >
+              생성하기
+            </button>
+          </div>
         </div>
       </div>
     )
@@ -111,7 +100,6 @@ export default function DailyIssuesPage() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* 헤더 */}
       <header className="bg-white border-b border-gray-200 sticky top-0 z-10">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
           <h1 className="text-2xl font-bold text-gray-900">🔥 일간 이슈</h1>
@@ -121,10 +109,9 @@ export default function DailyIssuesPage() {
         </div>
       </header>
 
-      {/* 날짜 선택 */}
       <div className="bg-white border-b border-gray-200 sticky top-[73px] z-40">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
-          <div className="flex items-center gap-2 overflow-x-auto">
+          <div className="flex items-center gap-2 overflow-x-auto relative">
             {availableDates.map((date) => (
               <button
                 key={date}
@@ -140,17 +127,18 @@ export default function DailyIssuesPage() {
             ))}
             <button
               onClick={() => setShowDatePicker(!showDatePicker)}
-              className="px-4 py-2 text-sm font-medium rounded-lg bg-green-100 text-green-700 hover:bg-green-200 whitespace-nowrap relative"
+              className="px-4 py-2 text-sm font-medium rounded-lg bg-green-100 text-green-700 hover:bg-green-200 whitespace-nowrap"
             >
               + 날짜 선택 생성
             </button>
             {showDatePicker && (
-              <div className="absolute top-full mt-2 bg-white border border-gray-200 rounded-lg shadow-lg p-4 z-50">
+              <div className="absolute top-full left-0 mt-2 bg-white border border-gray-200 rounded-lg shadow-lg p-4 z-50">
                 <div className="text-sm font-medium text-gray-700 mb-2">생성할 날짜 선택:</div>
                 <input
                   type="date"
                   value={newDate}
                   onChange={(e) => setNewDate(e.target.value)}
+                  max="2030-12-31"
                   className="px-3 py-2 border border-gray-300 rounded-lg text-sm mb-2 w-full"
                 />
                 <div className="flex gap-2">
@@ -194,12 +182,14 @@ export default function DailyIssuesPage() {
                   }`}
                 >
                   <div className="font-bold text-gray-900 text-lg mb-2">
-                    {item.period} (D-{item.days_until})
+                    {item.period} (D-{item.days_until}~)
                   </div>
                   <div className="text-sm text-gray-700 mb-2">
                     평균 OCC: {(item.avg_occ * 100).toFixed(1)}% | 
                     영향 지점: {item.total_affected}개
-                    {item.affected_branches && ` (${item.affected_branches.join(', ')})`}
+                    {item.affected_branches && item.affected_branches.length > 0 && 
+                      ` (${item.affected_branches.slice(0, 3).join(', ')}${item.affected_branches.length > 3 ? '...' : ''})`
+                    }
                   </div>
                   <div className="text-sm font-medium text-blue-700 mb-3">
                     💡 {item.recommendation}
@@ -235,7 +225,9 @@ export default function DailyIssuesPage() {
                   <div className="text-sm text-gray-700 mb-2">
                     평균 OCC 증가: +{(item.avg_occ_change * 100).toFixed(1)}%p | 
                     영향 지점: {item.total_affected}개
-                    {item.affected_branches && ` (${item.affected_branches.join(', ')})`}
+                    {item.affected_branches && item.affected_branches.length > 0 && 
+                      ` (${item.affected_branches.slice(0, 3).join(', ')}${item.affected_branches.length > 3 ? '...' : ''})`
+                    }
                   </div>
                   <div className="text-sm font-medium text-blue-700 mb-3">
                     💡 {item.recommendation}
@@ -289,7 +281,6 @@ export default function DailyIssuesPage() {
 
         {/* 성과 Top/Bottom */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          {/* Top 5 */}
           <section>
             <h2 className="text-lg font-bold text-gray-900 mb-4">✅ 잘한 지점 Top 5</h2>
             <div className="space-y-3">
@@ -318,7 +309,6 @@ export default function DailyIssuesPage() {
             </div>
           </section>
 
-          {/* Bottom 5 */}
           <section>
             <h2 className="text-lg font-bold text-gray-900 mb-4">⚠️ 개선 필요 지점 Bottom 5</h2>
             <div className="space-y-3">
