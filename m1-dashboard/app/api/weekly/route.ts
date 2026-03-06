@@ -47,47 +47,48 @@ export async function GET(request: NextRequest) {
 
     const result = data?.[0]
 
-    // ✅ 날짜별로 나눠서 가져오기 (7일이므로 7번 쿼리)
+    // ✅ 전체 기간 데이터를 한 번에 가져오기 (UTC 문제 해결)
+    let daily_query = supabase
+      .from('raw_bookings')
+      .select('reservation_created_at, payment_amount, check_in_date')
+      .gte('reservation_created_at', startStr + ' 00:00:00')
+      .lte('reservation_created_at', endDate + ' 23:59:59')
+
+    if (branch !== 'all') {
+      daily_query = daily_query.eq('branch_name', branch)
+    }
+
+    const { data: allData } = await daily_query.limit(100000)
+
+    // ✅ JavaScript에서 로컬 날짜로 분류
     const dailyMap: Record<string, { pickup: number; month1: number; month2: number; month3: number }> = {}
     const startMonth = new Date(startStr).getMonth() + 1
-    
-    for (let i = 0; i < 7; i++) {
-      const date = new Date(startStr)
-      date.setDate(date.getDate() + i)
-      const dateStr = date.toISOString().split('T')[0]
-      
-      // 날짜별로 쿼리
-      let daily_query = supabase
-        .from('raw_bookings')
-        .select('reservation_created_at, payment_amount, check_in_date')
-        .gte('reservation_created_at', dateStr + ' 00:00:00')
-        .lte('reservation_created_at', dateStr + ' 23:59:59')
 
-      if (branch !== 'all') {
-        daily_query = daily_query.eq('branch_name', branch)
+    allData?.forEach((row) => {
+      // 로컬 날짜로 변환
+      const createdDate = new Date(row.reservation_created_at)
+      const year = createdDate.getFullYear()
+      const month = String(createdDate.getMonth() + 1).padStart(2, '0')
+      const day = String(createdDate.getDate()).padStart(2, '0')
+      const dateKey = `${year}-${month}-${day}`
+
+      if (!dailyMap[dateKey]) {
+        dailyMap[dateKey] = { pickup: 0, month1: 0, month2: 0, month3: 0 }
       }
 
-      const { data: dailyData } = await daily_query.limit(50000)
-      
-      if (!dailyMap[dateStr]) {
-        dailyMap[dateStr] = { pickup: 0, month1: 0, month2: 0, month3: 0 }
+      const amount = row.payment_amount || 0
+      dailyMap[dateKey].pickup += amount
+
+      const checkinMonth = new Date(row.check_in_date).getMonth() + 1
+
+      if (checkinMonth === startMonth) {
+        dailyMap[dateKey].month1 += amount
+      } else if (checkinMonth === (startMonth % 12) + 1) {
+        dailyMap[dateKey].month2 += amount
+      } else if (checkinMonth === ((startMonth + 1) % 12) + 1) {
+        dailyMap[dateKey].month3 += amount
       }
-
-      dailyData?.forEach((row) => {
-        const amount = row.payment_amount || 0
-        dailyMap[dateStr].pickup += amount
-
-        const checkinMonth = new Date(row.check_in_date).getMonth() + 1
-
-        if (checkinMonth === startMonth) {
-          dailyMap[dateStr].month1 += amount
-        } else if (checkinMonth === (startMonth % 12) + 1) {
-          dailyMap[dateStr].month2 += amount
-        } else if (checkinMonth === ((startMonth + 1) % 12) + 1) {
-          dailyMap[dateStr].month3 += amount
-        }
-      })
-    }
+    })
 
     const days = []
     for (let i = 6; i >= 0; i--) {
