@@ -64,15 +64,21 @@ export async function GET(request: NextRequest) {
     fourWeeksLater.setDate(targetWeekEnd.getDate() + 28)
     const fourWeeksStr = fourWeeksLater.toISOString().split('T')[0]
     
-    const { data: occData } = await supabase
+    console.log('OCC Query Range:', { from: weekEndStr, to: fourWeeksStr })
+    
+    const { data: occData, error: occError } = await supabase
       .from('branch_room_occ')
       .select('*')
-      .gt('date', weekEndStr) // 이번주 이후부터
+      .gte('date', weekEndStr) // 이번주 마지막날부터
       .lte('date', fourWeeksStr)
+    
+    console.log('OCC Data:', { count: occData?.length, error: occError })
     
     // 7. 월 목표 데이터
     const targetMonth = targetWeekStart.getMonth() + 1
     const targetYear = targetWeekStart.getFullYear()
+    
+    console.log('Targets Query:', { targetYear, targetMonth })
     
     const { data: monthlyTargets, error: targetsError } = await supabase
       .from('targets')
@@ -80,17 +86,25 @@ export async function GET(request: NextRequest) {
       .eq('year', targetYear)
       .eq('month', targetMonth)
     
-    console.log('Monthly Targets:', { targetYear, targetMonth, count: monthlyTargets?.length, error: targetsError })
+    console.log('Monthly Targets:', { 
+      count: monthlyTargets?.length, 
+      error: targetsError,
+      sample: monthlyTargets?.[0]
+    })
     
     // 8. 해당 월 전체 실적 (체크인 기준)
     const monthStart = `${targetYear}-${String(targetMonth).padStart(2, '0')}-01`
     const monthEnd = new Date(targetYear, targetMonth, 0).toISOString().split('T')[0]
     
-    const { data: monthlyActuals } = await supabase
+    console.log('Monthly Actuals Query:', { monthStart, monthEnd })
+    
+    const { data: monthlyActuals, error: actualsError } = await supabase
       .from('raw_bookings')
-      .select('*')
+      .select('branch_name, payment_amount')
       .gte('check_in_date', monthStart)
       .lte('check_in_date', monthEnd)
+    
+    console.log('Monthly Actuals:', { count: monthlyActuals?.length, error: actualsError })
     
     // 9. 지점별 집계
     const thisWeekByBranch = aggregateByBranch(thisWeekData || [])
@@ -435,16 +449,16 @@ function getTopAchievers(actualsByBranch: any, targets: any[], limit: number) {
     const actual = actualsByBranch[branch].pickup
     const target = targets.find((t: any) => t.branch_name === branch)
     
-    console.log(`Branch: ${branch}, Actual: ${actual}, Target:`, target)
+    console.log(`Branch: ${branch}, Actual: ${actual}, Target:`, target?.target_amount)
     
-    if (!target || !target.monthly_target) return
+    if (!target || !target.target_amount) return
     
-    const achievement = (actual / target.monthly_target) * 100
+    const achievement = (actual / target.target_amount) * 100
     
     achievers.push({
       branch,
       actual,
-      target: target.monthly_target,
+      target: target.target_amount,
       achievement_pct: achievement,
     })
   })
@@ -462,14 +476,14 @@ function getBottomAchievers(actualsByBranch: any, targets: any[], limit: number)
     const actual = actualsByBranch[branch].pickup
     const target = targets.find((t: any) => t.branch_name === branch)
     
-    if (!target || !target.monthly_target) return
+    if (!target || !target.target_amount) return
     
-    const achievement = (actual / target.monthly_target) * 100
+    const achievement = (actual / target.target_amount) * 100
     
     achievers.push({
       branch,
       actual,
-      target: target.monthly_target,
+      target: target.target_amount,
       achievement_pct: achievement,
     })
   })
