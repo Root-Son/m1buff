@@ -429,14 +429,22 @@ export default function Dashboard() {
               <h1 className="text-2xl font-bold text-gray-900">📊 M1버프 현황판</h1>
               <p className="text-sm text-gray-500 mt-1">실시간 현황</p>
             </div>
-            <a
-              href="https://test-omega-rouge-35.vercel.app/"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 transition-colors"
-            >
-              리드타임별 예약점유율 데이터 →
-            </a>
+            <div className="flex items-center gap-2">
+              <a
+                href="/daily-issues"
+                className="px-4 py-2 bg-red-600 text-white text-sm font-medium rounded-lg hover:bg-red-700 transition-colors"
+              >
+                🔥 일간 이슈
+              </a>
+              <a
+                href="https://test-omega-rouge-35.vercel.app/"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 transition-colors"
+              >
+                리드타임별 예약점유율 데이터 →
+              </a>
+            </div>
           </div>
         </div>
       </header>
