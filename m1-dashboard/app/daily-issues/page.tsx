@@ -2,6 +2,65 @@
 
 import { useState, useEffect } from 'react'
 
+// 접기/펼치기 컴포넌트
+function ExpandableCard({ item, type }: { item: any, type: 'urgent' | 'pricing' }) {
+  const [isExpanded, setIsExpanded] = useState(false)
+  
+  const bgColor = type === 'urgent' 
+    ? item.severity === 'high'
+      ? 'bg-red-50 border-red-500'
+      : item.severity === 'opportunity'
+      ? 'bg-green-50 border-green-500'
+      : item.severity === 'medium'
+      ? 'bg-yellow-50 border-yellow-500'
+      : 'bg-gray-50 border-gray-500'
+    : 'bg-blue-50 border-blue-500'
+  
+  return (
+    <div className={`p-4 rounded-lg border-l-4 ${bgColor}`}>
+      <div className="font-bold text-gray-900 text-lg mb-2">
+        {item.period} {type === 'urgent' && `(D-${item.days_until}~)`}
+      </div>
+      <div className="text-sm text-gray-700 mb-2">
+        {type === 'urgent' ? (
+          <>평균 OCC: {(item.avg_occ * 100).toFixed(1)}%</>
+        ) : (
+          <>평균 OCC 증가: +{(item.avg_occ_change * 100).toFixed(1)}%p</>
+        )} | 
+        영향 지점: {item.total_affected}개
+        {item.affected_branches && item.affected_branches.length > 0 && 
+          ` (${item.affected_branches.slice(0, 3).join(', ')}${item.affected_branches.length > 3 ? '...' : ''})`
+        }
+      </div>
+      <div className="text-sm font-medium text-blue-700 mb-3">
+        💡 {item.recommendation}
+      </div>
+      {item.details && item.details.length > 0 && (
+        <div className="mt-2 pt-2 border-t border-gray-200">
+          <button
+            onClick={() => setIsExpanded(!isExpanded)}
+            className="text-xs text-blue-600 hover:text-blue-800 font-semibold mb-1"
+          >
+            {isExpanded ? '▼' : '▶'} 전체 사례 보기 ({item.details.length}개)
+          </button>
+          {isExpanded && (
+            <div className="mt-2 space-y-1 max-h-64 overflow-y-auto">
+              {item.details.map((detail: any, i: number) => (
+                <div key={i} className="text-xs text-gray-600 ml-2">
+                  • {detail.branch} {detail.room_type} ({detail.date}): 
+                  OCC {(detail.occ * 100).toFixed(1)}%
+                  {type === 'pricing' && ` (+${(detail.occ_change * 100).toFixed(1)}%p)`}
+                  {detail.adr && `, ADR ${detail.adr.toLocaleString()}원`}
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  )
+}
+
 export default function DailyIssuesPage() {
   const [issuesData, setIssuesData] = useState<any>(null)
   const [selectedDate, setSelectedDate] = useState<string>('')
@@ -168,56 +227,9 @@ export default function DailyIssuesPage() {
           <h2 className="text-lg font-bold text-gray-900 mb-4">🚨 가격 하향 검토 필요</h2>
           <div className="space-y-3">
             {issuesData.urgent_actions && issuesData.urgent_actions.length > 0 ? (
-              issuesData.urgent_actions.map((item: any, idx: number) => {
-                const [isExpanded, setIsExpanded] = useState(false)
-                return (
-                  <div
-                    key={idx}
-                    className={`p-4 rounded-lg border-l-4 ${
-                      item.severity === 'high'
-                        ? 'bg-red-50 border-red-500'
-                        : item.severity === 'opportunity'
-                        ? 'bg-green-50 border-green-500'
-                        : item.severity === 'medium'
-                        ? 'bg-yellow-50 border-yellow-500'
-                        : 'bg-gray-50 border-gray-500'
-                    }`}
-                  >
-                    <div className="font-bold text-gray-900 text-lg mb-2">
-                      {item.period} (D-{item.days_until}~)
-                    </div>
-                    <div className="text-sm text-gray-700 mb-2">
-                      평균 OCC: {(item.avg_occ * 100).toFixed(1)}% | 
-                      영향 지점: {item.total_affected}개
-                      {item.affected_branches && item.affected_branches.length > 0 && 
-                        ` (${item.affected_branches.slice(0, 3).join(', ')}${item.affected_branches.length > 3 ? '...' : ''})`
-                      }
-                    </div>
-                    <div className="text-sm font-medium text-blue-700 mb-3">
-                      💡 {item.recommendation}
-                    </div>
-                    {item.details && item.details.length > 0 && (
-                      <div className="mt-2 pt-2 border-t border-gray-200">
-                        <button
-                          onClick={() => setIsExpanded(!isExpanded)}
-                          className="text-xs text-blue-600 hover:text-blue-800 font-semibold mb-1"
-                        >
-                          {isExpanded ? '▼' : '▶'} 전체 사례 보기 ({item.details.length}개)
-                        </button>
-                        {isExpanded && (
-                          <div className="mt-2 space-y-1">
-                            {item.details.map((detail: any, i: number) => (
-                              <div key={i} className="text-xs text-gray-600 ml-2">
-                                • {detail.branch} {detail.room_type} ({detail.date}): OCC {(detail.occ * 100).toFixed(1)}%, ADR {detail.adr?.toLocaleString()}원
-                              </div>
-                            ))}
-                          </div>
-                        )}
-                      </div>
-                    )}
-                  </div>
-                )
-              })
+              issuesData.urgent_actions.map((item: any, idx: number) => (
+                <ExpandableCard key={idx} item={item} type="urgent" />
+              ))
             ) : (
               <div className="text-center py-8 text-gray-500">가격 하향이 필요한 항목이 없습니다</div>
             )}
@@ -229,45 +241,9 @@ export default function DailyIssuesPage() {
           <h2 className="text-lg font-bold text-gray-900 mb-4">💰 가격 조정 기회</h2>
           <div className="space-y-3">
             {issuesData.pricing_opportunities && issuesData.pricing_opportunities.length > 0 ? (
-              issuesData.pricing_opportunities.map((item: any, idx: number) => {
-                const [isExpanded, setIsExpanded] = useState(false)
-                return (
-                  <div key={idx} className="bg-blue-50 p-4 rounded-lg border-l-4 border-blue-500">
-                    <div className="font-bold text-gray-900 text-lg mb-2">
-                      {item.period}
-                    </div>
-                    <div className="text-sm text-gray-700 mb-2">
-                      평균 OCC 증가: +{(item.avg_occ_change * 100).toFixed(1)}%p | 
-                      영향 지점: {item.total_affected}개
-                      {item.affected_branches && item.affected_branches.length > 0 && 
-                        ` (${item.affected_branches.slice(0, 3).join(', ')}${item.affected_branches.length > 3 ? '...' : ''})`
-                      }
-                    </div>
-                    <div className="text-sm font-medium text-blue-700 mb-3">
-                      💡 {item.recommendation}
-                    </div>
-                    {item.details && item.details.length > 0 && (
-                      <div className="mt-2 pt-2 border-t border-gray-200">
-                        <button
-                          onClick={() => setIsExpanded(!isExpanded)}
-                          className="text-xs text-blue-600 hover:text-blue-800 font-semibold mb-1"
-                        >
-                          {isExpanded ? '▼' : '▶'} 전체 사례 보기 ({item.details.length}개)
-                        </button>
-                        {isExpanded && (
-                          <div className="mt-2 space-y-1">
-                            {item.details.map((detail: any, i: number) => (
-                              <div key={i} className="text-xs text-gray-600 ml-2">
-                                • {detail.branch} {detail.room_type} ({detail.date}): OCC {(detail.occ * 100).toFixed(1)}% (+{(detail.occ_change * 100).toFixed(1)}%p)
-                              </div>
-                            ))}
-                          </div>
-                        )}
-                      </div>
-                    )}
-                  </div>
-                )
-              })
+              issuesData.pricing_opportunities.map((item: any, idx: number) => (
+                <ExpandableCard key={idx} item={item} type="pricing" />
+              ))
             ) : (
               <div className="text-center py-8 text-gray-500">가격 조정 기회가 없습니다</div>
             )}
