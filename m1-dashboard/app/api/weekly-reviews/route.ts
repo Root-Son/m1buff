@@ -1,5 +1,8 @@
+// Version: 2024-03-07-FINAL-FIX
 export const dynamic = 'force-dynamic'
 export const revalidate = 0
+export const runtime = 'nodejs'
+
 import { NextRequest, NextResponse } from 'next/server'
 import { supabase } from '@/lib/supabase'
 
@@ -82,12 +85,10 @@ export async function GET(request: NextRequest) {
       .gte('date', nextDayStr)
       .lte('date', fourWeeksStr)
     
-    console.log('OCC Data Result:', {
-      count: occData?.length,
-      error: occError,
-      uniqueDates: occData ? [...new Set(occData.map(r => r.date))].sort().slice(0, 10) : [],
-      uniqueBranches: occData ? [...new Set(occData.map(r => r.branch_name))].length : 0
-    })
+    console.log('===== OCC Data Result =====')
+    console.log('Count:', occData?.length)
+    console.log('Error:', occError)
+    console.log('Sample dates:', occData ? [...new Set(occData.map(r => r.date))].sort().slice(0, 10) : [])
     
     // 7. 월 목표 데이터
     const targetMonth = targetWeekStart.getMonth() + 1
@@ -111,9 +112,7 @@ export async function GET(request: NextRequest) {
     const monthStart = `${targetYear}-${String(targetMonth).padStart(2, '0')}-01`
     const monthEnd = new Date(targetYear, targetMonth, 0).toISOString().split('T')[0]
     
-    console.log('===== Monthly Actuals Query =====')
-    console.log('Month:', targetYear, targetMonth)
-    console.log('Date Range:', monthStart, '~', monthEnd)
+    console.log('Monthly Actuals Query:', { monthStart, monthEnd })
     
     const { data: monthlyActuals, error: actualsError } = await supabase
       .from('raw_bookings')
@@ -121,7 +120,7 @@ export async function GET(request: NextRequest) {
       .gte('check_in_date', monthStart)
       .lte('check_in_date', monthEnd)
     
-    console.log('Monthly Actuals Result:', {
+    console.log('Monthly Actuals:', {
       count: monthlyActuals?.length,
       error: actualsError,
       sampleBranches: monthlyActuals?.slice(0, 3).map(r => ({ branch: r.branch_name, amount: r.payment_amount }))
@@ -135,7 +134,7 @@ export async function GET(request: NextRequest) {
     const monthlyActualsByBranch: Record<string, { pickup: number }> = {}
     if (monthlyActuals) {
       monthlyActuals.forEach(row => {
-        const branch = row.branch_name
+        const branch = normalizeBranchName(row.branch_name)
         if (!monthlyActualsByBranch[branch]) {
           monthlyActualsByBranch[branch] = { pickup: 0 }
         }
@@ -145,10 +144,7 @@ export async function GET(request: NextRequest) {
     
     console.log('Monthly Actuals By Branch:', {
       totalBranches: Object.keys(monthlyActualsByBranch).length,
-      sample: Object.entries(monthlyActualsByBranch).slice(0, 3).map(([branch, data]) => ({
-        branch,
-        total: data.pickup
-      }))
+      samples: Object.entries(monthlyActualsByBranch).slice(0, 3).map(([b, d]) => ({ branch: b, pickup: d.pickup }))
     })
     
     // 10. 분석
@@ -218,12 +214,19 @@ function getWeekStart(date: Date): Date {
   return d
 }
 
+// 지점명 정규화
+function normalizeBranchName(name: string): string {
+  if (name === "호텔 동탄") return "동탄점(호텔)"
+  if (name === "웨이브파크_펜트") return "웨이브파크점"
+  return name
+}
+
 // 지점별 집계
 function aggregateByBranch(data: any[]) {
   const result: any = {}
   
   data.forEach(row => {
-    const branch = row.branch_name
+    const branch = normalizeBranchName(row.branch_name)
     if (!result[branch]) {
       result[branch] = { pickup: 0, count: 0 }
     }
@@ -255,6 +258,10 @@ function analyzeBranchIssues(occData: any[], weekStart: string, weekEnd: string)
     issuesByBranch[branch] = []
   })
   
+  console.log('===== Analyzing Branch Issues =====')
+  console.log('Week End:', weekEnd)
+  console.log('Total OCC records:', occData.length)
+  
   // 앞으로 4주를 주차별로 분석
   for (let weekOffset = 1; weekOffset <= 4; weekOffset++) {
     // 이번주 마지막날(일요일) 기준으로 계산
@@ -267,7 +274,10 @@ function analyzeBranchIssues(occData: any[], weekStart: string, weekEnd: string)
     
     const weekLabel = getWeekLabel(weekStartDate)
     
-    console.log(`Week ${weekOffset}: ${weekStartDate.toISOString().split('T')[0]} ~ ${weekEndDate.toISOString().split('T')[0]} (${weekLabel})`)
+    console.log(`===== Week ${weekOffset} =====`)
+    console.log(`Start: ${weekStartDate.toISOString().split('T')[0]}`)
+    console.log(`End: ${weekEndDate.toISOString().split('T')[0]}`)
+    console.log(`Label: ${weekLabel}`)
     
     // 이번 주차의 데이터만 필터링
     const weekData = occData.filter(row => {
@@ -275,7 +285,7 @@ function analyzeBranchIssues(occData: any[], weekStart: string, weekEnd: string)
       return rowDate >= weekStartDate && rowDate <= weekEndDate
     })
     
-    console.log(`Week ${weekOffset} data count:`, weekData.length)
+    console.log(`Week ${weekOffset} data count: ${weekData.length}`)
     
     // 지점별로 그룹핑
     const groupedByBranch: Record<string, any> = {}
@@ -297,6 +307,8 @@ function analyzeBranchIssues(occData: any[], weekStart: string, weekEnd: string)
         groupedByBranch[branch].weekday.push(row)
       }
     })
+    
+    console.log(`Week ${weekOffset} branches with data: ${Object.keys(groupedByBranch).length}`)
     
     // 모든 지점에 대해 분석
     ALL_BRANCHES.forEach(branch => {
@@ -357,10 +369,16 @@ function analyzeBranchIssues(occData: any[], weekStart: string, weekEnd: string)
   }
   
   // 배열로 변환 (지점명 포함)
-  return Object.entries(issuesByBranch).map(([branch, details]) => ({
+  const result = Object.entries(issuesByBranch).map(([branch, details]) => ({
     branch,
     details: details.length > 0 ? details : [{ week: '전체', message: '정상', severity: 'normal' }]
   }))
+  
+  console.log('===== Branch Issues Result =====')
+  console.log('Total branches:', result.length)
+  console.log('Sample:', result.slice(0, 2))
+  
+  return result
 }
 
 // 주차 레이블 생성
@@ -517,8 +535,6 @@ function getTopAchievers(actualsByBranch: any, targets: any[], limit: number) {
   Object.keys(actualsByBranch).forEach(branch => {
     const actual = actualsByBranch[branch].pickup
     const target = targets.find((t: any) => t.branch_name === branch)
-    
-    console.log(`Branch: ${branch}, Actual: ${actual}, Target:`, target?.target_amount)
     
     if (!target || !target.target_amount) return
     
