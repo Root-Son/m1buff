@@ -103,12 +103,13 @@ def upload_to_supabase(table_name, data):
         'Prefer': 'return=minimal'
     }
     
-    # 1. 기존 데이터 전체 삭제
+    # 1. 기존 데이터 전체 삭제 (date 컬럼으로)
     print(f"  - 기존 데이터 삭제 중...")
     delete_url = f"{SUPABASE_URL}/rest/v1/{table_name}"
     
+    # date가 있는 레코드 전부 삭제
     delete_response = requests.delete(
-        f"{delete_url}?id=gte.0",
+        f"{delete_url}?date=gte.1900-01-01",
         headers=headers
     )
     
@@ -166,12 +167,12 @@ def process_branch_room_occ(df):
         'ADR': 'adr',
         'OCC': 'occ',
         'Revenue': 'revenue',
-        'revPAR': 'revpar',
+        'revPAR': 'rev_par',  # ← 언더스코어
         'OCC_현재': 'occ_asof',
         'OCC_1일전': 'occ_1d_ago',
         'OCC_7일전': 'occ_7d_ago',
-        'delta_1일_pp': 'delta_1d',
-        'delta_7일_pp': 'delta_7d'
+        'delta_1일_pp': 'delta_1d_pp',  # ← _pp 추가
+        'delta_7일_pp': 'delta_7d_pp'   # ← _pp 추가
     }
     
     df = df.rename(columns=column_map)
