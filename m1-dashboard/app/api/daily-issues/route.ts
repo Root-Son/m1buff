@@ -134,14 +134,40 @@ function analyzeUrgentActions(occData: any[], targetDate: string) {
   const urgent: any[] = []
   const today = new Date(targetDate)
   
-  // 주차 계산 함수 (월요일 시작)
+  // 주차 계산 함수 (월요일 시작, ISO 8601 방식)
   const getWeekLabel = (date: Date) => {
     const month = date.getMonth() + 1
+    
+    // 해당 월의 첫 월요일 찾기
     const firstDay = new Date(date.getFullYear(), date.getMonth(), 1)
-    const firstMonday = new Date(firstDay)
+    let firstMonday = new Date(firstDay)
+    
+    // 첫 날이 월요일이 아니면 다음 월요일 찾기
     const dayOfWeek = firstDay.getDay()
-    const daysToMonday = dayOfWeek === 0 ? 1 : (8 - dayOfWeek) % 7
-    firstMonday.setDate(1 + daysToMonday)
+    if (dayOfWeek === 0) {
+      // 일요일이면 다음날(월요일)
+      firstMonday.setDate(2)
+    } else if (dayOfWeek !== 1) {
+      // 월요일이 아니면 다음 월요일
+      firstMonday.setDate(1 + (8 - dayOfWeek))
+    }
+    
+    // 현재 날짜가 첫 월요일보다 이전이면 0주차 (이전 달 마지막 주)
+    if (date < firstMonday) {
+      // 이전 달로 계산
+      const prevMonth = date.getMonth()
+      const prevMonthFirstDay = new Date(date.getFullYear(), prevMonth, 1)
+      let prevFirstMonday = new Date(prevMonthFirstDay)
+      const prevDayOfWeek = prevMonthFirstDay.getDay()
+      if (prevDayOfWeek === 0) {
+        prevFirstMonday.setDate(2)
+      } else if (prevDayOfWeek !== 1) {
+        prevFirstMonday.setDate(1 + (8 - prevDayOfWeek))
+      }
+      
+      const weekNumber = Math.floor((date.getTime() - prevFirstMonday.getTime()) / (7 * 24 * 60 * 60 * 1000)) + 1
+      return `${prevMonth}월 ${weekNumber}주`
+    }
     
     const weekNumber = Math.floor((date.getTime() - firstMonday.getTime()) / (7 * 24 * 60 * 60 * 1000)) + 1
     
@@ -252,11 +278,31 @@ function analyzePricingOpportunities(occData: any[], todayByBranch: any, yesterd
   
   const getWeekLabel = (date: Date) => {
     const month = date.getMonth() + 1
+    
     const firstDay = new Date(date.getFullYear(), date.getMonth(), 1)
-    const firstMonday = new Date(firstDay)
+    let firstMonday = new Date(firstDay)
+    
     const dayOfWeek = firstDay.getDay()
-    const daysToMonday = dayOfWeek === 0 ? 1 : (8 - dayOfWeek) % 7
-    firstMonday.setDate(1 + daysToMonday)
+    if (dayOfWeek === 0) {
+      firstMonday.setDate(2)
+    } else if (dayOfWeek !== 1) {
+      firstMonday.setDate(1 + (8 - dayOfWeek))
+    }
+    
+    if (date < firstMonday) {
+      const prevMonth = date.getMonth()
+      const prevMonthFirstDay = new Date(date.getFullYear(), prevMonth, 1)
+      let prevFirstMonday = new Date(prevMonthFirstDay)
+      const prevDayOfWeek = prevMonthFirstDay.getDay()
+      if (prevDayOfWeek === 0) {
+        prevFirstMonday.setDate(2)
+      } else if (prevDayOfWeek !== 1) {
+        prevFirstMonday.setDate(1 + (8 - prevDayOfWeek))
+      }
+      
+      const weekNumber = Math.floor((date.getTime() - prevFirstMonday.getTime()) / (7 * 24 * 60 * 60 * 1000)) + 1
+      return `${prevMonth}월 ${weekNumber}주`
+    }
     
     const weekNumber = Math.floor((date.getTime() - firstMonday.getTime()) / (7 * 24 * 60 * 60 * 1000)) + 1
     
