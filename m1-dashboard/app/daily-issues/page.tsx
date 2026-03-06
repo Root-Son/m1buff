@@ -28,12 +28,12 @@ export default function DailyIssuesPage() {
       // 가장 최근 날짜 선택
       if (dates.length > 0) {
         setSelectedDate(dates[0])
-      } else {
-        // 없으면 생성
-        await generateIssues()
       }
+      // 날짜 없어도 여기서는 생성 안 함
+      setLoading(false)
     } catch (error) {
       console.error('Failed to fetch dates:', error)
+      setLoading(false)
     }
   }
 
@@ -57,7 +57,8 @@ export default function DailyIssuesPage() {
       const data = await response.json()
       setIssuesData(data)
       setSelectedDate(data.date)
-      fetchAvailableDates() // 목록 새로고침
+      // 날짜 목록에 추가
+      setAvailableDates(prev => [data.date, ...prev.filter(d => d !== data.date)])
     } catch (error) {
       console.error('Failed to generate issues:', error)
     } finally {
