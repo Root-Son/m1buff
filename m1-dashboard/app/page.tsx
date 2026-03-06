@@ -416,12 +416,12 @@ export default function Dashboard() {
 
   const roomTypes = roomTypeData?.roomTypes || []
   
-  // 지점 변경시 첫 번째 룸타입 자동 선택
+  // 지점 변경시에만 첫 번째 룸타입 자동 선택
   useEffect(() => {
     if (roomTypes.length > 0) {
       setSelectedRoomType(roomTypes[0])
     }
-  }, [selectedBranch, roomTypes.length])
+  }, [selectedBranch])  // ← roomTypes.length 제거!
 
   if (loading) {
     return (
@@ -436,8 +436,20 @@ export default function Dashboard() {
       {/* 헤더 */}
       <header className="bg-white border-b border-gray-200 sticky top-0 z-10">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
-          <h1 className="text-2xl font-bold text-gray-900">📊 M1버프 현황판</h1>
-          <p className="text-sm text-gray-500 mt-1">실시간 현황</p>
+          <div className="flex items-center justify-between">
+            <div>
+              <h1 className="text-2xl font-bold text-gray-900">📊 M1버프 현황판</h1>
+              <p className="text-sm text-gray-500 mt-1">실시간 현황</p>
+            </div>
+            <a
+              href="https://test-omega-rouge-35.vercel.app/"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 transition-colors"
+            >
+              리드타임별 예약점유율 데이터 →
+            </a>
+          </div>
         </div>
       </header>
 
