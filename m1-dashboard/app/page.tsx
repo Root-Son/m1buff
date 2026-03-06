@@ -437,6 +437,12 @@ export default function Dashboard() {
                 🔥 일간 이슈
               </a>
               <a
+                href="/weekly-reviews"
+                className="px-4 py-2 bg-purple-600 text-white text-sm font-medium rounded-lg hover:bg-purple-700 transition-colors"
+              >
+                📊 주간 리뷰
+              </a>
+              <a
                 href="https://test-omega-rouge-35.vercel.app/"
                 target="_blank"
                 rel="noopener noreferrer"
