@@ -1,32 +1,26 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { supabase } from '@/lib/supabase'
 
-function normalizeBranchName(name: string): string {
-  if (name === "호텔 동탄") return "동탄점(호텔)"
-  if (name === "웨이브파크_펜트") return "웨이브파크점"
-  return name
-}
-
 export async function GET(request: NextRequest) {
   const searchParams = request.nextUrl.searchParams
-  const rawBranch = searchParams.get('branch') || 'all'
-  const branch = rawBranch === 'all' ? 'all' : normalizeBranchName(rawBranch)
+  const branch = searchParams.get('branch') || 'all'
   const date = searchParams.get('date') || new Date().toISOString().split('T')[0]
 
   try {
     // 오늘 날짜 예약 데이터
-    const { data: allData, error } = await supabase
+    let query = supabase
       .from('raw_bookings')
-      .select('payment_amount, check_in_date, branch_name')
+      .select('payment_amount, check_in_date')
       .gte('reservation_created_at', `${date}T00:00:00`)
       .lt('reservation_created_at', `${date}T23:59:59`)
 
-    if (error) throw error
+    if (branch !== 'all') {
+      query = query.eq('branch_name', branch)
+    }
 
-    // 지점명 정규화 후 필터링
-    const data = branch === 'all' 
-      ? allData 
-      : allData?.filter(row => normalizeBranchName(row.branch_name) === branch)
+    const { data, error } = await query
+
+    if (error) throw error
 
     // 집계
     const result = {
