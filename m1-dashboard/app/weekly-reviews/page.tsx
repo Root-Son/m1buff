@@ -150,7 +150,7 @@ export default function WeeklyReviewsPage() {
 
   const fetchAvailableWeeks = async () => {
     try {
-      const response = await fetch('/api/weekly-reviews/list')
+      const response = await fetch('/api/weekly-reviews-v2-v2/list')
       const weeks = await response.json()
       setAvailableWeeks(weeks)
       
@@ -167,7 +167,7 @@ export default function WeeklyReviewsPage() {
   const fetchReview = async (weekStart: string) => {
     setLoading(true)
     try {
-      const response = await fetch(`/api/weekly-reviews?week=${weekStart}`)
+      const response = await fetch(`/api/weekly-reviews-v2?week=${weekStart}`)
       const data = await response.json()
       setReviewData(data)
     } catch (error) {
@@ -181,7 +181,7 @@ export default function WeeklyReviewsPage() {
     setLoading(true)
     setShowWeekPicker(false)
     try {
-      const response = await fetch(`/api/weekly-reviews?week=${weekStart}`)
+      const response = await fetch(`/api/weekly-reviews-v2?week=${weekStart}`)
       const data = await response.json()
       setReviewData(data)
       setSelectedWeek(data.week_start)
