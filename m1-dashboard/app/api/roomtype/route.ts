@@ -6,6 +6,43 @@ const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 )
 
+// 채널 그룹 맵핑
+const CHANNEL_GROUPS: Record<string, string> = {
+  '야놀자(호텔)': 'OTA',
+  '야놀자(모텔)': 'OTA',
+  '아고다': 'OTA',
+  '여기어때': 'OTA',
+  '씨트립': 'OTA',
+  '부킹닷컴': 'OTA',
+  '익스피디아': 'OTA',
+  '네이버': 'OTA',
+  '트립토파즈': 'OTA',
+  '에어비앤비': '에어비앤비',
+  '내부채널_어스앱': '자사채널',
+  '내부채널_어스(WEB)': '자사채널',
+  '내부채널_직접예약': '자사채널',
+  '내부채널_단체': 'B2B',
+  '내부채널_기업체': 'B2B',
+  '내부채널_홀세일': 'B2B',
+  '내부채널_홀세일(선수금)': 'B2B',
+  '내부채널_복지몰': 'B2B',
+  '내부채널_부킹엔진': 'B2B',
+  '내부채널_홈쇼핑': '홈쇼핑',
+  '내부채널_OD': 'OD',
+  '내부채널_LS': 'LS',
+  'LS_직계약': 'LS',
+  'LS_리버스': 'LS',
+  'LS_제휴부동산': 'LS',
+  '내부채널_무료': '무숙',
+  '임직원_무료숙박': '무숙',
+  '내부채널_대관': '기타',
+  '내부채널_임시': '기타',
+}
+
+function getChannelGroup(channel: string): string {
+  return CHANNEL_GROUPS[channel] || '기타'
+}
+
 // ISO Week 계산
 function getISOWeek(date: Date) {
   const target = new Date(date.valueOf())
@@ -60,7 +97,7 @@ export async function GET(request: Request) {
     const startDate = monday.toISOString().split('T')[0]
     const endDate = sunday.toISOString().split('T')[0]
 
-    // 3. 해당 주의 데이터만 가져오기
+    // 3. 해당 주의 OCC/ADR 데이터
     const { data, error } = await supabase
       .from('branch_room_occ')
       .select(`
@@ -78,7 +115,27 @@ export async function GET(request: Request) {
     
     if (error) throw error
 
-    // 4. YOLO 가격 가져오기
+    // 4. LoS 데이터 (평균 숙박일수)
+    const { data: losData, error: losError } = await supabase
+      .from('raw_bookings')
+      .select('check_in_date, room_type, nights')
+      .eq('branch_name', branch)
+      .gte('check_in_date', startDate)
+      .lte('check_in_date', endDate)
+    
+    if (losError) console.error('LoS query error:', losError)
+
+    // 5. 채널별 예약 데이터
+    const { data: channelData, error: channelError } = await supabase
+      .from('raw_bookings')
+      .select('check_in_date, room_type, reservation_channel')
+      .eq('branch_name', branch)
+      .gte('check_in_date', startDate)
+      .lte('check_in_date', endDate)
+    
+    if (channelError) console.error('Channel query error:', channelError)
+
+    // 6. YOLO 가격 가져오기
     const { data: yoloData } = await supabase
       .from('yolo_prices')
       .select('date, room_type, price')
@@ -86,7 +143,7 @@ export async function GET(request: Request) {
       .gte('date', startDate)
       .lte('date', endDate)
 
-    // 5. 가드레일 가져오기
+    // 7. 가드레일 가져오기
     const { data: guideData } = await supabase
       .from('price_guide')
       .select('date, room_type, min_price')
@@ -94,7 +151,41 @@ export async function GET(request: Request) {
       .gte('date', startDate)
       .lte('date', endDate)
 
-    // 6. 데이터 병합
+    // 8. LoS 집계 (날짜별, 룸타입별 평균)
+    const losMap: Record<string, Record<string, number>> = {}
+    losData?.forEach(row => {
+      const key = `${row.check_in_date}_${row.room_type}`
+      if (!losMap[key]) losMap[key] = { total: 0, count: 0 }
+      losMap[key].total += row.nights || 0
+      losMap[key].count += 1
+    })
+
+    const losAverages: Record<string, number> = {}
+    Object.entries(losMap).forEach(([key, val]) => {
+      losAverages[key] = val.count > 0 ? val.total / val.count : 0
+    })
+
+    // 9. 채널별 비중 집계 (날짜별, 룸타입별)
+    const channelMap: Record<string, Record<string, number>> = {}
+    channelData?.forEach(row => {
+      const key = `${row.check_in_date}_${row.room_type}`
+      const group = getChannelGroup(row.reservation_channel || '')
+      
+      if (!channelMap[key]) channelMap[key] = {}
+      channelMap[key][group] = (channelMap[key][group] || 0) + 1
+    })
+
+    // 채널 비중 계산 (퍼센트)
+    const channelRatios: Record<string, Record<string, number>> = {}
+    Object.entries(channelMap).forEach(([key, groups]) => {
+      const total = Object.values(groups).reduce((sum, cnt) => sum + cnt, 0)
+      channelRatios[key] = {}
+      Object.entries(groups).forEach(([group, count]) => {
+        channelRatios[key][group] = total > 0 ? (count / total) * 100 : 0
+      })
+    })
+
+    // 10. 데이터 병합
     const mergedData = (data || []).map(row => {
       const yolo = yoloData?.find(y => 
         y.date === row.date && y.room_type === row.room_type
@@ -103,14 +194,18 @@ export async function GET(request: Request) {
         g.date === row.date && g.room_type === row.room_type
       )
       
+      const key = `${row.date}_${row.room_type}`
+      
       return {
         ...row,
         yolo_price: yolo?.price || null,
-        guardrail_price: guide?.min_price || null
+        guardrail_price: guide?.min_price || null,
+        avg_los: losAverages[key] || 0,
+        channel_ratios: channelRatios[key] || {}
       }
     })
 
-    // 7. roomType 필터링
+    // 11. roomType 필터링
     const filteredData = roomType 
       ? mergedData.filter(d => d.room_type === roomType)
       : mergedData
