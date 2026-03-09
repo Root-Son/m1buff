@@ -6,6 +6,7 @@ export async function GET(request: NextRequest) {
   const branch = searchParams.get('branch') || 'all'
   const startDateParam = searchParams.get('startDate')
   const endDateParam = searchParams.get('endDate')
+  const dateParam = searchParams.get('date') // ← 추가!
   
   try {
     let startStr: string
@@ -16,6 +17,13 @@ export async function GET(request: NextRequest) {
       startStr = startDateParam
       endDate = endDateParam
       end = new Date(endDate)
+    } else if (dateParam) {
+      // date 파라미터만 있는 경우 (종료일)
+      endDate = dateParam
+      end = new Date(endDate)
+      const start = new Date(end)
+      start.setDate(start.getDate() - 6)
+      startStr = start.toISOString().split('T')[0]
     } else {
       const { data: latestData } = await supabase
         .from('raw_bookings')
