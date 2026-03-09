@@ -404,15 +404,18 @@ export default function Dashboard() {
                 let label = context.dataset.label || ''
                 if (label) label += ': '
                 
+                const value = context.parsed.y
+                if (value === null) return label + 'N/A'
+                
                 if (context.dataset.yAxisID === 'y') {
                   // OCC (채널별 stacked)
-                  return label + (context.parsed.y * 100).toFixed(1) + '%'
+                  return label + (value * 100).toFixed(1) + '%'
                 } else if (context.dataset.yAxisID === 'y2') {
                   // LoS
-                  return label + context.parsed.y.toFixed(1) + '박'
+                  return label + value.toFixed(1) + '박'
                 } else {
                   // 가격
-                  return label + new Intl.NumberFormat('ko-KR').format(context.parsed.y) + '원'
+                  return label + new Intl.NumberFormat('ko-KR').format(value) + '원'
                 }
               },
               afterLabel: function(context) {
