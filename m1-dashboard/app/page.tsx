@@ -61,7 +61,7 @@ export default function Dashboard() {
   const [selectedRoomType, setSelectedRoomType] = useState('')
   const [selectedMonth, setSelectedMonth] = useState(2)
   const [toplineMonth, setToplineMonth] = useState(3) // Topline 월 필터
-  const [currentWeek, setCurrentWeek] = useState(1) // 1 = 이번주
+  const [currentWeek, setCurrentWeek] = useState(0) // 0 = 이번주
   const [roomTypeWeekOffset, setRoomTypeWeekOffset] = useState<number | null>(0) // 0 = 이번주 디폴트
   const [selectedDate, setSelectedDate] = useState<string>('') // 일 실적 날짜 선택
 
@@ -295,32 +295,46 @@ export default function Dashboard() {
       return `${date.getMonth() + 1}/${date.getDate()} (${dayName})`
     })
 
+    // 채널 그룹 색상
+    const channelColors: Record<string, string> = {
+      'OTA': 'rgba(59, 130, 246, 0.7)',      // 파랑
+      '자사채널': 'rgba(16, 185, 129, 0.7)',  // 초록
+      '에어비앤비': 'rgba(236, 72, 153, 0.7)', // 핑크
+      'B2B': 'rgba(251, 146, 60, 0.7)',      // 오렌지
+      '홈쇼핑': 'rgba(168, 85, 247, 0.7)',    // 보라
+      'OD': 'rgba(34, 211, 238, 0.7)',       // 청록
+      'LS': 'rgba(250, 204, 21, 0.7)',       // 노랑
+      '무숙': 'rgba(156, 163, 175, 0.7)',     // 회색
+      '기타': 'rgba(100, 116, 139, 0.7)'     // 어두운 회색
+    }
+
+    // 모든 날짜의 채널 그룹 수집
+    const allChannels = new Set<string>()
+    roomTypeData.days.forEach((d: any) => {
+      if (d.channel_ratios) {
+        Object.keys(d.channel_ratios).forEach(ch => allChannels.add(ch))
+      }
+    })
+
+    // 채널별 데이터셋 생성 (stacked bar)
+    const channelDatasets = Array.from(allChannels).map(channel => ({
+      label: channel,
+      data: roomTypeData.days.map((d: any) => {
+        const ratio = d.channel_ratios?.[channel] || 0
+        return d.occ * (ratio / 100) // OCC * 채널 비중
+      }),
+      backgroundColor: channelColors[channel] || 'rgba(100, 116, 139, 0.7)',
+      yAxisID: 'y',
+      stack: 'occ',
+      order: 2
+    }))
+
     const config: ChartConfiguration = {
       type: 'bar',
       data: {
         labels,
         datasets: [
-          {
-            label: 'D-7 OCC',
-            data: roomTypeData.days.map((d: any) => d.occ_7d_ago),
-            backgroundColor: 'rgba(156, 163, 175, 0.6)',
-            yAxisID: 'y',
-            order: 1
-          },
-          {
-            label: 'D-1 OCC',
-            data: roomTypeData.days.map((d: any) => d.occ_1d_ago),
-            backgroundColor: 'rgba(59, 130, 246, 0.6)',
-            yAxisID: 'y',
-            order: 2
-          },
-          {
-            label: 'OCC',
-            data: roomTypeData.days.map((d: any) => d.occ),
-            backgroundColor: 'rgba(16, 185, 129, 0.7)',
-            yAxisID: 'y',
-            order: 3
-          },
+          ...channelDatasets, // 채널별 stacked bar
           {
             label: '셋팅가',
             data: roomTypeData.days.map((d: any) => d.yolo_price),
@@ -351,56 +365,118 @@ export default function Dashboard() {
             pointRadius: 3,
             yAxisID: 'y1',
             order: 0
+          },
+          {
+            label: 'LoS (평균 숙박일)',
+            data: roomTypeData.days.map((d: any) => d.avg_los || 0),
+            type: 'line',
+            borderColor: 'rgba(139, 92, 246, 1)',
+            borderWidth: 2,
+            pointRadius: 3,
+            yAxisID: 'y2',
+            order: 0
           }
         ],
       },
       options: {
         responsive: true,
         maintainAspectRatio: false,
+        interaction: {
+          mode: 'index',
+          intersect: false
+        },
         plugins: {
-          legend: { position: 'bottom' },
-          datalabels: {
-            display: true,
-            color: '#000',
-            anchor: 'end',
-            align: 'top',
-            formatter: (value: any, context: any) => {
-              if (context.dataset.yAxisID === 'y') {
-                return (value * 100).toFixed(0) + '%'
-              } else {
-                return new Intl.NumberFormat('ko-KR').format(value)
+          legend: { 
+            position: 'bottom',
+            labels: {
+              filter: (item) => {
+                // 채널은 범례에서 제외 (너무 많아서)
+                return !allChannels.has(item.text)
               }
-            },
-            font: { size: 10 }
+            }
+          },
+          datalabels: {
+            display: false // 너무 복잡해지니까 비활성화
           },
           tooltip: {
             callbacks: {
               label: function(context) {
                 let label = context.dataset.label || ''
                 if (label) label += ': '
+                
                 if (context.dataset.yAxisID === 'y') {
-                  label += ((context.parsed.y as number) * 100).toFixed(1) + '%'
+                  // OCC (채널별 stacked)
+                  return label + (context.parsed.y * 100).toFixed(1) + '%'
+                } else if (context.dataset.yAxisID === 'y2') {
+                  // LoS
+                  return label + context.parsed.y.toFixed(1) + '박'
                 } else {
-                  label += new Intl.NumberFormat('ko-KR').format(context.parsed.y as number)
+                  // 가격
+                  return label + new Intl.NumberFormat('ko-KR').format(context.parsed.y) + '원'
                 }
-                return label
+              },
+              afterLabel: function(context) {
+                // OCC bar에 채널 비중 표시
+                if (context.dataset.stack === 'occ') {
+                  const dayData = roomTypeData.days[context.dataIndex]
+                  const channel = context.dataset.label
+                  const ratio = dayData.channel_ratios?.[channel] || 0
+                  return `채널 비중: ${ratio.toFixed(1)}%`
+                }
+                return ''
+              },
+              footer: function(tooltipItems) {
+                // 전체 OCC와 채널 비중 요약
+                if (tooltipItems.length > 0) {
+                  const dataIndex = tooltipItems[0].dataIndex
+                  const dayData = roomTypeData.days[dataIndex]
+                  
+                  let footer = `\n총 OCC: ${(dayData.occ * 100).toFixed(1)}%`
+                  
+                  if (dayData.channel_ratios && Object.keys(dayData.channel_ratios).length > 0) {
+                    footer += '\n\n채널별 비중:'
+                    Object.entries(dayData.channel_ratios)
+                      .sort((a: any, b: any) => b[1] - a[1])
+                      .forEach(([ch, ratio]: any) => {
+                        footer += `\n${ch}: ${ratio.toFixed(1)}%`
+                      })
+                  }
+                  
+                  return footer
+                }
+                return ''
               }
             }
           }
         },
         scales: {
           y: {
+            type: 'linear',
             position: 'left',
+            stacked: true, // stacked bar 활성화
             title: { display: true, text: 'OCC (%)' },
-            min: 0,
-            max: 1,
-            ticks: { callback: (v) => ((v as number) * 100).toFixed(0) + '%' }
+            ticks: {
+              callback: (value) => (Number(value) * 100).toFixed(0) + '%'
+            },
+            max: 1
           },
           y1: {
+            type: 'linear',
             position: 'right',
             title: { display: true, text: '가격 (원)' },
             grid: { drawOnChartArea: false },
-            ticks: { callback: (v) => new Intl.NumberFormat('ko-KR').format(v as number) }
+            ticks: {
+              callback: (value) => new Intl.NumberFormat('ko-KR').format(Number(value))
+            }
+          },
+          y2: {
+            type: 'linear',
+            position: 'right',
+            title: { display: true, text: 'LoS (박)' },
+            grid: { drawOnChartArea: false },
+            ticks: {
+              callback: (value) => value + '박'
+            }
           }
         }
       }
