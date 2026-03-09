@@ -188,8 +188,8 @@ export default function Dashboard() {
         fetch(`/api/daily?branch=${branch}${dateParam}`).then(r => r.json()),
         fetch(`/api/daily?branch=${branch}&date=${prevDateStr}`).then(r => r.json()),
         fetch(`/api/monthly?branch=${branch}&month=${selectedMonth}`).then(r => r.json()),
-        fetch(`/api/weekly?branch=${branch}&startDate=${weekStartStr}&endDate=${weekEndStr}`).then(r => r.json()),
-        fetch(`/api/weekly?branch=${branch}&startDate=${prevWeekStartStr}&endDate=${prevWeekEndStr}`).then(r => r.json()),
+        fetch(`/api/weekly?branch=${branch}&date=${weekEndStr}`).then(r => r.json()),
+        fetch(`/api/weekly?branch=${branch}&date=${prevWeekEndStr}`).then(r => r.json()),
         fetch(`/api/topline?branch=${branch}&month=${toplineMonth}`).then(r => r.json()),
       ])
       
