@@ -422,7 +422,8 @@ export default function Dashboard() {
                 // OCC bar에 채널 비중 표시
                 if (context.dataset.stack === 'occ') {
                   const dayData = roomTypeData.days[context.dataIndex]
-                  const channel = context.dataset.label
+                  const channel = context.dataset.label || ''
+                  if (!channel) return ''
                   const ratio = dayData.channel_ratios?.[channel] || 0
                   return `채널 비중: ${ratio.toFixed(1)}%`
                 }
