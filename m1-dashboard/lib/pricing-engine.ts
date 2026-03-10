@@ -138,6 +138,33 @@ export function getSalesPaceDetail(
   return { pace, detail }
 }
 
+// ===== 요일 유형 판별 =====
+function getDowType(dateStr: string): 'weekday' | 'weekend' {
+  const d = new Date(dateStr)
+  const dow = d.getDay() // 0=Sun, 5=Fri, 6=Sat
+  return (dow === 0 || dow === 5 || dow === 6) ? 'weekend' : 'weekday'
+}
+
+// ===== 벤치마크 대비 판정 =====
+function evaluatePaceVsBenchmark(
+  currentOcc: number,
+  expectedOcc: number | null,
+  leadTimeDays: number
+): 'ahead' | 'normal' | 'behind' | null {
+  if (expectedOcc === null || expectedOcc <= 0) return null
+  if (leadTimeDays <= 1) return null // D-0, D-1은 판정 불필요
+
+  const diff = currentOcc - expectedOcc
+
+  // 현재 OCC가 기대치보다 15pp 이상 높으면 → 조기완판 위험 (ahead)
+  if (diff >= 0.15) return 'ahead'
+
+  // 현재 OCC가 기대치보다 15pp 이상 낮으면 → 판매 부진 (behind)
+  if (diff <= -0.15) return 'behind'
+
+  return 'normal'
+}
+
 // ===== 가격 추천 계산 =====
 export function calculatePricingRecommendation(params: {
   branch_name: string
@@ -158,8 +185,11 @@ export function calculatePricingRecommendation(params: {
     branch_name, room_type, date,
     available_rooms, total_rooms, lead_time_days,
     set_price, guardrail_price,
-    occ, occ_1d_ago, occ_7d_ago, delta_1d_pp, delta_7d_pp
+    occ_1d_ago, occ_7d_ago, delta_1d_pp, delta_7d_pp
   } = params
+
+  // ★ FIX #1: OCC를 100%로 캡핑
+  const occ = Math.min(params.occ, 1)
 
   // total_rooms가 0이면 OCC 데이터에서 fallback
   const effectiveTotalRooms = total_rooms > 0 ? total_rooms : (available_rooms > 0 ? Math.round(available_rooms / Math.max(1 - occ, 0.01)) : 0)
@@ -179,10 +209,16 @@ export function calculatePricingRecommendation(params: {
     priceDiffPct = ((set_price - guardrail_price) / guardrail_price) * 100
   }
 
-  // 판매 페이스 (상세 포함)
-  const salesPaceResult = getSalesPaceDetail(delta_1d_pp, delta_7d_pp, lead_time_days, effectiveTotalRooms)
+  // ★ FIX #2: 판매 페이스 (완판 상태 반영)
+  const salesPaceResult = getSalesPaceDetail(delta_1d_pp, delta_7d_pp, lead_time_days, effectiveTotalRooms, occ)
   const salesPace = salesPaceResult.pace
   const salesPaceDetail = salesPaceResult.detail
+
+  // ★ FIX #3: 벤치마크 대비 판정
+  const stayMonth = new Date(date).getMonth() + 1
+  const dowType = getDowType(date)
+  const expectedOcc = getExpectedOcc(branch_name, room_type, stayMonth, dowType, lead_time_days)
+  const paceVsBenchmark = evaluatePaceVsBenchmark(occ, expectedOcc, lead_time_days)
 
   // ===== 가격 방향 결정 =====
   let action: 'price_down' | 'price_up' | 'monitor' = 'monitor'
@@ -190,9 +226,10 @@ export function calculatePricingRecommendation(params: {
   let suggestedPrice: number | null = null
 
   // --- 가격 하향 판단 ---
-  const isHighAvailSlowPace = availPct >= THRESHOLDS.DOWN_HIGH_AVAIL_PCT && lead_time_days <= THRESHOLDS.DOWN_HIGH_AVAIL_LEAD && salesPace === 'slow'
-  const isUrgentHighAvail = availPct >= THRESHOLDS.DOWN_URGENT_AVAIL_PCT && lead_time_days <= THRESHOLDS.DOWN_URGENT_LEAD
-  const isOverpricedLowOcc = priceDiffPct !== null && priceDiffPct >= THRESHOLDS.DOWN_PRICE_DIFF_PCT && occ < THRESHOLDS.DOWN_PRICE_OCC && lead_time_days <= THRESHOLDS.DOWN_PRICE_LEAD
+  // 완판 상태에서는 하향 판단 스킵
+  const isHighAvailSlowPace = salesPace !== 'sold_out' && availPct >= THRESHOLDS.DOWN_HIGH_AVAIL_PCT && lead_time_days <= THRESHOLDS.DOWN_HIGH_AVAIL_LEAD && salesPace === 'slow'
+  const isUrgentHighAvail = salesPace !== 'sold_out' && availPct >= THRESHOLDS.DOWN_URGENT_AVAIL_PCT && lead_time_days <= THRESHOLDS.DOWN_URGENT_LEAD
+  const isOverpricedLowOcc = salesPace !== 'sold_out' && priceDiffPct !== null && priceDiffPct >= THRESHOLDS.DOWN_PRICE_DIFF_PCT && occ < THRESHOLDS.DOWN_PRICE_OCC && lead_time_days <= THRESHOLDS.DOWN_PRICE_LEAD
 
   if (isHighAvailSlowPace || isUrgentHighAvail || isOverpricedLowOcc) {
     action = 'price_down'
@@ -212,10 +249,18 @@ export function calculatePricingRecommendation(params: {
   const isLowAvailFastPace = availPct <= THRESHOLDS.UP_LOW_AVAIL_PCT && salesPace === 'fast' && lead_time_days >= THRESHOLDS.UP_LOW_AVAIL_LEAD
   const isHighOccFastGrowth = occ >= THRESHOLDS.UP_HIGH_OCC && delta_1d_pp >= THRESHOLDS.UP_HIGH_OCC_DELTA && lead_time_days >= THRESHOLDS.UP_HIGH_OCC_LEAD
   const isUnderpriced = set_price !== null && guardrail_price !== null && set_price < guardrail_price && occ >= 0.7
+  // ★ NEW: 벤치마크 대비 조기완판 위험 → 가격 인상 시그널
+  const isEarlySelloutRisk = paceVsBenchmark === 'ahead' && lead_time_days >= 3 && occ >= 0.6
 
-  if (!action.includes('down') && (isLowAvailFastPace || isHighOccFastGrowth || isUnderpriced)) {
+  if (!action.includes('down') && (isLowAvailFastPace || isHighOccFastGrowth || isUnderpriced || isEarlySelloutRisk)) {
     action = 'price_up'
-    urgency = 'medium'
+
+    // 조기완판 위험은 urgency를 높임
+    if (isEarlySelloutRisk && occ >= 0.8) {
+      urgency = 'high'
+    } else {
+      urgency = 'medium'
+    }
 
     if (set_price && guardrail_price) {
       // 현재가 대비 10~20% 상향 제안
@@ -227,7 +272,8 @@ export function calculatePricingRecommendation(params: {
   const message = generateDetailedMessage({
     remaining_rooms, total_rooms: effectiveTotalRooms,
     lead_time_days, set_price, guardrail_price, priceDiffPct,
-    salesPaceDetail, action, suggestedPrice, occ
+    salesPaceDetail, action, suggestedPrice, occ,
+    expectedOcc, paceVsBenchmark
   })
 
   return {
@@ -243,7 +289,9 @@ export function calculatePricingRecommendation(params: {
     sales_pace_detail: salesPaceDetail,
     action, urgency,
     message,
-    suggested_price: suggestedPrice
+    suggested_price: suggestedPrice,
+    expected_occ: expectedOcc,
+    pace_vs_benchmark: paceVsBenchmark,
   }
 }
 
