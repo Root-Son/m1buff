@@ -184,6 +184,6 @@ if __name__ == "__main__":
     benchmarks = compute_benchmarks()
     print(f"\nTotal benchmark entries: {len(benchmarks)}", file=sys.stderr)
 
-    output_path = "lib/pace-benchmark-data.ts"
-    write_typescript(benchmarks, output_path)
+    output_path = "lib/pace-benchmark.json"
+    write_json(benchmarks, output_path)
     print("Done!", file=sys.stderr)
