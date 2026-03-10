@@ -126,15 +126,10 @@ export async function GET(request: Request) {
     // 5. 채널별 예약 데이터
     const { data: channelData, error: channelError } = await supabase
       .from('raw_bookings')
-      .select('check_in_date, room_type, reservation_channel')
+      .select('check_in_date, roomtype, reservation_channel')
       .eq('branch_name', branch)
       .gte('check_in_date', startDate)
       .lte('check_in_date', endDate)
-    
-    console.log('=== Channel Query ===')
-    console.log('Channel data count:', channelData?.length || 0)
-    console.log('Channel sample:', channelData?.slice(0, 3))
-    if (channelError) console.error('Channel query error:', channelError)
 
     // 6. YOLO 가격 가져오기
     const { data: yoloData } = await supabase
