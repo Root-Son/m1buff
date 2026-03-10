@@ -235,8 +235,11 @@ def process_price_guide(df):
 def process_raw_bookings(df):
     """raw_bookings 데이터 처리 (Redash)"""
     df['branch_name'] = df['branch_name'].apply(normalize_branch_name)
+    if 'payment_amount' in df.columns:
+        df['payment_amount'] = df['payment_amount'].apply(lambda x: str(x).replace(',', '') if pd.notna(x) else x)
+        df['payment_amount'] = pd.to_numeric(df['payment_amount'], errors='coerce')
     df = df.fillna(0)
-    
+
     return df.to_dict('records')
 
 def main():
