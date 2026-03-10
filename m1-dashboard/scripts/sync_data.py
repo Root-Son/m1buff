@@ -46,40 +46,55 @@ SHEET_GIDS = {
 def execute_redash_query(query_id, parameters=None):
     """Redash 쿼리 실행 및 결과 가져오기"""
     print(f"🔄 쿼리 {query_id} 실행 중... (파라미터: {parameters})")
-    
-    refresh_url = f"{REDASH_URL}/api/queries/{query_id}/refresh"
+
     headers = {'Authorization': f'Key {REDASH_API_KEY}'}
-    
+
+    # 1차: refresh (실행 요청)
+    refresh_url = f"{REDASH_URL}/api/queries/{query_id}/refresh"
     payload = {}
     if parameters:
+        # Redash는 p_파라미터명 형식을 사용할 수 있음
         payload['parameters'] = parameters
-    
+
     response = requests.post(refresh_url, headers=headers, json=payload)
-    response.raise_for_status()
-    
-    job = response.json()['job']
-    
-    result_url = f"{REDASH_URL}/api/jobs/{job['id']}"
-    max_attempts = 120
-    
-    for attempt in range(max_attempts):
-        result = requests.get(result_url, headers=headers).json()
-        
-        if result['job']['status'] == 3:
-            print(f"✅ 쿼리 {query_id} 완료!")
-            
-            query_result_id = result['job']['query_result_id']
-            data_url = f"{REDASH_URL}/api/query_results/{query_result_id}"
-            data = requests.get(data_url, headers=headers).json()
-            
-            return pd.DataFrame(data['query_result']['data']['rows'])
-        
-        elif result['job']['status'] == 4:
-            raise Exception(f"쿼리 {query_id} 실행 실패!")
-        
-        time.sleep(3)
-    
-    raise Exception(f"쿼리 {query_id} 타임아웃!")
+
+    if response.status_code == 200:
+        job = response.json()['job']
+        result_url = f"{REDASH_URL}/api/jobs/{job['id']}"
+        max_attempts = 120
+
+        for attempt in range(max_attempts):
+            result = requests.get(result_url, headers=headers).json()
+
+            if result['job']['status'] == 3:
+                print(f"✅ 쿼리 {query_id} 완료!")
+                query_result_id = result['job']['query_result_id']
+                data_url = f"{REDASH_URL}/api/query_results/{query_result_id}"
+                data = requests.get(data_url, headers=headers).json()
+                return pd.DataFrame(data['query_result']['data']['rows'])
+
+            elif result['job']['status'] == 4:
+                raise Exception(f"쿼리 {query_id} 실행 실패!")
+
+            time.sleep(3)
+
+        raise Exception(f"쿼리 {query_id} 타임아웃!")
+    else:
+        # refresh 실패 시 → 최신 캐시된 결과 가져오기
+        print(f"  ⚠️ refresh 실패 ({response.status_code}), 최신 캐시 결과 시도...")
+        query_url = f"{REDASH_URL}/api/queries/{query_id}"
+        query_info = requests.get(query_url, headers=headers)
+        query_info.raise_for_status()
+        query_data = query_info.json()
+
+        result_id = query_data.get('latest_query_data_id')
+        if not result_id:
+            raise Exception(f"쿼리 {query_id}: refresh 실패 + 캐시 결과 없음 (status={response.status_code}, body={response.text[:200]})")
+
+        data_url = f"{REDASH_URL}/api/query_results/{result_id}"
+        data = requests.get(data_url, headers=headers).json()
+        print(f"✅ 쿼리 {query_id} 캐시 결과 사용!")
+        return pd.DataFrame(data['query_result']['data']['rows'])
 
 def get_google_sheet_data(gid: str, sheet_name: str):
     """Google Sheets에서 데이터 가져오기"""
