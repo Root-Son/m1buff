@@ -141,29 +141,35 @@ export async function GET(request: NextRequest) {
       .eq('year', targetYear)
       .eq('month', targetMonth)
 
-    // Monthly actuals
-    const monthStart = `${targetYear}-${String(targetMonth).padStart(2, '0')}-01`
-    const monthEnd = new Date(targetYear, targetMonth, 0).toISOString().split('T')[0]
+    // Monthly actuals: topline RPC와 동일한 방식 사용 (체크인 매출 기준)
+    const { data: monthlyTargets2 } = await supabase
+      .from('targets')
+      .select('branch_name, target_amount')
+      .eq('year', targetYear)
+      .eq('month', targetMonth)
+      .neq('branch_name', '전지점')
 
-    const monthlyActuals = await fetchAllRows('raw_bookings', 'branch_name, payment_amount', {
-      gte: ['check_in_date', monthStart],
-      lte: ['check_in_date', monthEnd],
-    })
+    const monthlyActualsByBranch: Record<string, { pickup: number }> = {}
+    // 각 지점별 RPC 호출하여 체크인 매출 집계
+    const targetBranches = (monthlyTargets2 || []).map(t => t.branch_name).filter(Boolean)
+    for (const branchName of targetBranches) {
+      try {
+        const { data: rpcData } = await supabase.rpc('get_topline_weekly_checkin', {
+          p_branch: branchName,
+          p_month: targetMonth,
+          p_year: targetYear
+        })
+        const totalCI = (rpcData || []).reduce((sum: number, w: any) => sum + (w.ci_amount || 0), 0)
+        const normalized = normalizeBranchName(branchName)
+        monthlyActualsByBranch[normalized] = { pickup: totalCI }
+      } catch (err) {
+        console.error(`RPC 실패 (${branchName}):`, err)
+      }
+    }
 
     // Aggregate by branch
     const thisWeekByBranch = aggregateByBranch(thisWeekData || [])
     const prevWeekByBranch = aggregateByBranch(prevWeekData || [])
-
-    const monthlyActualsByBranch: Record<string, { pickup: number }> = {}
-    if (monthlyActuals) {
-      monthlyActuals.forEach(row => {
-        const branch = normalizeBranchName(row.branch_name)
-        if (!monthlyActualsByBranch[branch]) {
-          monthlyActualsByBranch[branch] = { pickup: 0 }
-        }
-        monthlyActualsByBranch[branch].pickup += (row.payment_amount || 0)
-      })
-    }
 
     // Analysis
     const branchIssues = analyzeBranchIssues(
