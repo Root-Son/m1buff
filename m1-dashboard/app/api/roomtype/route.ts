@@ -187,21 +187,7 @@ export async function GET(request: Request) {
       })
     })
 
-    // DEBUG: raw_bookings 컬럼 확인
-    const { data: sampleRow } = await supabase
-      .from('raw_bookings')
-      .select('*')
-      .eq('branch_name', branch)
-      .limit(1)
-    const _debug = {
-      rawBookingsColumns: sampleRow?.[0] ? Object.keys(sampleRow[0]) : [],
-      sampleRow: sampleRow?.[0] || null,
-      losError: losError?.message || null,
-      channelError: channelError?.message || null,
-      branch,
-      startDate,
-      endDate,
-    }
+    // 10. 데이터 병합
     
     const mergedData = (data || []).map(row => {
       const yolo = yoloData?.find(y => 
