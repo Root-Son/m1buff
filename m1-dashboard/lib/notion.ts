@@ -6,13 +6,16 @@
  */
 
 import { Client } from '@notionhq/client'
-import { PricingRecommendation, ExecutiveSummary } from './supabase'
+import type { PricingRecommendation, ExecutiveSummary } from './supabase'
 
-const notion = new Client({
-  auth: process.env.NOTION_API_KEY,
-})
+// 런타임에만 초기화 (빌드 시 환경변수 없어도 에러 안남)
+function getNotionClient() {
+  return new Client({ auth: process.env.NOTION_API_KEY })
+}
 
-const PARENT_PAGE_ID = process.env.NOTION_PARENT_PAGE_ID || ''
+function getParentPageId() {
+  return process.env.NOTION_PARENT_PAGE_ID || ''
+}
 
 // 요일 한글
 const DAY_NAMES = ['일', '월', '화', '수', '목', '금', '토']
@@ -42,16 +45,18 @@ export async function createDailyReport(
   const dayName = DAY_NAMES[d.getDay()]
   const title = `${dateStr} (${dayName}) 데일리 리포트`
 
+  const notion = getNotionClient()
+
   // 1. 날짜별 상위 페이지 생성
   const parentPage = await notion.pages.create({
-    parent: { page_id: PARENT_PAGE_ID },
-    icon: { type: 'emoji', emoji: '📊' },
+    parent: { page_id: getParentPageId() },
+    icon: { type: 'emoji', emoji: '📊' } as any,
     properties: {
       title: {
         title: [{ text: { content: title } }]
       }
     },
-    children: buildSummaryBlocks(dateStr, executiveSummary, byBranch)
+    children: buildSummaryBlocks(dateStr, executiveSummary, byBranch) as any
   })
 
   const parentPageId = parentPage.id
@@ -210,15 +215,17 @@ async function createBranchChecklist(
   const firstBatch = children.slice(0, maxBlocksPerRequest)
   const remainingBatches = children.slice(maxBlocksPerRequest)
 
+  const notion = getNotionClient()
+
   const page = await notion.pages.create({
     parent: { page_id: parentPageId },
-    icon: { type: 'emoji', emoji: emoji as any },
+    icon: { type: 'emoji', emoji } as any,
     properties: {
       title: {
         title: [{ text: { content: `${branchName} (하향 ${downCount} / 상향 ${upCount})` } }]
       }
     },
-    children: firstBatch
+    children: firstBatch as any
   })
 
   // 남은 블록 추가
@@ -227,7 +234,7 @@ async function createBranchChecklist(
       const batch = remainingBatches.slice(i, i + maxBlocksPerRequest)
       await notion.blocks.children.append({
         block_id: page.id,
-        children: batch
+        children: batch as any
       })
     }
   }
@@ -314,15 +321,18 @@ function parseChecklistRichText(text: string, rec: PricingRecommendation): any[]
 // ===== 기존 리포트 삭제 (중복 방지) =====
 export async function deleteExistingReport(dateStr: string): Promise<void> {
   try {
+    const notion = getNotionClient()
+
     // 부모 페이지의 자식 블록(하위 페이지) 검색
     const children = await notion.blocks.children.list({
-      block_id: PARENT_PAGE_ID,
+      block_id: getParentPageId(),
       page_size: 100
     })
 
     for (const block of children.results) {
-      if (block.type === 'child_page') {
-        const title = (block as any).child_page?.title || ''
+      const b = block as any
+      if (b.type === 'child_page') {
+        const title = b.child_page?.title || ''
         if (title.startsWith(dateStr)) {
           // 해당 날짜 리포트 삭제 (아카이브)
           await notion.blocks.delete({ block_id: block.id })
