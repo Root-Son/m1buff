@@ -387,12 +387,12 @@ function generateDetailedMessage(params: {
 
 // ===== Executive Summary 생성 =====
 export function generateExecutiveSummary(recommendations: PricingRecommendation[]): ExecutiveSummary {
-  const priceDownItems = recommendations.filter(r => r.action === 'price_down')
+  const priceDownItems = recommendations.filter(r => r.action === 'price_down' || r.action === 'guardrail_adjust')
   const priceUpItems = recommendations.filter(r => r.action === 'price_up')
   const monitorItems = recommendations.filter(r => r.action === 'monitor')
   const criticalItems = recommendations.filter(r => r.urgency === 'critical')
 
-  // 위험 객실수: 하향 권고 항목의 잔여 객실 합
+  // 위험 객실수: 하향/가드레일조정 항목의 잔여 객실 합
   const totalRoomsAtRisk = priceDownItems.reduce((sum, r) => sum + r.remaining_rooms, 0)
 
   // 긴급 지점 (critical + high)
