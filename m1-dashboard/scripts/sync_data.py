@@ -200,7 +200,22 @@ def process_branch_room_occ(df):
 
     # NULL 처리
     df = df.fillna(0)
-    
+
+    # 디버깅: 이상값 확인
+    for col in ['occ', 'occ_asof', 'occ_1d_ago', 'occ_7d_ago']:
+        if col in df.columns:
+            bad = df[df[col] > 1]
+            if len(bad) > 0:
+                print(f"  ⚠️ {col}: {len(bad)}개 행이 1 초과 (max={df[col].max()})")
+    for col in ['delta_1d_pp', 'delta_7d_pp']:
+        if col in df.columns:
+            bad = df[df[col].abs() > 9.9]
+            if len(bad) > 0:
+                print(f"  ⚠️ {col}: {len(bad)}개 행이 abs>9.9 (max={df[col].max()}, min={df[col].min()})")
+    for col in ['revenue', 'adr', 'rev_par']:
+        if col in df.columns:
+            print(f"  ℹ️ {col}: max={df[col].max()}, min={df[col].min()}")
+
     return df.to_dict('records')
 
 def process_yolo_prices(df):
