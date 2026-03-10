@@ -145,22 +145,22 @@ function getDowType(dateStr: string): 'weekday' | 'weekend' {
   return (dow === 0 || dow === 5 || dow === 6) ? 'weekend' : 'weekday'
 }
 
-// ===== 벤치마크 대비 판정 =====
+// ===== 벤치마크 대비 판정 (판매 객실수 기반) =====
 function evaluatePaceVsBenchmark(
-  currentOcc: number,
-  expectedOcc: number | null,
+  currentSold: number,
+  expectedSold: number | null,
+  expectedFinalSold: number | null,
   leadTimeDays: number
 ): 'ahead' | 'normal' | 'behind' | null {
-  if (expectedOcc === null || expectedOcc <= 0) return null
+  if (expectedSold === null) return null
   if (leadTimeDays <= 1) return null // D-0, D-1은 판정 불필요
 
-  const diff = currentOcc - expectedOcc
+  const diff = currentSold - expectedSold
+  // 임계값: 최소 3실 이상 차이, 또는 과거 최종 판매의 15% 이상
+  const threshold = Math.max(3, (expectedFinalSold ?? expectedSold) * 0.15)
 
-  // 현재 OCC가 기대치보다 15pp 이상 높으면 → 조기완판 위험 (ahead)
-  if (diff >= 0.15) return 'ahead'
-
-  // 현재 OCC가 기대치보다 15pp 이상 낮으면 → 판매 부진 (behind)
-  if (diff <= -0.15) return 'behind'
+  if (diff >= threshold) return 'ahead'
+  if (diff <= -threshold) return 'behind'
 
   return 'normal'
 }
