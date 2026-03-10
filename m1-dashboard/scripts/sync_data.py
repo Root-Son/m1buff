@@ -85,7 +85,8 @@ def execute_redash_query(query_id, parameters=None):
                 return pd.DataFrame(data['query_result']['data']['rows'])
 
             elif result['job']['status'] == 4:
-                raise Exception(f"쿼리 {query_id} 실행 실패!")
+                err = result['job'].get('error', 'unknown')
+                raise Exception(f"쿼리 {query_id} 실행 실패! ({err})")
 
             time.sleep(3)
 
