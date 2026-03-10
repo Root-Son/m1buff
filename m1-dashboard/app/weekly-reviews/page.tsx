@@ -345,6 +345,146 @@ function BranchIssuesCard({ issues }: { issues: any[] }) {
   )
 }
 
+// ── 월/주차 그룹핑 헬퍼 ──
+function groupWeeksByMonth(weeks: any[]): Record<string, { label: string; weeks: { weekNum: number; week_start: string; week_end: string; dateRange: string }[] }> {
+  const groups: Record<string, { label: string; weeks: { weekNum: number; week_start: string; week_end: string; dateRange: string }[] }> = {}
+
+  weeks.forEach(week => {
+    const weekLabel = getWeekLabel(week.week_start)
+    // "3월 2주" → month="3월", weekNum=2
+    const match = weekLabel.match(/^(\d+)월\s+(\d+)주$/)
+    if (!match) return
+
+    const monthKey = match[1]
+    const monthLabel = `${match[1]}월`
+    const weekNum = parseInt(match[2])
+    const dateRange = formatDateRange(week.week_start, week.week_end)
+
+    if (!groups[monthKey]) {
+      groups[monthKey] = { label: monthLabel, weeks: [] }
+    }
+    groups[monthKey].weeks.push({ weekNum, week_start: week.week_start, week_end: week.week_end, dateRange })
+  })
+
+  // 각 월 내에서 주차순 정렬
+  Object.values(groups).forEach(g => g.weeks.sort((a, b) => a.weekNum - b.weekNum))
+
+  return groups
+}
+
+// ── WeekSelector 컴포넌트 ──
+function WeekSelector({ availableWeeks, selectedWeek, onSelectWeek, onGenerateWeek }: {
+  availableWeeks: any[]
+  selectedWeek: string
+  onSelectWeek: (week: string) => void
+  onGenerateWeek: (week: string) => void
+}) {
+  const [showPicker, setShowPicker] = useState(false)
+  const [newWeek, setNewWeek] = useState('')
+
+  const grouped = groupWeeksByMonth(availableWeeks)
+  // 월 키를 최근 순으로 정렬
+  const monthKeys = Object.keys(grouped).sort((a, b) => parseInt(b) - parseInt(a))
+
+  // 현재 선택된 주가 속한 월 찾기
+  const selectedLabel = selectedWeek ? getWeekLabel(selectedWeek) : ''
+  const selectedMonthMatch = selectedLabel.match(/^(\d+)월/)
+  const [activeMonth, setActiveMonth] = useState(selectedMonthMatch?.[1] || monthKeys[0] || '')
+
+  // 선택된 주가 바뀌면 해당 월로 이동
+  useEffect(() => {
+    if (selectedWeek) {
+      const label = getWeekLabel(selectedWeek)
+      const match = label.match(/^(\d+)월/)
+      if (match) setActiveMonth(match[1])
+    }
+  }, [selectedWeek])
+
+  const currentGroup = grouped[activeMonth]
+
+  return (
+    <div className="bg-white border-b border-gray-200 sticky top-[73px] z-40">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3">
+        {/* 1단: 월 선택 */}
+        <div className="flex items-center gap-1.5 mb-2 overflow-x-auto">
+          {monthKeys.map(mk => (
+            <button
+              key={mk}
+              onClick={() => setActiveMonth(mk)}
+              className={`px-3 py-1.5 text-sm font-medium rounded-full whitespace-nowrap transition-colors ${
+                mk === activeMonth
+                  ? 'bg-gray-900 text-white'
+                  : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+              }`}
+            >
+              {grouped[mk].label}
+            </button>
+          ))}
+          <button
+            onClick={() => setShowPicker(!showPicker)}
+            className="px-3 py-1.5 text-sm font-medium rounded-full bg-green-100 text-green-700 hover:bg-green-200 whitespace-nowrap ml-1"
+          >
+            +
+          </button>
+        </div>
+
+        {/* 2단: W1~W4 선택 */}
+        {currentGroup && (
+          <div className="flex items-center gap-2">
+            {currentGroup.weeks.map(w => {
+              const isSelected = w.week_start === selectedWeek
+              return (
+                <button
+                  key={w.week_start}
+                  onClick={() => onSelectWeek(w.week_start)}
+                  className={`flex flex-col items-center px-4 py-2 rounded-lg transition-colors min-w-[70px] ${
+                    isSelected
+                      ? 'bg-blue-600 text-white shadow-sm'
+                      : 'bg-gray-50 text-gray-700 hover:bg-blue-50 border border-gray-200'
+                  }`}
+                >
+                  <span className="text-sm font-bold">W{w.weekNum}</span>
+                  <span className={`text-[10px] mt-0.5 ${isSelected ? 'text-blue-100' : 'text-gray-400'}`}>
+                    {w.dateRange}
+                  </span>
+                </button>
+              )
+            })}
+          </div>
+        )}
+
+        {/* 새 주차 생성 팝업 */}
+        {showPicker && (
+          <div className="mt-2 bg-white border border-gray-200 rounded-lg shadow-lg p-4 w-72">
+            <div className="text-sm font-medium text-gray-700 mb-2">생성할 주의 월요일 선택:</div>
+            <input
+              type="date"
+              value={newWeek}
+              onChange={(e) => setNewWeek(e.target.value)}
+              className="px-3 py-2 border border-gray-300 rounded-lg text-sm mb-2 w-full"
+            />
+            <div className="flex gap-2">
+              <button
+                onClick={() => { if (newWeek) { onGenerateWeek(newWeek); setShowPicker(false) } }}
+                disabled={!newWeek}
+                className="px-4 py-2 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700 disabled:bg-gray-300"
+              >
+                생성
+              </button>
+              <button
+                onClick={() => setShowPicker(false)}
+                className="px-4 py-2 bg-gray-100 text-gray-700 text-sm rounded-lg hover:bg-gray-200"
+              >
+                취소
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
 export default function WeeklyReviewsPage() {
   const [reviewData, setReviewData] = useState<any>(null)
   const [selectedWeek, setSelectedWeek] = useState<string>('')
