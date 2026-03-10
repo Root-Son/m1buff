@@ -332,9 +332,9 @@ function generateDetailedMessage(params: {
 
   // 벤치마크 텍스트
   let benchmarkText = ''
-  if (paceVsBenchmark === 'ahead' && expectedOcc !== null) {
+  if (paceVsBenchmark === 'ahead' && expectedOcc != null) {
     benchmarkText = ` | ⚠️ 조기완판위험 (과거 동기간 OCC ${(expectedOcc * 100).toFixed(0)}% → 현재 ${(occ * 100).toFixed(0)}%)`
-  } else if (paceVsBenchmark === 'behind' && expectedOcc !== null) {
+  } else if (paceVsBenchmark === 'behind' && expectedOcc != null) {
     benchmarkText = ` | 과거 대비 부진 (과거 ${(expectedOcc * 100).toFixed(0)}% → 현재 ${(occ * 100).toFixed(0)}%)`
   }
 
