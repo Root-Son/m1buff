@@ -224,8 +224,7 @@ export async function GET(request: Request) {
 
     return NextResponse.json({
       roomTypes,
-      days: filteredData,
-      _debug
+      days: filteredData
     })
   } catch (error: any) {
     console.error('Roomtype API Error:', error)
