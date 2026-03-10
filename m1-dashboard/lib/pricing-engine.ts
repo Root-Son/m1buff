@@ -267,7 +267,7 @@ export function calculatePricingRecommendation(params: {
   // ★ 벤치마크 대비 조기완판 위험 → 가격 인상 시그널 (완판 전에만 의미 있음)
   const isEarlySelloutRisk = salesPace !== 'sold_out' && paceVsBenchmark === 'ahead' && lead_time_days >= 3 && occ >= 0.6
 
-  if (action !== 'price_down' && (isLowAvailFastPace || isHighOccFastGrowth || isUnderpriced || isEarlySelloutRisk)) {
+  if (action !== 'price_down' && action !== 'guardrail_adjust' && (isLowAvailFastPace || isHighOccFastGrowth || isUnderpriced || isEarlySelloutRisk)) {
     action = 'price_up'
 
     // 조기완판 위험은 urgency를 높임
