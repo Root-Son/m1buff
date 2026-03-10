@@ -111,7 +111,7 @@ def get_dow_type(date_str):
 
 
 def compute_benchmarks():
-    """전 지점 벤치마크 계산"""
+    """전 지점 벤치마크 계산 — 판매 객실수 기반 (OCC X, 실수 기반)"""
     benchmarks = {}
 
     for branch_name, room_types in ROOM_COUNTS.items():
@@ -131,11 +131,7 @@ def compute_benchmarks():
             date_bookings[rt][cid].append(lt)
 
         # 각 roomtype에 대해 벤치마크 계산
-        for rt, total_rooms in room_types.items():
-            if total_rooms <= 0:
-                continue
-
-            # 해당 roomtype의 데이터 (raw_booking_history의 roomtype이 약간 다를 수 있음)
+        for rt in room_types:
             rt_dates = date_bookings.get(rt, {})
             if not rt_dates:
                 continue
@@ -147,15 +143,10 @@ def compute_benchmarks():
                 month = int(cid[5:7])
                 dow_type = get_dow_type(cid)
 
-                # 이 날짜의 총 예약 수
-                total_bookings = len(lead_times)
-
-                # 각 리드타임 버킷에서의 누적 예약 비율
+                # 각 리드타임 버킷에서의 누적 판매 객실수 (실수 그대로)
                 for bucket in LEAD_TIME_BUCKETS:
-                    booked_by = sum(1 for lt in lead_times if lt >= bucket)
-                    # OCC at this lead_time = booked_by / total_rooms
-                    occ_at_lt = min(booked_by / total_rooms, 1.0)
-                    month_dow_curves[(month, dow_type)][bucket].append(occ_at_lt)
+                    sold_by = sum(1 for lt in lead_times if lt >= bucket)
+                    month_dow_curves[(month, dow_type)][bucket].append(sold_by)
 
             # 중앙값 계산
             for (month, dow_type), bucket_values in month_dow_curves.items():
@@ -165,7 +156,7 @@ def compute_benchmarks():
                     if len(values) >= 3:  # 최소 3개 데이터 필요
                         values.sort()
                         median = values[len(values) // 2]
-                        curve[bucket] = round(median, 3)
+                        curve[bucket] = median  # 정수 (판매 객실수)
 
                 if curve:
                     key = f"{branch_name}|{rt}|{month}|{dow_type}"
