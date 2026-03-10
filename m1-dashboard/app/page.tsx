@@ -61,7 +61,7 @@ export default function Dashboard() {
   const [selectedRoomType, setSelectedRoomType] = useState('')
   const [selectedMonth, setSelectedMonth] = useState(2)
   const [toplineMonth, setToplineMonth] = useState(3) // Topline 월 필터
-  const [currentWeek, setCurrentWeek] = useState(0) // 0 = 이번주
+  const [currentWeek, setCurrentWeek] = useState(1) // 1 = 이번주
   const [roomTypeWeekOffset, setRoomTypeWeekOffset] = useState<number | null>(0) // 0 = 이번주 디폴트
   const [selectedDate, setSelectedDate] = useState<string>('') // 일 실적 날짜 선택
 
@@ -188,8 +188,8 @@ export default function Dashboard() {
         fetch(`/api/daily?branch=${branch}${dateParam}`).then(r => r.json()),
         fetch(`/api/daily?branch=${branch}&date=${prevDateStr}`).then(r => r.json()),
         fetch(`/api/monthly?branch=${branch}&month=${selectedMonth}`).then(r => r.json()),
-        fetch(`/api/weekly?branch=${branch}&date=${weekEndStr}`).then(r => r.json()),
-        fetch(`/api/weekly?branch=${branch}&date=${prevWeekEndStr}`).then(r => r.json()),
+        fetch(`/api/weekly?branch=${branch}&startDate=${weekStartStr}&endDate=${weekEndStr}`).then(r => r.json()),
+        fetch(`/api/weekly?branch=${branch}&startDate=${prevWeekStartStr}&endDate=${prevWeekEndStr}`).then(r => r.json()),
         fetch(`/api/topline?branch=${branch}&month=${toplineMonth}`).then(r => r.json()),
       ])
       
@@ -322,6 +322,18 @@ export default function Dashboard() {
             order: 3
           },
           {
+            label: 'OTA 비율',
+            data: roomTypeData.days.map((d: any) => {
+              const otaRatio = d.channel_ratios?.['OTA'] || 0
+              return d.occ * (otaRatio / 100) // OCC * OTA 비율
+            }),
+            backgroundColor: 'rgba(59, 130, 246, 0.9)',
+            borderColor: 'rgba(59, 130, 246, 1)',
+            borderWidth: 2,
+            yAxisID: 'y',
+            order: 4
+          },
+          {
             label: '셋팅가',
             data: roomTypeData.days.map((d: any) => d.yolo_price),
             type: 'line',
@@ -351,27 +363,6 @@ export default function Dashboard() {
             pointRadius: 3,
             yAxisID: 'y1',
             order: 0
-          },
-          {
-            label: 'LoS',
-            data: roomTypeData.days.map((d: any) => 0.5), // 고정 높이 (축 없이)
-            type: 'line',
-            borderColor: 'rgba(139, 92, 246, 0)',
-            borderWidth: 0,
-            pointRadius: 0,
-            yAxisID: 'y',
-            datalabels: {
-              display: true,
-              color: 'rgba(139, 92, 246, 1)',
-              align: 'top',
-              offset: 10,
-              font: { size: 11, weight: 'bold' },
-              formatter: (value: any, context: any) => {
-                const los = roomTypeData.days[context.dataIndex]?.avg_los || 0
-                return los > 0 ? los.toFixed(1) + '박' : ''
-              }
-            },
-            order: -1
           }
         ],
       },
@@ -379,20 +370,19 @@ export default function Dashboard() {
         responsive: true,
         maintainAspectRatio: false,
         plugins: {
-          legend: { 
-            position: 'bottom',
-            labels: {
-              filter: (item) => item.text !== 'LoS' // LoS는 범례에서 제외
-            }
-          },
+          legend: { position: 'bottom' },
           datalabels: {
             display: true,
             color: '#000',
             anchor: 'end',
             align: 'top',
             formatter: (value: any, context: any) => {
-              // LoS는 별도 처리
-              if (context.dataset.label === 'LoS') return ''
+              // LoS 표시 (OCC 막대 위에)
+              if (context.dataset.label === 'OCC') {
+                const los = roomTypeData.days[context.dataIndex]?.avg_los || 0
+                const occPct = (value * 100).toFixed(0)
+                return los > 0 ? `${occPct}%\n${los.toFixed(1)}박` : `${occPct}%`
+              }
               
               if (context.dataset.yAxisID === 'y') {
                 return (value * 100).toFixed(0) + '%'
@@ -409,13 +399,14 @@ export default function Dashboard() {
                 if (label) label += ': '
                 
                 const value = context.parsed.y
-                if (value === null) return label + 'N/A'
+                if (value === null || value === undefined) return label + 'N/A'
                 
                 if (context.dataset.yAxisID === 'y') {
-                  return label + (value * 100).toFixed(1) + '%'
+                  label += (value * 100).toFixed(1) + '%'
                 } else {
-                  return label + new Intl.NumberFormat('ko-KR').format(value) + '원'
+                  label += new Intl.NumberFormat('ko-KR').format(value)
                 }
+                return label
               },
               afterBody: function(tooltipItems) {
                 if (tooltipItems.length === 0) return ''
@@ -447,32 +438,17 @@ export default function Dashboard() {
         },
         scales: {
           y: {
-            type: 'linear',
             position: 'left',
-            stacked: true, // stacked bar 활성화
             title: { display: true, text: 'OCC (%)' },
-            ticks: {
-              callback: (value) => (Number(value) * 100).toFixed(0) + '%'
-            },
-            max: 1
+            min: 0,
+            max: 1,
+            ticks: { callback: (v) => ((v as number) * 100).toFixed(0) + '%' }
           },
           y1: {
-            type: 'linear',
             position: 'right',
             title: { display: true, text: '가격 (원)' },
             grid: { drawOnChartArea: false },
-            ticks: {
-              callback: (value) => new Intl.NumberFormat('ko-KR').format(Number(value))
-            }
-          },
-          y2: {
-            type: 'linear',
-            position: 'right',
-            title: { display: true, text: 'LoS (박)' },
-            grid: { drawOnChartArea: false },
-            ticks: {
-              callback: (value) => value + '박'
-            }
+            ticks: { callback: (v) => new Intl.NumberFormat('ko-KR').format(v as number) }
           }
         }
       }
