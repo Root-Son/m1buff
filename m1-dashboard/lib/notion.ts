@@ -282,11 +282,12 @@ function buildChecklistText(rec: PricingRecommendation, emoji: string): string {
   // 페이스 정보
   const paceInfo = rec.sales_pace_detail
 
-  // 벤치마크 정보
+  // 벤치마크 정보 (판매 객실수 기반)
   let benchmarkInfo = ''
-  if (rec.pace_vs_benchmark === 'ahead' && rec.expected_occ != null) {
-    const finalPart = rec.expected_final_occ != null ? `→최종${(rec.expected_final_occ * 100).toFixed(0)}%` : ''
-    benchmarkInfo = ` | ⚠️ 조기완판위험(과거D-${rec.lead_time_days} ${(rec.expected_occ * 100).toFixed(0)}%${finalPart}, 현재${occPct}%)`
+  const currentSold = (rec.total_rooms || 0) - (rec.remaining_rooms || 0)
+  if (rec.pace_vs_benchmark === 'ahead' && rec.expected_sold != null) {
+    const finalPart = rec.expected_final_sold != null ? `→최종${rec.expected_final_sold}실` : ''
+    benchmarkInfo = ` | ⚠️ 조기완판위험(작년D-${rec.lead_time_days} ${rec.expected_sold}실${finalPart}, 현재${currentSold}실)`
   }
 
   // 액션
