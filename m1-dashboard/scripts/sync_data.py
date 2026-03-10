@@ -332,15 +332,10 @@ def main():
         print(f"❌ branch_room_occ 실패: {e}")
         errors.append(('branch_room_occ', str(e)))
 
-    # 2. yolo_prices (Redash)
+    # 2. yolo_prices (Google Sheets — Redash 쿼리 파라미터 호환성 문제로 전환)
     try:
-        print("\n[2/4] yolo_prices 동기화 (Redash)")
-        params_yolo = {
-            'date.start': DATE_RANGES['yolo_prices']['start'],
-            'date.end': DATE_RANGES['yolo_prices']['end'],
-            'branch': '%'
-        }
-        df_yolo = execute_redash_query(QUERIES['yolo_prices'], params_yolo)
+        print("\n[2/4] yolo_prices 동기화 (Google Sheets)")
+        df_yolo = get_google_sheet_data(SHEET_GIDS['yolo_prices'], 'yolo_prices')
         data_yolo = process_yolo_prices(df_yolo)
         upload_to_supabase('yolo_prices', data_yolo)
     except Exception as e:
