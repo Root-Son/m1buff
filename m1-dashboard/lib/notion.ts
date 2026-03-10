@@ -284,7 +284,8 @@ function buildChecklistText(rec: PricingRecommendation, emoji: string): string {
   // 벤치마크 정보
   let benchmarkInfo = ''
   if (rec.pace_vs_benchmark === 'ahead' && rec.expected_occ != null) {
-    benchmarkInfo = ` | ⚠️ 조기완판위험(과거 ${(rec.expected_occ * 100).toFixed(0)}%→현재 ${occPct}%)`
+    const finalPart = rec.expected_final_occ != null ? `→최종${(rec.expected_final_occ * 100).toFixed(0)}%` : ''
+    benchmarkInfo = ` | ⚠️ 조기완판위험(과거D-${rec.lead_time_days} ${(rec.expected_occ * 100).toFixed(0)}%${finalPart}, 현재${occPct}%)`
   }
 
   // 액션
