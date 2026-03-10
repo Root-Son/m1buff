@@ -246,11 +246,12 @@ export function calculatePricingRecommendation(params: {
   }
 
   // --- 가격 상향 판단 ---
-  const isLowAvailFastPace = availPct <= THRESHOLDS.UP_LOW_AVAIL_PCT && salesPace === 'fast' && lead_time_days >= THRESHOLDS.UP_LOW_AVAIL_LEAD
-  const isHighOccFastGrowth = occ >= THRESHOLDS.UP_HIGH_OCC && delta_1d_pp >= THRESHOLDS.UP_HIGH_OCC_DELTA && lead_time_days >= THRESHOLDS.UP_HIGH_OCC_LEAD
-  const isUnderpriced = set_price !== null && guardrail_price !== null && set_price < guardrail_price && occ >= 0.7
-  // ★ NEW: 벤치마크 대비 조기완판 위험 → 가격 인상 시그널
-  const isEarlySelloutRisk = paceVsBenchmark === 'ahead' && lead_time_days >= 3 && occ >= 0.6
+  // 완판 상태에서는 상향도 불필요 (이미 다 팔림)
+  const isLowAvailFastPace = salesPace !== 'sold_out' && availPct <= THRESHOLDS.UP_LOW_AVAIL_PCT && salesPace === 'fast' && lead_time_days >= THRESHOLDS.UP_LOW_AVAIL_LEAD
+  const isHighOccFastGrowth = salesPace !== 'sold_out' && occ >= THRESHOLDS.UP_HIGH_OCC && delta_1d_pp >= THRESHOLDS.UP_HIGH_OCC_DELTA && lead_time_days >= THRESHOLDS.UP_HIGH_OCC_LEAD
+  const isUnderpriced = salesPace !== 'sold_out' && set_price !== null && guardrail_price !== null && set_price < guardrail_price && occ >= 0.7
+  // ★ 벤치마크 대비 조기완판 위험 → 가격 인상 시그널 (완판 전에만 의미 있음)
+  const isEarlySelloutRisk = salesPace !== 'sold_out' && paceVsBenchmark === 'ahead' && lead_time_days >= 3 && occ >= 0.6
 
   if (action !== 'price_down' && (isLowAvailFastPace || isHighOccFastGrowth || isUnderpriced || isEarlySelloutRisk)) {
     action = 'price_up'
