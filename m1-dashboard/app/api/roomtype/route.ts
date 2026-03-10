@@ -206,13 +206,6 @@ export async function GET(request: Request) {
         channel_ratios: channelRatios[key] || {}
       }
       
-      if (losAverages[key]) {
-        console.log(`Matched LoS for ${key}: ${losAverages[key].toFixed(2)}`)
-      }
-      if (channelRatios[key] && Object.keys(channelRatios[key]).length > 0) {
-        console.log(`Matched channels for ${key}:`, channelRatios[key])
-      }
-      
       return result
     })
 
