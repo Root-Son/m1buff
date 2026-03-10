@@ -210,8 +210,10 @@ def process_yolo_prices(df):
     df = df.rename(columns=column_map)
     df['branch_name'] = df['branch_name'].apply(normalize_branch_name)
     df = df[df['room_type'].notna() & (df['room_type'] != '-')]
+    df['price'] = df['price'].apply(lambda x: str(x).replace(',', '') if pd.notna(x) else x)
+    df['price'] = pd.to_numeric(df['price'], errors='coerce')
     df = df[df['price'] > 0]
-    
+
     return df.to_dict('records')
 
 def process_price_guide(df):
