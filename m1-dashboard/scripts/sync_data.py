@@ -50,13 +50,14 @@ def execute_redash_query(query_id, parameters=None):
     headers = {'Authorization': f'Key {REDASH_API_KEY}'}
 
     # 1차: refresh (실행 요청)
+    # Redash refresh API는 쿼리스트링으로 p_파라미터명 형식 사용
     refresh_url = f"{REDASH_URL}/api/queries/{query_id}/refresh"
-    payload = {}
+    query_params = {}
     if parameters:
-        # Redash는 p_파라미터명 형식을 사용할 수 있음
-        payload['parameters'] = parameters
+        for k, v in parameters.items():
+            query_params[f'p_{k}'] = v
 
-    response = requests.post(refresh_url, headers=headers, json=payload)
+    response = requests.post(refresh_url, headers=headers, params=query_params)
 
     if response.status_code == 200:
         job = response.json()['job']
