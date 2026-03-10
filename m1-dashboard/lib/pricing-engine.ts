@@ -289,7 +289,8 @@ export function calculatePricingRecommendation(params: {
     remaining_rooms, total_rooms: effectiveTotalRooms,
     lead_time_days, set_price, guardrail_price, priceDiffPct,
     salesPaceDetail, action, suggestedPrice, occ,
-    expectedOcc, expectedFinalOcc, paceVsBenchmark
+    currentSold, expectedSold, expectedFinalSold, paceVsBenchmark,
+    lead_time_days
   })
 
   return {
@@ -306,8 +307,8 @@ export function calculatePricingRecommendation(params: {
     action, urgency,
     message,
     suggested_price: suggestedPrice,
-    expected_occ: expectedOcc,
-    expected_final_occ: expectedFinalOcc,
+    expected_sold: expectedSold,
+    expected_final_sold: expectedFinalSold,
     pace_vs_benchmark: paceVsBenchmark,
   }
 }
