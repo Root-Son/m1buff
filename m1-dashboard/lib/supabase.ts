@@ -59,7 +59,8 @@ export type PricingRecommendation = {
   message: string
   suggested_price: number | null
   // 과거 벤치마크 대비 페이스 정보
-  expected_occ: number | null       // 역사적 기대 OCC (0-1)
+  expected_occ: number | null       // 해당 리드타임의 역사적 기대 OCC (0-1)
+  expected_final_occ: number | null // 역사적 최종 OCC (D-1 기준, 0-1)
   pace_vs_benchmark: 'ahead' | 'normal' | 'behind' | null  // 벤치마크 대비 빠름/보통/느림
 }
 
