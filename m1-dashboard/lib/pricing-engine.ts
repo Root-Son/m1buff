@@ -252,7 +252,7 @@ export function calculatePricingRecommendation(params: {
   // ★ NEW: 벤치마크 대비 조기완판 위험 → 가격 인상 시그널
   const isEarlySelloutRisk = paceVsBenchmark === 'ahead' && lead_time_days >= 3 && occ >= 0.6
 
-  if (!action.includes('down') && (isLowAvailFastPace || isHighOccFastGrowth || isUnderpriced || isEarlySelloutRisk)) {
+  if (action !== 'price_down' && (isLowAvailFastPace || isHighOccFastGrowth || isUnderpriced || isEarlySelloutRisk)) {
     action = 'price_up'
 
     // 조기완판 위험은 urgency를 높임
