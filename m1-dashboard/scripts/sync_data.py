@@ -108,12 +108,12 @@ def get_google_sheet_data(gid: str, sheet_name: str):
     
     return df
 
-# 테이블별 unique constraint 컬럼
+# 테이블별 unique constraint 컬럼 (upsert용)
 UPSERT_KEYS = {
     'branch_room_occ': 'date,branch_name,room_type',
     'yolo_prices': 'date,branch_name,room_type',
     'price_guide': 'date,branch_name,room_type',
-    'raw_bookings': 'reservation_no',
+    # raw_bookings는 unique constraint 없을 수 있으므로 delete+insert
 }
 
 def upload_to_supabase(table_name, data):
