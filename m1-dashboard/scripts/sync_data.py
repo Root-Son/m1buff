@@ -93,49 +93,34 @@ def get_google_sheet_data(gid: str, sheet_name: str):
     return df
 
 def upload_to_supabase(table_name, data):
-    """Supabase에 데이터 업로드 (전체 교체)"""
-    print(f"🔄 {table_name} 테이블 전체 교체 중... ({len(data)}개)")
-    
+    """Supabase에 데이터 업로드 (upsert)"""
+    print(f"🔄 {table_name} 테이블 업로드 중... ({len(data)}개)")
+
     headers = {
         'apikey': SUPABASE_KEY,
         'Authorization': f'Bearer {SUPABASE_KEY}',
         'Content-Type': 'application/json',
-        'Prefer': 'return=minimal'
+        'Prefer': 'return=minimal,resolution=merge-duplicates'
     }
-    
-    # 1. 기존 데이터 전체 삭제 (date 컬럼으로)
-    print(f"  - 기존 데이터 삭제 중...")
-    delete_url = f"{SUPABASE_URL}/rest/v1/{table_name}"
-    
-    # date가 있는 레코드 전부 삭제
-    delete_response = requests.delete(
-        f"{delete_url}?date=gte.1900-01-01",
-        headers=headers
-    )
-    
-    if delete_response.status_code not in [200, 204]:
-        print(f"  ⚠️ 삭제 실패: {delete_response.text}")
-    else:
-        print(f"  ✅ 기존 데이터 삭제 완료")
-    
-    # 2. 새 데이터 배치 업로드 (1000개씩)
+
+    # 배치 upsert (1000개씩)
     batch_size = 1000
     total_batches = (len(data) + batch_size - 1) // batch_size
-    
+
     for i in range(0, len(data), batch_size):
         batch = data[i:i+batch_size]
         batch_num = (i // batch_size) + 1
-        
-        insert_url = f"{SUPABASE_URL}/rest/v1/{table_name}"
-        response = requests.post(insert_url, headers=headers, json=batch)
-        
+
+        url = f"{SUPABASE_URL}/rest/v1/{table_name}"
+        response = requests.post(url, headers=headers, json=batch)
+
         if response.status_code not in [200, 201]:
             print(f"  ❌ 배치 {batch_num}/{total_batches} 실패: {response.text}")
             response.raise_for_status()
-        
+
         print(f"  - 배치 {batch_num}/{total_batches} 완료 ({len(batch)}개)")
         time.sleep(0.3)
-    
+
     print(f"✅ {table_name} 업로드 완료! (총 {len(data)}개)")
 
 def normalize_branch_name(name):
