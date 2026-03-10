@@ -52,12 +52,15 @@ export type PricingRecommendation = {
   occ_7d_ago: number
   delta_1d_pp: number
   delta_7d_pp: number
-  sales_pace: 'fast' | 'normal' | 'slow'
+  sales_pace: 'fast' | 'normal' | 'slow' | 'sold_out'
   sales_pace_detail: string
   action: 'price_down' | 'price_up' | 'monitor'
   urgency: 'critical' | 'high' | 'medium' | 'low'
   message: string
   suggested_price: number | null
+  // 과거 벤치마크 대비 페이스 정보
+  expected_occ: number | null       // 역사적 기대 OCC (0-1)
+  pace_vs_benchmark: 'ahead' | 'normal' | 'behind' | null  // 벤치마크 대비 빠름/보통/느림
 }
 
 export type ExecutiveSummary = {
