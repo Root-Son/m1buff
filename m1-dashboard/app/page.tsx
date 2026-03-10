@@ -459,11 +459,11 @@ export default function Dashboard() {
             min: 0,
             max: 5,
             grid: { drawOnChartArea: false },
-            ticks: { 
+            ticks: {
               callback: (v) => ((v as number).toFixed(1)) + '박',
               stepSize: 1
             }
-          }
+          }} : {})
         }
       }
     }
