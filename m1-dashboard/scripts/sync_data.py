@@ -146,10 +146,10 @@ def normalize_branch_name(name):
     cleaned = str(name).strip()
     
     mapping = {
-        '동탄점': '동탄점(호텔)',
-        '호텔동탄': '동탄점(호텔)',
-        '동탄호텔': '동탄점(호텔)',
-        '호텔 동탄': '동탄점(호텔)',
+        '동탄점': '호텔 동탄',
+        '호텔동탄': '호텔 동탄',
+        '동탄호텔': '호텔 동탄',
+        '동탄점(호텔)': '호텔 동탄',
     }
     
     return mapping.get(cleaned, cleaned)

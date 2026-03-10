@@ -216,7 +216,7 @@ function getWeekStart(date: Date): Date {
 
 // 지점명 정규화
 function normalizeBranchName(name: string): string {
-  if (name === "호텔 동탄") return "동탄점(호텔)"
+  // "호텔 동탄"은 DB 원본 그대로 사용
   if (name === "웨이브파크_펜트") return "웨이브파크점"
   return name
 }
@@ -244,7 +244,7 @@ function analyzeBranchIssues(occData: any[], weekStart: string, weekEnd: string)
   // 전체 지점 목록 (여수점 제외)
   const ALL_BRANCHES = [
     '강남예전로이움점', '강남예전시그니티점', '거북섬점', '낙산해변',
-    '당진터미널점', '동탄점(호텔)', '명동점', '부산기장점', '부산송도해변점',
+    '당진터미널점', '호텔 동탄', '명동점', '부산기장점', '부산송도해변점',
     '부산시청점', '부산역점', '부티크남포BIFF점', '부티크익선점', '서면점',
     '속초등대해변점', '속초자이엘라더비치', '속초중앙점', '속초해변',
     '속초해변 AB점', '속초해변C점', '송도달빛공원점', '스타즈울산점',
