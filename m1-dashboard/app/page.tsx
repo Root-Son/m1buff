@@ -478,7 +478,7 @@ export default function Dashboard() {
             max: 5,
             grid: { drawOnChartArea: false },
             ticks: { 
-              callback: (v) => v.toFixed(1) + '박',
+              callback: (v) => ((v as number).toFixed(1)) + '박',
               stepSize: 1
             }
           }
