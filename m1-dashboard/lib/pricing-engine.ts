@@ -87,8 +87,14 @@ export function getTotalRooms(branchName: string, roomType: string): number {
 export function determineSalesPace(
   delta_1d_pp: number,
   delta_7d_pp: number,
-  leadTimeDays: number
-): 'fast' | 'normal' | 'slow' {
+  leadTimeDays: number,
+  occ?: number
+): 'fast' | 'normal' | 'slow' | 'sold_out' {
+  // ★ 완판: OCC 98% 이상이면 더 이상 판매 속도를 논할 필요 없음
+  if (occ !== undefined && occ >= 0.98) {
+    return 'sold_out'
+  }
+
   // 빠름: 일간 +5pp 이상 또는 주간 +15pp 이상
   if (delta_1d_pp >= THRESHOLDS.FAST_DELTA_1D || delta_7d_pp >= THRESHOLDS.FAST_DELTA_7D) {
     return 'fast'
