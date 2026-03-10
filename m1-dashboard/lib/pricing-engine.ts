@@ -233,7 +233,14 @@ export function calculatePricingRecommendation(params: {
 
   if (isHighAvailSlowPace || isUrgentHighAvail || isOverpricedLowOcc) {
     action = 'price_down'
-    suggestedPrice = guardrail_price
+
+    // 셋팅가가 이미 가드레일 이하면 더 내릴 수 없음 → 가드레일 조정 필요
+    const alreadyAtOrBelowGuardrail = set_price != null && guardrail_price != null && set_price <= guardrail_price
+    if (alreadyAtOrBelowGuardrail) {
+      suggestedPrice = null  // 제안가 없음 (메시지에서 "가드레일 조정 필요" 처리)
+    } else {
+      suggestedPrice = guardrail_price
+    }
 
     // 긴급도
     if (lead_time_days <= THRESHOLDS.CRITICAL_LEAD && occ < THRESHOLDS.CRITICAL_OCC) {
