@@ -199,14 +199,17 @@ export async function GET(request: Request) {
       })
     })
 
-    // 10. 데이터 병합
+    // DEBUG: raw_bookings 컬럼 확인
+    const { data: sampleRow } = await supabase
+      .from('raw_bookings')
+      .select('*')
+      .eq('branch_name', branch)
+      .limit(1)
     const _debug = {
-      losCount: losData?.length || 0,
+      rawBookingsColumns: sampleRow?.[0] ? Object.keys(sampleRow[0]) : [],
+      sampleRow: sampleRow?.[0] || null,
       losError: losError?.message || null,
-      losSample: losData?.slice(0, 2),
-      channelCount: channelData?.length || 0,
       channelError: channelError?.message || null,
-      channelSample: channelData?.slice(0, 2),
       branch,
       startDate,
       endDate,
