@@ -303,7 +303,8 @@ def main():
         print("\n[2/4] yolo_prices 동기화 (Redash)")
         params_yolo = {
             'date.start': DATE_RANGES['yolo_prices']['start'],
-            'date.end': DATE_RANGES['yolo_prices']['end']
+            'date.end': DATE_RANGES['yolo_prices']['end'],
+            'branch': '%'
         }
         df_yolo = execute_redash_query(QUERIES['yolo_prices'], params_yolo)
         data_yolo = process_yolo_prices(df_yolo)
