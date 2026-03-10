@@ -363,6 +363,32 @@ export default function Dashboard() {
             pointRadius: 3,
             yAxisID: 'y1',
             order: 0
+          },
+          {
+            label: 'LoS (평균 숙박)',
+            data: roomTypeData.days.map((d: any) => {
+              const los = d.avg_los || 0
+              // LoS를 가격 축 범위에 맞게 스케일링 (예: 2박 → 200000원 정도로 표시)
+              return los > 0 ? los * 100000 : null
+            }),
+            type: 'line',
+            borderColor: 'rgba(139, 92, 246, 1)',
+            borderWidth: 2,
+            pointRadius: 4,
+            yAxisID: 'y1',
+            borderDash: [3, 3],
+            datalabels: {
+              display: true,
+              color: 'rgba(139, 92, 246, 1)',
+              align: 'top',
+              offset: 8,
+              font: { size: 11, weight: 'bold' },
+              formatter: (value: any, context: any) => {
+                const los = roomTypeData.days[context.dataIndex]?.avg_los || 0
+                return los > 0 ? los.toFixed(1) + '박' : ''
+              }
+            },
+            order: 0
           }
         ],
       },
