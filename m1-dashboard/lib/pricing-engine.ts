@@ -325,15 +325,17 @@ function generateDetailedMessage(params: {
   action: 'price_down' | 'price_up' | 'monitor' | 'guardrail_adjust'
   suggestedPrice: number | null
   occ: number
-  expectedOcc?: number | null
-  expectedFinalOcc?: number | null
+  currentSold?: number
+  expectedSold?: number | null
+  expectedFinalSold?: number | null
   paceVsBenchmark?: 'ahead' | 'normal' | 'behind' | null
+  lead_time_days: number
 }): string {
   const {
     remaining_rooms, total_rooms, lead_time_days,
     set_price, guardrail_price, priceDiffPct,
     salesPaceDetail, action, suggestedPrice, occ,
-    expectedOcc, expectedFinalOcc, paceVsBenchmark
+    currentSold, expectedSold, expectedFinalSold, paceVsBenchmark
   } = params
 
   // ★ 완판이면 간결하게
@@ -354,14 +356,14 @@ function generateDetailedMessage(params: {
     priceText = `가격 데이터 없음`
   }
 
-  // 벤치마크 텍스트
+  // 벤치마크 텍스트 (판매 객실수 기반)
   let benchmarkText = ''
-  if (paceVsBenchmark === 'ahead' && expectedOcc != null) {
-    const finalPart = expectedFinalOcc != null ? `→최종 ${(expectedFinalOcc * 100).toFixed(0)}%` : ''
-    benchmarkText = ` | ⚠️ 조기완판위험 (과거 D-${lead_time_days} OCC ${(expectedOcc * 100).toFixed(0)}%${finalPart}, 현재 ${(occ * 100).toFixed(0)}%)`
-  } else if (paceVsBenchmark === 'behind' && expectedOcc != null) {
-    const finalPart = expectedFinalOcc != null ? `→최종 ${(expectedFinalOcc * 100).toFixed(0)}%` : ''
-    benchmarkText = ` | 과거 대비 부진 (과거 D-${lead_time_days} OCC ${(expectedOcc * 100).toFixed(0)}%${finalPart}, 현재 ${(occ * 100).toFixed(0)}%)`
+  if (paceVsBenchmark === 'ahead' && expectedSold != null) {
+    const finalPart = expectedFinalSold != null ? `→최종 ${expectedFinalSold}실` : ''
+    benchmarkText = ` | ⚠️ 조기완판위험 (작년 D-${lead_time_days} ${expectedSold}실${finalPart}, 현재 ${currentSold ?? 0}실 판매)`
+  } else if (paceVsBenchmark === 'behind' && expectedSold != null) {
+    const finalPart = expectedFinalSold != null ? `→최종 ${expectedFinalSold}실` : ''
+    benchmarkText = ` | 과거 대비 부진 (작년 D-${lead_time_days} ${expectedSold}실${finalPart}, 현재 ${currentSold ?? 0}실 판매)`
   }
 
   // 액션 텍스트
