@@ -196,7 +196,7 @@ async function createBranchChecklist(
 
     // 각 룸타입별 체크리스트
     for (const rec of dayRecs) {
-      const emoji = getActionEmoji(rec.action)
+      const emoji = getActionEmoji(rec.action, rec.pace_vs_benchmark)
       const checklistText = buildChecklistText(rec, emoji)
 
       children.push({
