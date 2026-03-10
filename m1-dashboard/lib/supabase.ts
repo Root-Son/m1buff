@@ -58,9 +58,9 @@ export type PricingRecommendation = {
   urgency: 'critical' | 'high' | 'medium' | 'low'
   message: string
   suggested_price: number | null
-  // 과거 벤치마크 대비 페이스 정보
-  expected_occ: number | null       // 해당 리드타임의 역사적 기대 OCC (0-1)
-  expected_final_occ: number | null // 역사적 최종 OCC (D-1 기준, 0-1)
+  // 과거 벤치마크 대비 페이스 정보 (판매 객실수 기반)
+  expected_sold: number | null       // 해당 리드타임의 과거 판매 객실수 (중앙값)
+  expected_final_sold: number | null // 과거 최종 판매 객실수 (D-1 기준, 중앙값)
   pace_vs_benchmark: 'ahead' | 'normal' | 'behind' | null  // 벤치마크 대비 빠름/보통/느림
 }
 
