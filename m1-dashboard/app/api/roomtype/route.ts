@@ -188,6 +188,11 @@ export async function GET(request: Request) {
     })
 
     // 10. 데이터 병합
+    console.log('=== LoS/Channel Matching Debug ===')
+    console.log('Sample OCC dates:', data?.slice(0, 3).map(d => `${d.date}_${d.room_type}`))
+    console.log('Sample LoS keys:', Object.keys(losAverages).slice(0, 3))
+    console.log('Sample Channel keys:', Object.keys(channelRatios).slice(0, 3))
+    
     const mergedData = (data || []).map(row => {
       const yolo = yoloData?.find(y => 
         y.date === row.date && y.room_type === row.room_type
@@ -198,13 +203,22 @@ export async function GET(request: Request) {
       
       const key = `${row.date}_${row.room_type}`
       
-      return {
+      const result = {
         ...row,
         yolo_price: yolo?.price || null,
         guardrail_price: guide?.min_price || null,
         avg_los: losAverages[key] || 0,
         channel_ratios: channelRatios[key] || {}
       }
+      
+      if (losAverages[key]) {
+        console.log(`Matched LoS for ${key}: ${losAverages[key].toFixed(2)}`)
+      }
+      if (channelRatios[key] && Object.keys(channelRatios[key]).length > 0) {
+        console.log(`Matched channels for ${key}:`, channelRatios[key])
+      }
+      
+      return result
     })
 
     // 11. roomType 필터링
