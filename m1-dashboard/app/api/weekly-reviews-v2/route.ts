@@ -145,11 +145,10 @@ export async function GET(request: NextRequest) {
     const monthStart = `${targetYear}-${String(targetMonth).padStart(2, '0')}-01`
     const monthEnd = new Date(targetYear, targetMonth, 0).toISOString().split('T')[0]
 
-    const { data: monthlyActuals } = await supabase
-      .from('raw_bookings')
-      .select('branch_name, payment_amount')
-      .gte('check_in_date', monthStart)
-      .lte('check_in_date', monthEnd)
+    const monthlyActuals = await fetchAllRows('raw_bookings', 'branch_name, payment_amount', {
+      gte: ['check_in_date', monthStart],
+      lte: ['check_in_date', monthEnd],
+    })
 
     // Aggregate by branch
     const thisWeekByBranch = aggregateByBranch(thisWeekData || [])
