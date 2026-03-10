@@ -532,7 +532,6 @@ export default function WeeklyReviewsPage() {
 
   const generateReview = async (weekStart: string) => {
     setLoading(true)
-    setShowWeekPicker(false)
     try {
       const response = await fetch(`/api/weekly-reviews-v2?week=${weekStart}`)
       const data = await response.json()
