@@ -490,8 +490,6 @@ export default function WeeklyReviewsPage() {
   const [selectedWeek, setSelectedWeek] = useState<string>('')
   const [availableWeeks, setAvailableWeeks] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
-  const [showWeekPicker, setShowWeekPicker] = useState(false)
-  const [newWeek, setNewWeek] = useState('')
 
   useEffect(() => {
     fetchAvailableWeeks()
