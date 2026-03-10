@@ -320,7 +320,7 @@ function generateDetailedMessage(params: {
   guardrail_price: number | null
   priceDiffPct: number | null
   salesPaceDetail: string
-  action: 'price_down' | 'price_up' | 'monitor'
+  action: 'price_down' | 'price_up' | 'monitor' | 'guardrail_adjust'
   suggestedPrice: number | null
   occ: number
   expectedOcc?: number | null
