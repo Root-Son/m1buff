@@ -397,6 +397,8 @@ export function generateBranchSummary(recommendations: PricingRecommendation[]):
   const hasCritical = recommendations.some(r => r.urgency === 'critical')
   const hasHigh = recommendations.some(r => r.urgency === 'high')
 
+  const earlySelloutCount = recommendations.filter(r => r.pace_vs_benchmark === 'ahead').length
+
   const parts: string[] = []
 
   // OCC 상태
@@ -408,6 +410,11 @@ export function generateBranchSummary(recommendations: PricingRecommendation[]):
     parts.push(`평균 OCC ${(avgOcc * 100).toFixed(0)}%`)
   } else {
     parts.push('전반적으로 OCC 낮음')
+  }
+
+  // 조기완판 위험 경고
+  if (earlySelloutCount > 0) {
+    parts.push(`조기완판 위험 ${earlySelloutCount}건 (가격 인상 검토)`)
   }
 
   // 액션 요약
