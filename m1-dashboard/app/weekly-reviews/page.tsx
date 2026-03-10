@@ -468,58 +468,13 @@ export default function WeeklyReviewsPage() {
         </div>
       </header>
 
-      {/* 주차 선택 */}
-      <div className="bg-white border-b border-gray-200 sticky top-[73px] z-40">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
-          <div className="flex items-center gap-2 overflow-x-auto relative">
-            {availableWeeks.map((week) => (
-              <button
-                key={week.week_start}
-                onClick={() => setSelectedWeek(week.week_start)}
-                className={`px-4 py-2 text-sm font-medium rounded-lg whitespace-nowrap ${
-                  week.week_start === selectedWeek
-                    ? 'bg-blue-600 text-white'
-                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                }`}
-              >
-                {getWeekLabel(week.week_start)} ({formatDateRange(week.week_start, week.week_end)})
-              </button>
-            ))}
-            <button
-              onClick={() => setShowWeekPicker(!showWeekPicker)}
-              className="px-4 py-2 text-sm font-medium rounded-lg bg-green-100 text-green-700 hover:bg-green-200 whitespace-nowrap"
-            >
-              + 주차 선택 생성
-            </button>
-            {showWeekPicker && (
-              <div className="absolute top-full left-0 mt-2 bg-white border border-gray-200 rounded-lg shadow-lg p-4 z-50">
-                <div className="text-sm font-medium text-gray-700 mb-2">생성할 주의 월요일 선택:</div>
-                <input
-                  type="date"
-                  value={newWeek}
-                  onChange={(e) => setNewWeek(e.target.value)}
-                  className="px-3 py-2 border border-gray-300 rounded-lg text-sm mb-2 w-full"
-                />
-                <div className="flex gap-2">
-                  <button
-                    onClick={() => newWeek && generateReview(newWeek)}
-                    disabled={!newWeek}
-                    className="px-4 py-2 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700 disabled:bg-gray-300"
-                  >
-                    생성
-                  </button>
-                  <button
-                    onClick={() => setShowWeekPicker(false)}
-                    className="px-4 py-2 bg-gray-100 text-gray-700 text-sm rounded-lg hover:bg-gray-200"
-                  >
-                    취소
-                  </button>
-                </div>
-              </div>
-            )}
-          </div>
-        </div>
-      </div>
+      {/* 주차 선택: 월 → W1~W4 */}
+      <WeekSelector
+        availableWeeks={availableWeeks}
+        selectedWeek={selectedWeek}
+        onSelectWeek={setSelectedWeek}
+        onGenerateWeek={generateReview}
+      />
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-6">
         {/* 1. 주간 요약 대시보드 */}
