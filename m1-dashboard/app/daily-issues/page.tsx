@@ -196,7 +196,9 @@ function BranchDailyCard({ branchName, recommendations, summary }: {
                             </div>
                             {rec.pace_vs_benchmark === 'ahead' && rec.expected_occ != null && (
                               <div className="text-xs font-medium text-amber-700 mt-1 bg-amber-50 px-2 py-0.5 rounded inline-block">
-                                ⚠️ 조기완판위험: 과거 동기간 OCC {(rec.expected_occ * 100).toFixed(0)}% → 현재 {Math.min(rec.occ * 100, 100).toFixed(0)}%
+                                ⚠️ 조기완판위험: 과거 D-{rec.lead_time_days} OCC {(rec.expected_occ * 100).toFixed(0)}%
+                                {rec.expected_final_occ != null && <>→최종 {(rec.expected_final_occ * 100).toFixed(0)}%</>}
+                                , 현재 {Math.min(rec.occ * 100, 100).toFixed(0)}%
                               </div>
                             )}
                             {rec.action === 'price_down' && rec.suggested_price == null && rec.set_price != null && rec.guardrail_price != null && rec.set_price <= rec.guardrail_price && (
