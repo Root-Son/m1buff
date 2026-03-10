@@ -329,6 +329,11 @@ function generateDetailedMessage(params: {
     expectedOcc, paceVsBenchmark
   } = params
 
+  // ★ 완판이면 간결하게
+  if (salesPaceDetail === '완판') {
+    return `${total_rooms}실 전량 판매 완료`
+  }
+
   // 가격 비교 텍스트
   let priceText: string
   if (set_price && guardrail_price && priceDiffPct !== null) {
