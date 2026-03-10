@@ -170,7 +170,7 @@ export async function GET(request: Request) {
     const channelMap: Record<string, Record<string, number>> = {}
     channelData?.forEach(row => {
       const dateStr = String(row.check_in_date).split('T')[0].split(' ')[0]
-      const key = `${dateStr}_${row.room_type}`
+      const key = `${dateStr}_${row.roomtype}`
       const group = getChannelGroup(row.reservation_channel || '')
       
       if (!channelMap[key]) channelMap[key] = {}
