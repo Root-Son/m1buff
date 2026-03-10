@@ -151,10 +151,11 @@ export async function GET(request: Request) {
       .gte('date', startDate)
       .lte('date', endDate)
 
-    // 8. LoS 집계 (날짜별, 룸타입별 평균)
+    // 8. LoS 집계 (date별, 룸타입별 평균)
+    // OCC 데이터는 date 기준이므로, check_in_date를 date로 매핑
     const losMap: Record<string, Record<string, number>> = {}
     losData?.forEach(row => {
-      const key = `${row.check_in_date}_${row.room_type}`
+      const key = `${row.check_in_date}_${row.room_type}` // check_in_date 사용
       if (!losMap[key]) losMap[key] = { total: 0, count: 0 }
       losMap[key].total += row.nights || 0
       losMap[key].count += 1
@@ -165,10 +166,11 @@ export async function GET(request: Request) {
       losAverages[key] = val.count > 0 ? val.total / val.count : 0
     })
 
-    // 9. 채널별 비중 집계 (날짜별, 룸타입별)
+    // 9. 채널별 비중 집계 (date별, 룸타입별)
+    // check_in_date 기준으로 집계
     const channelMap: Record<string, Record<string, number>> = {}
     channelData?.forEach(row => {
-      const key = `${row.check_in_date}_${row.room_type}`
+      const key = `${row.check_in_date}_${row.room_type}` // check_in_date 사용
       const group = getChannelGroup(row.reservation_channel || '')
       
       if (!channelMap[key]) channelMap[key] = {}
