@@ -205,11 +205,6 @@ function BranchDailyCard({ branchName, recommendations, summary }: {
                                 , 현재 {Math.min(rec.occ * 100, 100).toFixed(0)}%
                               </div>
                             )}
-                            {rec.action === 'price_down' && rec.suggested_price == null && rec.set_price != null && rec.guardrail_price != null && rec.set_price <= rec.guardrail_price && (
-                              <div className="text-xs font-medium text-orange-700 mt-1">
-                                → 이미 가드레일 이하, 가드레일 조정 필요
-                              </div>
-                            )}
                             {rec.suggested_price != null && (
                               <div className="text-xs font-medium text-blue-700 mt-1">
                                 → 제안가: {rec.suggested_price.toLocaleString()}원
