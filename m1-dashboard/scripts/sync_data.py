@@ -225,6 +225,7 @@ def process_price_guide(df):
     df = df[df['room_type'].notna() & (df['room_type'] != '-')]
     df = df[df['min_price'].notna() & (df['min_price'] != '-')]
     
+    df['min_price'] = df['min_price'].apply(lambda x: str(x).replace(',', '') if pd.notna(x) else x)
     df['min_price'] = pd.to_numeric(df['min_price'], errors='coerce')
     df = df.dropna(subset=['min_price'])
     df = df[df['min_price'] > 0]
