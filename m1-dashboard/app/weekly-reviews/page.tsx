@@ -291,7 +291,9 @@ function BranchIssuesCard({ issues }: { issues: any[] }) {
                                 const isSoldOut = rec.sales_pace === 'sold_out'
                                 const recAction = isSoldOut
                                   ? { bg: 'bg-purple-500 text-white', label: '완판' }
-                                  : rec.action === 'price_down'
+                                  : rec.action === 'guardrail_adjust'
+                                    ? { bg: 'bg-orange-500 text-white', label: '가드레일 조정' }
+                                    : rec.action === 'price_down'
                                     ? { bg: 'bg-red-500 text-white', label: '하향' }
                                     : rec.action === 'price_up'
                                     ? { bg: 'bg-green-500 text-white', label: '상향' }
