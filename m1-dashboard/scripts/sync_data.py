@@ -191,6 +191,12 @@ def process_branch_room_occ(df):
     # NULL 처리
     df = df.fillna(0)
 
+    # 중복 제거 (date, branch_name, room_type 기준)
+    before = len(df)
+    df = df.drop_duplicates(subset=['date', 'branch_name', 'room_type'], keep='last')
+    if len(df) < before:
+        print(f"  ℹ️ 중복 {before - len(df)}개 제거 → {len(df)}개")
+
     # 디버깅: 이상값 확인
     for col in ['occ', 'occ_asof', 'occ_1d_ago', 'occ_7d_ago']:
         if col in df.columns:
