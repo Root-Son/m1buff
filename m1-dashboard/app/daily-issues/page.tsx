@@ -169,7 +169,7 @@ function BranchDailyCard({ branchName, recommendations, summary }: {
                           )}
                         </div>
                         <div className="text-xs text-gray-600 leading-relaxed">
-                          잔여 {rec.remaining_rooms ?? 0}실/{rec.total_rooms ?? 0}실 (OCC {rec.occ != null ? `${(rec.occ * 100).toFixed(0)}%` : '-'})
+                          잔여 {rec.remaining_rooms ?? 0}실/{rec.total_rooms ?? 0}실 (OCC {rec.occ != null ? `${Math.min(rec.occ * 100, 100).toFixed(0)}%` : '-'})
                           {' | '}
                           {rec.sales_pace_detail || rec.sales_pace || '-'}
                           {rec.set_price != null && (
@@ -179,6 +179,11 @@ function BranchDailyCard({ branchName, recommendations, summary }: {
                             <> (가드레일 대비 {rec.price_diff_pct >= 0 ? '+' : ''}{rec.price_diff_pct.toFixed(0)}%)</>
                           )}
                         </div>
+                        {rec.pace_vs_benchmark === 'ahead' && rec.expected_occ != null && (
+                          <div className="text-xs font-medium text-amber-700 mt-1 bg-amber-50 px-2 py-0.5 rounded inline-block">
+                            ⚠️ 조기완판위험: 과거 동기간 OCC {(rec.expected_occ * 100).toFixed(0)}% → 현재 {Math.min(rec.occ * 100, 100).toFixed(0)}% (가격 인상 검토)
+                          </div>
+                        )}
                         {rec.suggested_price != null && (
                           <div className="text-xs font-medium text-blue-700 mt-1">
                             → 제안가: {rec.suggested_price.toLocaleString()}원
