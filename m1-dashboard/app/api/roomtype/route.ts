@@ -163,8 +163,7 @@ export async function GET(request: Request) {
     Object.entries(losMap).forEach(([key, val]) => {
       losAverages[key] = val.count > 0 ? val.total / val.count : 0
     })
-    
-    console.log('LoS Map sample:', Object.entries(losAverages).slice(0, 3))
+
 
     // 9. 채널별 비중 집계 (date별, 룸타입별)
     const channelMap: Record<string, Record<string, number>> = {}
