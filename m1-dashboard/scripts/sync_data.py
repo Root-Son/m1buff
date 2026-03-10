@@ -198,6 +198,11 @@ def process_branch_room_occ(df):
         if col in df.columns:
             df[col] = df[col].clip(0, 1)
 
+    # delta_pp도 퍼센트→소수 변환 (DB가 numeric(5,4), max 9.9999)
+    for col in ['delta_1d_pp', 'delta_7d_pp']:
+        if col in df.columns:
+            df[col] = df[col].apply(lambda x: x / 100 if (pd.notna(x) and abs(x) > 1) else x)
+
     # NULL 처리
     df = df.fillna(0)
 
