@@ -188,11 +188,15 @@ def process_branch_room_occ(df):
             df[col] = df[col].apply(lambda x: str(x).replace(',', '') if pd.notna(x) else x)
             df[col] = pd.to_numeric(df[col], errors='coerce')
 
-    # OCC/delta 값들을 소수로 변환 (퍼센트 → 0~1 범위)
-    # DB 컬럼이 numeric(5,4) 이므로 소수로 변환 필수
-    for col in ['occ', 'occ_asof', 'occ_1d_ago', 'occ_7d_ago', 'delta_1d_pp', 'delta_7d_pp']:
+    # OCC 값들을 소수로 변환 (퍼센트 → 0~1 범위, DB가 numeric(5,4))
+    for col in ['occ', 'occ_asof', 'occ_1d_ago', 'occ_7d_ago']:
         if col in df.columns:
             df[col] = df[col].apply(lambda x: x / 100 if (pd.notna(x) and abs(x) > 1) else x)
+
+    # OCC 값을 0~1 범위로 클램핑 (DB overflow 방지)
+    for col in ['occ', 'occ_asof', 'occ_1d_ago', 'occ_7d_ago']:
+        if col in df.columns:
+            df[col] = df[col].clip(0, 1)
 
     # NULL 처리
     df = df.fillna(0)
