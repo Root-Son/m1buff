@@ -54,7 +54,7 @@ export type PricingRecommendation = {
   delta_7d_pp: number
   sales_pace: 'fast' | 'normal' | 'slow' | 'sold_out'
   sales_pace_detail: string
-  action: 'price_down' | 'price_up' | 'monitor'
+  action: 'price_down' | 'price_up' | 'monitor' | 'guardrail_adjust'
   urgency: 'critical' | 'high' | 'medium' | 'low'
   message: string
   suggested_price: number | null
