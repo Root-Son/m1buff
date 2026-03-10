@@ -29,8 +29,9 @@ function formatDateKR(dateStr: string): string {
 }
 
 function getActionEmoji(action: string, paceVsBenchmark?: string | null): string {
+  if (action === 'guardrail_adjust') return '🟠'
   if (action === 'price_down') return '🔴'
-  if (action === 'price_up' && paceVsBenchmark === 'ahead') return '🟡'  // 조기완판 위험
+  if (action === 'price_up' && paceVsBenchmark === 'ahead') return '🟡'
   if (action === 'price_up') return '🟢'
   return '⚪'
 }
