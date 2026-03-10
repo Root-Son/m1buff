@@ -307,11 +307,14 @@ function generateDetailedMessage(params: {
   action: 'price_down' | 'price_up' | 'monitor'
   suggestedPrice: number | null
   occ: number
+  expectedOcc?: number | null
+  paceVsBenchmark?: 'ahead' | 'normal' | 'behind' | null
 }): string {
   const {
     remaining_rooms, total_rooms, lead_time_days,
     set_price, guardrail_price, priceDiffPct,
-    salesPaceDetail, action, suggestedPrice, occ
+    salesPaceDetail, action, suggestedPrice, occ,
+    expectedOcc, paceVsBenchmark
   } = params
 
   // 가격 비교 텍스트
@@ -325,6 +328,14 @@ function generateDetailedMessage(params: {
     priceText = `셋팅가 미등록 (가드레일 ${guardrail_price.toLocaleString()}원)`
   } else {
     priceText = `가격 데이터 없음`
+  }
+
+  // 벤치마크 텍스트
+  let benchmarkText = ''
+  if (paceVsBenchmark === 'ahead' && expectedOcc !== null) {
+    benchmarkText = ` | ⚠️ 조기완판위험 (과거 동기간 OCC ${(expectedOcc * 100).toFixed(0)}% → 현재 ${(occ * 100).toFixed(0)}%)`
+  } else if (paceVsBenchmark === 'behind' && expectedOcc !== null) {
+    benchmarkText = ` | 과거 대비 부진 (과거 ${(expectedOcc * 100).toFixed(0)}% → 현재 ${(occ * 100).toFixed(0)}%)`
   }
 
   // 액션 텍스트
@@ -345,7 +356,7 @@ function generateDetailedMessage(params: {
     actionText = `현 수준 유지, 추이 관찰`
   }
 
-  return `잔여 ${remaining_rooms}실/${total_rooms}실 (OCC ${(occ * 100).toFixed(0)}%) | 리드타임 ${lead_time_days}일 | ${priceText} | 판매 페이스 ${salesPaceDetail} → ${actionText}`
+  return `잔여 ${remaining_rooms}실/${total_rooms}실 (OCC ${(occ * 100).toFixed(0)}%) | 리드타임 ${lead_time_days}일 | ${priceText} | ${salesPaceDetail}${benchmarkText} → ${actionText}`
 }
 
 // ===== Executive Summary 생성 =====
