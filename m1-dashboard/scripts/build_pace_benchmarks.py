@@ -165,71 +165,18 @@ def compute_benchmarks():
     return benchmarks
 
 
-def write_typescript(benchmarks, output_path):
-    """TypeScript 파일 생성"""
-    lines = []
-    lines.append("/**")
-    lines.append(" * 과거 예약 데이터 기반 OCC 빌드업 벤치마크")
-    lines.append(" * raw_booking_history 테이블에서 자동 생성됨")
-    lines.append(f" * 생성일: {datetime.now().strftime('%Y-%m-%d %H:%M')}")
-    lines.append(" * ")
-    lines.append(" * 키: 'branch|roomtype|month|dow_type'")
-    lines.append(" * 값: { lead_time_days: expected_occ (0-1) }")
-    lines.append(" *   예: { 14: 0.5 } → D-14 시점에 역사적으로 OCC 50% 수준")
-    lines.append(" */")
-    lines.append("")
-    lines.append("export const PACE_BENCHMARKS: Record<string, Record<number, number>> = {")
-
+def write_json(benchmarks, output_path):
+    """JSON 파일 생성 (판매 객실수 기반)"""
+    # key → { "lead_time": sold_rooms } (정수값)
+    output = {}
     for key in sorted(benchmarks.keys()):
         curve = benchmarks[key]
-        curve_str = ", ".join(f"{k}: {v}" for k, v in sorted(curve.items()))
-        lines.append(f'  "{key}": {{ {curve_str} }},')
-
-    lines.append("}")
-    lines.append("")
-    lines.append("/**")
-    lines.append(" * 벤치마크 조회")
-    lines.append(" * @param leadTimeDays 현재 리드타임 (일)")
-    lines.append(" * @returns expected OCC (0-1) 또는 null (데이터 없음)")
-    lines.append(" */")
-    lines.append("export function getExpectedOcc(")
-    lines.append("  branchName: string,")
-    lines.append("  roomType: string,")
-    lines.append("  month: number,")
-    lines.append("  dowType: 'weekday' | 'weekend',")
-    lines.append("  leadTimeDays: number")
-    lines.append("): number | null {")
-    lines.append('  const key = `${branchName}|${roomType}|${month}|${dowType}`')
-    lines.append("  const curve = PACE_BENCHMARKS[key]")
-    lines.append("  if (!curve) return null")
-    lines.append("")
-    lines.append("  // 정확한 버킷이 있으면 반환")
-    lines.append("  if (curve[leadTimeDays] !== undefined) return curve[leadTimeDays]")
-    lines.append("")
-    lines.append("  // 가장 가까운 버킷에서 보간")
-    lines.append("  const buckets = Object.keys(curve).map(Number).sort((a, b) => a - b)")
-    lines.append("  if (buckets.length === 0) return null")
-    lines.append("")
-    lines.append("  // 범위 밖이면 경계값 반환")
-    lines.append("  if (leadTimeDays <= buckets[0]) return curve[buckets[0]]")
-    lines.append("  if (leadTimeDays >= buckets[buckets.length - 1]) return curve[buckets[buckets.length - 1]]")
-    lines.append("")
-    lines.append("  // 선형 보간")
-    lines.append("  for (let i = 0; i < buckets.length - 1; i++) {")
-    lines.append("    if (leadTimeDays >= buckets[i] && leadTimeDays <= buckets[i + 1]) {")
-    lines.append("      const ratio = (leadTimeDays - buckets[i]) / (buckets[i + 1] - buckets[i])")
-    lines.append("      return curve[buckets[i]] + ratio * (curve[buckets[i + 1]] - curve[buckets[i]])")
-    lines.append("    }")
-    lines.append("  }")
-    lines.append("")
-    lines.append("  return null")
-    lines.append("}")
-    lines.append("")
+        output[key] = {str(k): v for k, v in sorted(curve.items())}
 
     with open(output_path, "w", encoding="utf-8") as f:
-        f.write("\n".join(lines))
+        json.dump(output, f, ensure_ascii=False)
 
-    print(f"Written to {output_path}", file=sys.stderr)
+    print(f"Written to {output_path} ({len(output)} entries)", file=sys.stderr)
 
 
 if __name__ == "__main__":
