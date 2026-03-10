@@ -453,7 +453,7 @@ export default function Dashboard() {
             grid: { drawOnChartArea: false },
             ticks: { callback: (v) => new Intl.NumberFormat('ko-KR').format(v as number) }
           },
-          y2: {
+          ...(hasLosData ? { y2: {
             position: 'right',
             title: { display: true, text: 'LoS (박)' },
             min: 0,
