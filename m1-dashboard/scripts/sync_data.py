@@ -117,19 +117,35 @@ UPSERT_KEYS = {
 }
 
 def upload_to_supabase(table_name, data):
-    """Supabase에 데이터 업로드 (upsert)"""
+    """Supabase에 데이터 업로드 (upsert 또는 delete+insert)"""
     print(f"🔄 {table_name} 테이블 업로드 중... ({len(data)}개)")
 
-    headers = {
+    base_headers = {
         'apikey': SUPABASE_KEY,
         'Authorization': f'Bearer {SUPABASE_KEY}',
         'Content-Type': 'application/json',
-        'Prefer': 'return=minimal,resolution=merge-duplicates'
     }
 
     on_conflict = UPSERT_KEYS.get(table_name, '')
 
-    # 배치 upsert (1000개씩)
+    # unique constraint가 없는 테이블은 delete+insert
+    if not on_conflict:
+        print(f"  - 기존 데이터 삭제 중...")
+        delete_response = requests.delete(
+            f"{SUPABASE_URL}/rest/v1/{table_name}?id=gt.0",
+            headers={**base_headers, 'Prefer': 'return=minimal'}
+        )
+        if delete_response.status_code not in [200, 204]:
+            # id 컬럼이 없을 수 있으니 date로도 시도
+            delete_response = requests.delete(
+                f"{SUPABASE_URL}/rest/v1/{table_name}?date=gte.1900-01-01",
+                headers={**base_headers, 'Prefer': 'return=minimal'}
+            )
+        print(f"  ✅ 기존 데이터 삭제 완료 (status={delete_response.status_code})")
+
+    headers = {**base_headers, 'Prefer': 'return=minimal,resolution=merge-duplicates'} if on_conflict else {**base_headers, 'Prefer': 'return=minimal'}
+
+    # 배치 업로드 (1000개씩)
     batch_size = 1000
     total_batches = (len(data) + batch_size - 1) // batch_size
 
