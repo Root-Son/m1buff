@@ -149,45 +149,67 @@ function BranchDailyCard({ branchName, recommendations, summary }: {
                 {/* 룸타입별 상세 */}
                 <div className="space-y-1.5">
                   {dateRecs.map((rec: any, i: number) => {
-                    const actionBg = rec.action === 'price_down'
+                    // 완판 여부
+                    const isSoldOut = rec.sales_pace === 'sold_out'
+
+                    const actionBg = isSoldOut
+                      ? 'bg-purple-500 text-white'
+                      : rec.action === 'price_down'
                       ? 'bg-red-500 text-white'
                       : rec.action === 'price_up'
                       ? 'bg-green-500 text-white'
                       : 'bg-gray-300 text-gray-700'
 
+                    const actionLabel = isSoldOut
+                      ? '완판'
+                      : rec.action === 'price_down' ? '하향' : rec.action === 'price_up' ? '상향' : '관찰'
+
                     return (
-                      <div key={i} className="bg-white rounded px-3 py-2 border border-gray-100">
+                      <div key={i} className={`bg-white rounded px-3 py-2 border ${isSoldOut ? 'border-purple-200 opacity-60' : 'border-gray-100'}`}>
                         <div className="flex items-center gap-2 flex-wrap mb-1">
                           <span className="text-sm font-semibold text-gray-900">{rec.room_type}</span>
                           <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold ${actionBg}`}>
-                            {rec.action === 'price_down' ? '하향' : rec.action === 'price_up' ? '상향' : '관찰'}
+                            {actionLabel}
                           </span>
-                          {(rec.urgency === 'critical' || rec.urgency === 'high') && (
+                          {!isSoldOut && (rec.urgency === 'critical' || rec.urgency === 'high') && (
                             <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-red-600 text-white">
                               {rec.urgency === 'critical' ? '긴급' : '높음'}
                             </span>
                           )}
                         </div>
-                        <div className="text-xs text-gray-600 leading-relaxed">
-                          잔여 {rec.remaining_rooms ?? 0}실/{rec.total_rooms ?? 0}실 (OCC {rec.occ != null ? `${Math.min(rec.occ * 100, 100).toFixed(0)}%` : '-'})
-                          {' | '}
-                          {rec.sales_pace_detail || rec.sales_pace || '-'}
-                          {rec.set_price != null && (
-                            <> | 셋팅가 {rec.set_price.toLocaleString()}원</>
-                          )}
-                          {rec.guardrail_price != null && rec.price_diff_pct != null && (
-                            <> (가드레일 대비 {rec.price_diff_pct >= 0 ? '+' : ''}{rec.price_diff_pct.toFixed(0)}%)</>
-                          )}
-                        </div>
-                        {rec.pace_vs_benchmark === 'ahead' && rec.expected_occ != null && (
-                          <div className="text-xs font-medium text-amber-700 mt-1 bg-amber-50 px-2 py-0.5 rounded inline-block">
-                            ⚠️ 조기완판위험: 과거 동기간 OCC {(rec.expected_occ * 100).toFixed(0)}% → 현재 {Math.min(rec.occ * 100, 100).toFixed(0)}% (가격 인상 검토)
+                        {isSoldOut ? (
+                          <div className="text-xs text-purple-600">
+                            {rec.total_rooms ?? 0}실 전량 판매 완료
                           </div>
-                        )}
-                        {rec.suggested_price != null && (
-                          <div className="text-xs font-medium text-blue-700 mt-1">
-                            → 제안가: {rec.suggested_price.toLocaleString()}원
-                          </div>
+                        ) : (
+                          <>
+                            <div className="text-xs text-gray-600 leading-relaxed">
+                              잔여 {rec.remaining_rooms ?? 0}실/{rec.total_rooms ?? 0}실 (OCC {rec.occ != null ? `${Math.min(rec.occ * 100, 100).toFixed(0)}%` : '-'})
+                              {' | '}
+                              {rec.sales_pace_detail || rec.sales_pace || '-'}
+                              {rec.set_price != null && (
+                                <> | 셋팅가 {rec.set_price.toLocaleString()}원</>
+                              )}
+                              {rec.guardrail_price != null && rec.price_diff_pct != null && (
+                                <> (가드레일 대비 {rec.price_diff_pct >= 0 ? '+' : ''}{rec.price_diff_pct.toFixed(0)}%)</>
+                              )}
+                            </div>
+                            {rec.pace_vs_benchmark === 'ahead' && rec.expected_occ != null && (
+                              <div className="text-xs font-medium text-amber-700 mt-1 bg-amber-50 px-2 py-0.5 rounded inline-block">
+                                ⚠️ 조기완판위험: 과거 동기간 OCC {(rec.expected_occ * 100).toFixed(0)}% → 현재 {Math.min(rec.occ * 100, 100).toFixed(0)}%
+                              </div>
+                            )}
+                            {rec.action === 'price_down' && rec.suggested_price == null && rec.set_price != null && rec.guardrail_price != null && rec.set_price <= rec.guardrail_price && (
+                              <div className="text-xs font-medium text-orange-700 mt-1">
+                                → 이미 가드레일 이하, 가드레일 조정 필요
+                              </div>
+                            )}
+                            {rec.suggested_price != null && (
+                              <div className="text-xs font-medium text-blue-700 mt-1">
+                                → 제안가: {rec.suggested_price.toLocaleString()}원
+                              </div>
+                            )}
+                          </>
                         )}
                       </div>
                     )
