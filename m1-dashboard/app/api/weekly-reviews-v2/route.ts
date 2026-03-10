@@ -612,7 +612,7 @@ function getTopAchievers(actualsByBranch: any, targets: any[], limit: number) {
 
   Object.keys(actualsByBranch).forEach(branch => {
     const actual = actualsByBranch[branch].pickup
-    const target = targets.find((t: any) => t.branch_name === branch)
+    const target = targets.find((t: any) => normalizeBranchName(t.branch_name) === branch)
 
     if (!target || !target.target_amount) return
 
@@ -634,7 +634,7 @@ function getBottomAchievers(actualsByBranch: any, targets: any[], limit: number)
 
   Object.keys(actualsByBranch).forEach(branch => {
     const actual = actualsByBranch[branch].pickup
-    const target = targets.find((t: any) => t.branch_name === branch)
+    const target = targets.find((t: any) => normalizeBranchName(t.branch_name) === branch)
 
     if (!target || !target.target_amount) return
 
