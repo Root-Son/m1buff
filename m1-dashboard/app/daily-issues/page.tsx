@@ -154,6 +154,8 @@ function BranchDailyCard({ branchName, recommendations, summary }: {
 
                     const actionBg = isSoldOut
                       ? 'bg-purple-500 text-white'
+                      : rec.action === 'guardrail_adjust'
+                      ? 'bg-orange-500 text-white'
                       : rec.action === 'price_down'
                       ? 'bg-red-500 text-white'
                       : rec.action === 'price_up'
@@ -162,7 +164,9 @@ function BranchDailyCard({ branchName, recommendations, summary }: {
 
                     const actionLabel = isSoldOut
                       ? '완판'
-                      : rec.action === 'price_down' ? '하향' : rec.action === 'price_up' ? '상향' : '관찰'
+                      : rec.action === 'guardrail_adjust' ? '가드레일 조정'
+                      : rec.action === 'price_down' ? '하향'
+                      : rec.action === 'price_up' ? '상향' : '관찰'
 
                     return (
                       <div key={i} className={`bg-white rounded px-3 py-2 border ${isSoldOut ? 'border-purple-200 opacity-60' : 'border-gray-100'}`}>
