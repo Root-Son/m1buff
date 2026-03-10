@@ -372,6 +372,33 @@ function groupWeeksByMonth(weeks: any[]): Record<string, { label: string; weeks:
   return groups
 }
 
+// ── EmptyWeeklyReview ──
+function EmptyWeeklyReview({ onGenerate }: { onGenerate: (week: string) => void }) {
+  const [newWeek, setNewWeek] = useState('')
+  return (
+    <div className="min-h-screen flex items-center justify-center bg-gray-50">
+      <div className="text-center">
+        <div className="text-xl mb-4">주간 리뷰 데이터가 없습니다</div>
+        <div className="space-y-2">
+          <input
+            type="date"
+            value={newWeek}
+            onChange={(e) => setNewWeek(e.target.value)}
+            className="px-3 py-2 border border-gray-300 rounded-lg"
+          />
+          <button
+            onClick={() => newWeek && onGenerate(newWeek)}
+            disabled={!newWeek}
+            className="ml-2 px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-gray-300"
+          >
+            생성하기
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 // ── WeekSelector 컴포넌트 ──
 function WeekSelector({ availableWeeks, selectedWeek, onSelectWeek, onGenerateWeek }: {
   availableWeeks: any[]
