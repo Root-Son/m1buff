@@ -123,6 +123,11 @@ export async function GET(request: Request) {
       .gte('check_in_date', startDate)
       .lte('check_in_date', endDate)
     
+    console.log('=== LoS Query ===')
+    console.log('Branch:', branch)
+    console.log('Date range:', startDate, '~', endDate)
+    console.log('LoS data count:', losData?.length || 0)
+    console.log('LoS sample:', losData?.slice(0, 3))
     if (losError) console.error('LoS query error:', losError)
 
     // 5. 채널별 예약 데이터
@@ -133,6 +138,9 @@ export async function GET(request: Request) {
       .gte('check_in_date', startDate)
       .lte('check_in_date', endDate)
     
+    console.log('=== Channel Query ===')
+    console.log('Channel data count:', channelData?.length || 0)
+    console.log('Channel sample:', channelData?.slice(0, 3))
     if (channelError) console.error('Channel query error:', channelError)
 
     // 6. YOLO 가격 가져오기
@@ -152,10 +160,12 @@ export async function GET(request: Request) {
       .lte('date', endDate)
 
     // 8. LoS 집계 (date별, 룸타입별 평균)
-    // OCC 데이터는 date 기준이므로, check_in_date를 date로 매핑
+    // branch_room_occ의 date = 체크인 날짜
+    // raw_bookings의 check_in_date와 매칭
     const losMap: Record<string, Record<string, number>> = {}
     losData?.forEach(row => {
-      const key = `${row.check_in_date}_${row.room_type}` // check_in_date 사용
+      // date로 키 생성 (OCC 데이터와 매칭하기 위해)
+      const key = `${row.check_in_date}_${row.room_type}`
       if (!losMap[key]) losMap[key] = { total: 0, count: 0 }
       losMap[key].total += row.nights || 0
       losMap[key].count += 1
@@ -165,12 +175,14 @@ export async function GET(request: Request) {
     Object.entries(losMap).forEach(([key, val]) => {
       losAverages[key] = val.count > 0 ? val.total / val.count : 0
     })
+    
+    console.log('LoS Map sample:', Object.entries(losAverages).slice(0, 3))
 
     // 9. 채널별 비중 집계 (date별, 룸타입별)
-    // check_in_date 기준으로 집계
     const channelMap: Record<string, Record<string, number>> = {}
     channelData?.forEach(row => {
-      const key = `${row.check_in_date}_${row.room_type}` // check_in_date 사용
+      // date로 키 생성 (OCC 데이터와 매칭하기 위해)
+      const key = `${row.check_in_date}_${row.room_type}`
       const group = getChannelGroup(row.reservation_channel || '')
       
       if (!channelMap[key]) channelMap[key] = {}
