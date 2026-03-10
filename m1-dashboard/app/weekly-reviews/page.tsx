@@ -288,8 +288,10 @@ function BranchIssuesCard({ issues }: { issues: any[] }) {
                           {isWeekExpanded && (
                             <div className="mt-2 space-y-2">
                               {detail.recommendations.map((rec: any, ri: number) => {
-                                const recAction =
-                                  rec.action === 'price_down'
+                                const isSoldOut = rec.sales_pace === 'sold_out'
+                                const recAction = isSoldOut
+                                  ? { bg: 'bg-purple-500 text-white', label: '완판' }
+                                  : rec.action === 'price_down'
                                     ? { bg: 'bg-red-500 text-white', label: '하향' }
                                     : rec.action === 'price_up'
                                     ? { bg: 'bg-green-500 text-white', label: '상향' }
@@ -298,7 +300,7 @@ function BranchIssuesCard({ issues }: { issues: any[] }) {
                                 return (
                                   <div
                                     key={ri}
-                                    className="bg-white rounded-md border border-gray-200 px-3 py-2 text-sm"
+                                    className={`bg-white rounded-md border px-3 py-2 text-sm ${isSoldOut ? 'border-purple-200 opacity-60' : 'border-gray-200'}`}
                                   >
                                     <div className="flex items-center gap-2 flex-wrap">
                                       <span className="font-medium text-gray-900">
@@ -313,18 +315,26 @@ function BranchIssuesCard({ issues }: { issues: any[] }) {
                                         <span className="text-xs text-gray-400">{rec.date}</span>
                                       )}
                                     </div>
-                                    {rec.message && (
-                                      <div className="text-xs text-gray-600 mt-1">{rec.message}</div>
-                                    )}
-                                    {rec.sales_pace_detail && (
-                                      <div className="text-xs text-gray-500 mt-0.5">
-                                        판매 페이스: {rec.sales_pace_detail}
+                                    {isSoldOut ? (
+                                      <div className="text-xs text-purple-600 mt-1">
+                                        {rec.total_rooms ?? 0}실 전량 판매 완료
                                       </div>
-                                    )}
-                                    {rec.suggested_price != null && (
-                                      <div className="text-xs text-blue-700 font-medium mt-1">
-                                        → 제안가: {rec.suggested_price?.toLocaleString()}원
-                                      </div>
+                                    ) : (
+                                      <>
+                                        {rec.message && (
+                                          <div className="text-xs text-gray-600 mt-1">{rec.message}</div>
+                                        )}
+                                        {rec.sales_pace_detail && (
+                                          <div className="text-xs text-gray-500 mt-0.5">
+                                            판매 페이스: {rec.sales_pace_detail}
+                                          </div>
+                                        )}
+                                        {rec.suggested_price != null && (
+                                          <div className="text-xs text-blue-700 font-medium mt-1">
+                                            → 제안가: {rec.suggested_price?.toLocaleString()}원
+                                          </div>
+                                        )}
+                                      </>
                                     )}
                                   </div>
                                 )
