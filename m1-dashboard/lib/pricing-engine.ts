@@ -227,7 +227,7 @@ export function calculatePricingRecommendation(params: {
   }
 
   // ===== 가격 방향 결정 =====
-  let action: 'price_down' | 'price_up' | 'monitor' = 'monitor'
+  let action: 'price_down' | 'price_up' | 'monitor' | 'guardrail_adjust' = 'monitor'
   let urgency: 'critical' | 'high' | 'medium' | 'low' = 'low'
   let suggestedPrice: number | null = null
 
