@@ -552,7 +552,7 @@ export function generateSmartRecommendations(
 
   return {
     executive_summary: generateExecutiveSummary(sorted),
-    price_down: sorted.filter(r => r.action === 'price_down'),
+    price_down: sorted.filter(r => r.action === 'price_down' || r.action === 'guardrail_adjust'),
     price_up: sorted.filter(r => r.action === 'price_up'),
     monitor: sorted.filter(r => r.action === 'monitor'),
     by_branch: sortedByBranch,
