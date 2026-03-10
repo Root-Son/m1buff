@@ -265,97 +265,109 @@ export default function Dashboard() {
       return `${date.getMonth() + 1}/${date.getDate()} (${dayName})`
     })
 
+    // OTA/LoS 데이터 유무 확인
+    const hasOtaData = roomTypeData.days.some((d: any) => d.channel_ratios && Object.keys(d.channel_ratios).length > 0)
+    const hasLosData = roomTypeData.days.some((d: any) => d.avg_los > 0)
+
+    const datasets: any[] = [
+      {
+        label: 'D-7 OCC',
+        data: roomTypeData.days.map((d: any) => d.occ_7d_ago),
+        backgroundColor: 'rgba(156, 163, 175, 0.6)',
+        yAxisID: 'y',
+        order: 1
+      },
+      {
+        label: 'D-1 OCC',
+        data: roomTypeData.days.map((d: any) => d.occ_1d_ago),
+        backgroundColor: 'rgba(59, 130, 246, 0.6)',
+        yAxisID: 'y',
+        order: 2
+      },
+      {
+        label: 'OCC',
+        data: roomTypeData.days.map((d: any) => d.occ),
+        backgroundColor: 'rgba(16, 185, 129, 0.7)',
+        yAxisID: 'y',
+        order: 3
+      },
+      {
+        label: '셋팅가',
+        data: roomTypeData.days.map((d: any) => d.yolo_price),
+        type: 'line',
+        borderColor: 'rgba(245, 158, 11, 1)',
+        borderWidth: 2,
+        pointRadius: 3,
+        yAxisID: 'y1',
+        order: 0
+      },
+      {
+        label: '가드레일',
+        data: roomTypeData.days.map((d: any) => d.guardrail_price || null),
+        type: 'line',
+        borderColor: 'rgba(239, 68, 68, 1)',
+        borderWidth: 2,
+        borderDash: [5, 5],
+        pointRadius: 3,
+        yAxisID: 'y1',
+        order: 0
+      },
+      {
+        label: 'ADR',
+        data: roomTypeData.days.map((d: any) => d.adr || null),
+        type: 'line',
+        borderColor: 'rgba(99, 102, 241, 1)',
+        borderWidth: 2,
+        pointRadius: 3,
+        yAxisID: 'y1',
+        order: 0
+      },
+    ]
+
+    if (hasOtaData) {
+      datasets.push({
+        label: 'OTA 비율',
+        data: roomTypeData.days.map((d: any) => {
+          const otaRatio = d.channel_ratios?.['OTA'] || 0
+          return otaRatio / 100
+        }),
+        backgroundColor: 'rgba(236, 72, 153, 0.7)',
+        borderColor: 'rgba(236, 72, 153, 1)',
+        borderWidth: 2,
+        yAxisID: 'y',
+        order: 4
+      })
+    }
+
+    if (hasLosData) {
+      datasets.push({
+        label: 'LoS (평균 숙박)',
+        data: roomTypeData.days.map((d: any) => d.avg_los || null),
+        type: 'line',
+        borderColor: 'rgba(139, 92, 246, 1)',
+        borderWidth: 2,
+        pointRadius: 4,
+        yAxisID: 'y2',
+        borderDash: [3, 3],
+        datalabels: {
+          display: true,
+          color: 'rgba(139, 92, 246, 1)',
+          align: 'top',
+          offset: 8,
+          font: { size: 11, weight: 'bold' },
+          formatter: (value: any) => {
+            return value > 0 ? value.toFixed(1) + '박' : ''
+          }
+        },
+        order: 0
+      })
+    }
+
     const config: ChartConfiguration = {
       type: 'bar',
       data: {
         labels,
-        datasets: [
-          {
-            label: 'D-7 OCC',
-            data: roomTypeData.days.map((d: any) => d.occ_7d_ago),
-            backgroundColor: 'rgba(156, 163, 175, 0.6)',
-            yAxisID: 'y',
-            order: 1
-          },
-          {
-            label: 'D-1 OCC',
-            data: roomTypeData.days.map((d: any) => d.occ_1d_ago),
-            backgroundColor: 'rgba(59, 130, 246, 0.6)',
-            yAxisID: 'y',
-            order: 2
-          },
-          {
-            label: 'OCC',
-            data: roomTypeData.days.map((d: any) => d.occ),
-            backgroundColor: 'rgba(16, 185, 129, 0.7)',
-            yAxisID: 'y',
-            order: 3
-          },
-          {
-            label: 'OTA 비율',
-            data: roomTypeData.days.map((d: any) => {
-              const otaRatio = d.channel_ratios?.['OTA'] || 0
-              return otaRatio / 100 // 퍼센트를 0-1 범위로
-            }),
-            backgroundColor: 'rgba(236, 72, 153, 0.7)',
-            borderColor: 'rgba(236, 72, 153, 1)',
-            borderWidth: 2,
-            yAxisID: 'y',
-            order: 4
-          },
-          {
-            label: '셋팅가',
-            data: roomTypeData.days.map((d: any) => d.yolo_price),
-            type: 'line',
-            borderColor: 'rgba(245, 158, 11, 1)',
-            borderWidth: 2,
-            pointRadius: 3,
-            yAxisID: 'y1',
-            order: 0
-          },
-          {
-            label: '가드레일',
-            data: roomTypeData.days.map((d: any) => d.guardrail_price || null),
-            type: 'line',
-            borderColor: 'rgba(239, 68, 68, 1)',
-            borderWidth: 2,
-            borderDash: [5, 5],
-            pointRadius: 3,
-            yAxisID: 'y1',
-            order: 0
-          },
-          {
-            label: 'ADR',
-            data: roomTypeData.days.map((d: any) => d.adr || null),
-            type: 'line',
-            borderColor: 'rgba(99, 102, 241, 1)',
-            borderWidth: 2,
-            pointRadius: 3,
-            yAxisID: 'y1',
-            order: 0
-          },
-          {
-            label: 'LoS (평균 숙박)',
-            data: roomTypeData.days.map((d: any) => d.avg_los || null),
-            type: 'line',
-            borderColor: 'rgba(139, 92, 246, 1)',
-            borderWidth: 2,
-            pointRadius: 4,
-            yAxisID: 'y2',
-            borderDash: [3, 3],
-            datalabels: {
-              display: true,
-              color: 'rgba(139, 92, 246, 1)',
-              align: 'top',
-              offset: 8,
-              font: { size: 11, weight: 'bold' },
-              formatter: (value: any) => {
-                return value > 0 ? value.toFixed(1) + '박' : ''
-              }
-            },
-            order: 0
-          }
-        ],
+        datasets,
       },
       options: {
         responsive: true,
