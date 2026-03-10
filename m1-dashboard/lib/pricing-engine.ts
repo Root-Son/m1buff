@@ -214,16 +214,17 @@ export function calculatePricingRecommendation(params: {
   const salesPace = salesPaceResult.pace
   const salesPaceDetail = salesPaceResult.detail
 
-  // ★ FIX #3: 벤치마크 대비 판정 (완판이면 비교 불필요)
-  let expectedOcc: number | null = null
-  let expectedFinalOcc: number | null = null
+  // ★ 벤치마크 대비 판정 — 판매 객실수 기반 (완판이면 비교 불필요)
+  const currentSold = effectiveTotalRooms - remaining_rooms
+  let expectedSold: number | null = null
+  let expectedFinalSold: number | null = null
   let paceVsBenchmark: 'ahead' | 'normal' | 'behind' | null = null
   if (salesPace !== 'sold_out') {
     const stayMonth = new Date(date).getMonth() + 1
     const dowType = getDowType(date)
-    expectedOcc = getExpectedOcc(branch_name, room_type, stayMonth, dowType, lead_time_days)
-    expectedFinalOcc = getExpectedOcc(branch_name, room_type, stayMonth, dowType, 1) // D-1 = 최종 OCC
-    paceVsBenchmark = evaluatePaceVsBenchmark(occ, expectedOcc, lead_time_days)
+    expectedSold = getExpectedSold(branch_name, room_type, stayMonth, dowType, lead_time_days)
+    expectedFinalSold = getExpectedSold(branch_name, room_type, stayMonth, dowType, 1) // D-1 = 최종 판매수
+    paceVsBenchmark = evaluatePaceVsBenchmark(currentSold, expectedSold, expectedFinalSold, lead_time_days)
   }
 
   // ===== 가격 방향 결정 =====
