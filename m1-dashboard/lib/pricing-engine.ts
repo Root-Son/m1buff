@@ -214,11 +214,15 @@ export function calculatePricingRecommendation(params: {
   const salesPace = salesPaceResult.pace
   const salesPaceDetail = salesPaceResult.detail
 
-  // ★ FIX #3: 벤치마크 대비 판정
-  const stayMonth = new Date(date).getMonth() + 1
-  const dowType = getDowType(date)
-  const expectedOcc = getExpectedOcc(branch_name, room_type, stayMonth, dowType, lead_time_days)
-  const paceVsBenchmark = evaluatePaceVsBenchmark(occ, expectedOcc, lead_time_days)
+  // ★ FIX #3: 벤치마크 대비 판정 (완판이면 비교 불필요)
+  let expectedOcc: number | null = null
+  let paceVsBenchmark: 'ahead' | 'normal' | 'behind' | null = null
+  if (salesPace !== 'sold_out') {
+    const stayMonth = new Date(date).getMonth() + 1
+    const dowType = getDowType(date)
+    expectedOcc = getExpectedOcc(branch_name, room_type, stayMonth, dowType, lead_time_days)
+    paceVsBenchmark = evaluatePaceVsBenchmark(occ, expectedOcc, lead_time_days)
+  }
 
   // ===== 가격 방향 결정 =====
   let action: 'price_down' | 'price_up' | 'monitor' = 'monitor'
