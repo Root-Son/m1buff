@@ -279,7 +279,13 @@ function buildChecklistText(rec: PricingRecommendation, emoji: string): string {
   }
 
   // 페이스 정보
-  const paceInfo = `페이스 ${rec.sales_pace_detail}`
+  const paceInfo = rec.sales_pace_detail
+
+  // 벤치마크 정보
+  let benchmarkInfo = ''
+  if (rec.pace_vs_benchmark === 'ahead' && rec.expected_occ != null) {
+    benchmarkInfo = ` | ⚠️ 조기완판위험(과거 ${(rec.expected_occ * 100).toFixed(0)}%→현재 ${occPct}%)`
+  }
 
   // 액션
   let actionText = ''
@@ -299,7 +305,7 @@ function buildChecklistText(rec: PricingRecommendation, emoji: string): string {
     actionText = `→ 현 수준 유지`
   }
 
-  return `${emoji} ${rec.room_type}: ${remainInfo} | ${priceInfo ? priceInfo + ' | ' : ''}${paceInfo} ${actionText}`
+  return `${emoji} ${rec.room_type}: ${remainInfo} | ${priceInfo ? priceInfo + ' | ' : ''}${paceInfo}${benchmarkInfo} ${actionText}`
 }
 
 // ===== 체크리스트 Rich Text (색상 적용) =====
