@@ -117,9 +117,15 @@ export function getSalesPaceDetail(
   delta_1d_pp: number,
   delta_7d_pp: number,
   leadTimeDays: number,
-  effectiveTotalRooms: number
-): { pace: 'fast' | 'normal' | 'slow'; detail: string } {
-  const pace = determineSalesPace(delta_1d_pp, delta_7d_pp, leadTimeDays)
+  effectiveTotalRooms: number,
+  occ?: number
+): { pace: 'fast' | 'normal' | 'slow' | 'sold_out'; detail: string } {
+  const pace = determineSalesPace(delta_1d_pp, delta_7d_pp, leadTimeDays, occ)
+
+  // ★ 완판이면 별도 메시지
+  if (pace === 'sold_out') {
+    return { pace, detail: '완판' }
+  }
 
   // 7일간 판매객실 추정: delta_7d_pp(pp) / 100 * total_rooms
   const roomsSold7d = effectiveTotalRooms > 0
