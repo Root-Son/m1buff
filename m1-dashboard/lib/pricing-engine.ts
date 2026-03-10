@@ -323,13 +323,14 @@ function generateDetailedMessage(params: {
   suggestedPrice: number | null
   occ: number
   expectedOcc?: number | null
+  expectedFinalOcc?: number | null
   paceVsBenchmark?: 'ahead' | 'normal' | 'behind' | null
 }): string {
   const {
     remaining_rooms, total_rooms, lead_time_days,
     set_price, guardrail_price, priceDiffPct,
     salesPaceDetail, action, suggestedPrice, occ,
-    expectedOcc, paceVsBenchmark
+    expectedOcc, expectedFinalOcc, paceVsBenchmark
   } = params
 
   // ★ 완판이면 간결하게
