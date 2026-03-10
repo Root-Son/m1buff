@@ -198,11 +198,11 @@ function BranchDailyCard({ branchName, recommendations, summary }: {
                                 <> (가드레일 대비 {rec.price_diff_pct >= 0 ? '+' : ''}{rec.price_diff_pct.toFixed(0)}%)</>
                               )}
                             </div>
-                            {rec.pace_vs_benchmark === 'ahead' && rec.expected_occ != null && (
+                            {rec.pace_vs_benchmark === 'ahead' && rec.expected_sold != null && (
                               <div className="text-xs font-medium text-amber-700 mt-1 bg-amber-50 px-2 py-0.5 rounded inline-block">
-                                ⚠️ 조기완판위험: 과거 D-{rec.lead_time_days} OCC {(rec.expected_occ * 100).toFixed(0)}%
-                                {rec.expected_final_occ != null && <>→최종 {(rec.expected_final_occ * 100).toFixed(0)}%</>}
-                                , 현재 {Math.min(rec.occ * 100, 100).toFixed(0)}%
+                                ⚠️ 조기완판위험: 작년 D-{rec.lead_time_days} {rec.expected_sold}실 판매
+                                {rec.expected_final_sold != null && <>→최종 {rec.expected_final_sold}실</>}
+                                , 현재 {(rec.total_rooms ?? 0) - (rec.remaining_rooms ?? 0)}실 판매
                               </div>
                             )}
                             {rec.suggested_price != null && (
