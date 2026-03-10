@@ -292,14 +292,20 @@ def main():
     print(f"🚀 데이터 동기화 시작: {start_time.strftime('%Y-%m-%d %H:%M:%S')}")
     print(f"{'='*60}\n")
     
+    errors = []
+
+    # 1. branch_room_occ (Google Sheets)
     try:
-        # 1. branch_room_occ (Google Sheets)
         print("\n[1/4] branch_room_occ 동기화 (Google Sheets)")
         df_occ = get_google_sheet_data(SHEET_GIDS['branch_room_occ'], 'branch_room_occ')
         data_occ = process_branch_room_occ(df_occ)
         upload_to_supabase('branch_room_occ', data_occ)
-        
-        # 2. yolo_prices (Redash)
+    except Exception as e:
+        print(f"❌ branch_room_occ 실패: {e}")
+        errors.append(('branch_room_occ', str(e)))
+
+    # 2. yolo_prices (Redash)
+    try:
         print("\n[2/4] yolo_prices 동기화 (Redash)")
         params_yolo = {
             'date.start': DATE_RANGES['yolo_prices']['start'],
@@ -309,35 +315,47 @@ def main():
         df_yolo = execute_redash_query(QUERIES['yolo_prices'], params_yolo)
         data_yolo = process_yolo_prices(df_yolo)
         upload_to_supabase('yolo_prices', data_yolo)
-        
-        # 3. price_guide (Google Sheets)
+    except Exception as e:
+        print(f"❌ yolo_prices 실패: {e}")
+        errors.append(('yolo_prices', str(e)))
+
+    # 3. price_guide (Google Sheets)
+    try:
         print("\n[3/4] price_guide 동기화 (Google Sheets)")
         df_guide = get_google_sheet_data(SHEET_GIDS['price_guide'], 'price_guide')
         data_guide = process_price_guide(df_guide)
         upload_to_supabase('price_guide', data_guide)
-        
-        # 4. raw_bookings (Redash - 대용량)
+    except Exception as e:
+        print(f"❌ price_guide 실패: {e}")
+        errors.append(('price_guide', str(e)))
+
+    # 4. raw_bookings (Redash - 대용량)
+    try:
         print("\n[4/4] raw_bookings 동기화 (Redash - 대용량)")
         params_bookings = {
             'startDate': DATE_RANGES['raw_bookings']['start'],
-            'endDate': DATE_RANGES['raw_bookings']['end']
+            'endDate': DATE_RANGES['raw_bookings']['end'],
+            'branch': '%'
         }
         df_bookings = execute_redash_query(QUERIES['raw_bookings'], params_bookings)
         data_bookings = process_raw_bookings(df_bookings)
         upload_to_supabase('raw_bookings', data_bookings)
-        
-        end_time = datetime.now()
-        duration = (end_time - start_time).total_seconds()
-        
-        print(f"\n{'='*60}")
+    except Exception as e:
+        print(f"❌ raw_bookings 실패: {e}")
+        errors.append(('raw_bookings', str(e)))
+
+    end_time = datetime.now()
+    duration = (end_time - start_time).total_seconds()
+
+    print(f"\n{'='*60}")
+    if errors:
+        print(f"⚠️ 동기화 일부 실패 ({len(errors)}/{4}): {[e[0] for e in errors]}")
+        print(f"소요시간: {duration:.1f}초 = {duration/60:.1f}분")
+        print(f"{'='*60}\n")
+        raise Exception(f"동기화 실패: {errors}")
+    else:
         print(f"✅ 동기화 완료! (소요시간: {duration:.1f}초 = {duration/60:.1f}분)")
         print(f"{'='*60}\n")
-        
-    except Exception as e:
-        print(f"\n{'='*60}")
-        print(f"❌ 동기화 실패: {str(e)}")
-        print(f"{'='*60}\n")
-        raise
 
 if __name__ == '__main__':
     main()
