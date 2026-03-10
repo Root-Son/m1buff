@@ -4,6 +4,7 @@
  */
 
 import { PricingRecommendation, ExecutiveSummary } from './supabase'
+import { getExpectedOcc } from './pace-benchmark-data'
 
 // ===== 임계값 설정 =====
 const THRESHOLDS = {
