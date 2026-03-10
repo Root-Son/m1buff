@@ -92,6 +92,14 @@ def get_google_sheet_data(gid: str, sheet_name: str):
     
     return df
 
+# 테이블별 unique constraint 컬럼
+UPSERT_KEYS = {
+    'branch_room_occ': 'date,branch_name,room_type',
+    'yolo_prices': 'date,branch_name,room_type',
+    'price_guide': 'date,branch_name,room_type',
+    'raw_bookings': 'reservation_no',
+}
+
 def upload_to_supabase(table_name, data):
     """Supabase에 데이터 업로드 (upsert)"""
     print(f"🔄 {table_name} 테이블 업로드 중... ({len(data)}개)")
@@ -103,6 +111,8 @@ def upload_to_supabase(table_name, data):
         'Prefer': 'return=minimal,resolution=merge-duplicates'
     }
 
+    on_conflict = UPSERT_KEYS.get(table_name, '')
+
     # 배치 upsert (1000개씩)
     batch_size = 1000
     total_batches = (len(data) + batch_size - 1) // batch_size
@@ -112,6 +122,8 @@ def upload_to_supabase(table_name, data):
         batch_num = (i // batch_size) + 1
 
         url = f"{SUPABASE_URL}/rest/v1/{table_name}"
+        if on_conflict:
+            url += f"?on_conflict={on_conflict}"
         response = requests.post(url, headers=headers, json=batch)
 
         if response.status_code not in [200, 201]:
