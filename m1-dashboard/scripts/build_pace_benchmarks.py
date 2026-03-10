@@ -54,26 +54,37 @@ ROOM_COUNTS = {
 
 def fetch_page(branch_name, page, check_in_from="2025-01-01", check_in_to="2026-03-09"):
     """Supabase에서 한 페이지 (1000건) 가져오기"""
+    import time
     page_size = 1000
     offset = page * page_size
 
-    params = urllib.parse.urlencode({
-        "select": "roomtype,check_in_date,lead_time",
-        "branch_name": f"eq.{branch_name}",
-        "check_in_date": f"gte.{check_in_from}",
-        "order": "check_in_date.asc",
-        "limit": page_size,
-        "offset": offset,
-    })
-    # check_in_date lte filter 추가
-    url = f"{SUPABASE_URL}/rest/v1/raw_booking_history?{params}&check_in_date=lte.{check_in_to}"
+    encoded_branch = urllib.parse.quote(branch_name, safe='')
+    url = (
+        f"{SUPABASE_URL}/rest/v1/raw_booking_history"
+        f"?select=roomtype,check_in_date,lead_time"
+        f"&branch_name=eq.{encoded_branch}"
+        f"&check_in_date=gte.{check_in_from}"
+        f"&check_in_date=lte.{check_in_to}"
+        f"&order=check_in_date.asc"
+        f"&limit={page_size}"
+        f"&offset={offset}"
+    )
 
-    req = urllib.request.Request(url, headers={
-        "apikey": SUPABASE_KEY,
-        "Authorization": f"Bearer {SUPABASE_KEY}",
-    })
-    with urllib.request.urlopen(req) as resp:
-        return json.loads(resp.read().decode())
+    for attempt in range(3):
+        try:
+            req = urllib.request.Request(url, headers={
+                "apikey": SUPABASE_KEY,
+                "Authorization": f"Bearer {SUPABASE_KEY}",
+            })
+            with urllib.request.urlopen(req, timeout=30) as resp:
+                return json.loads(resp.read().decode())
+        except Exception as e:
+            if attempt < 2:
+                print(f"  Retry {attempt+1} for {branch_name} page {page}: {e}", file=sys.stderr)
+                time.sleep(2)
+            else:
+                print(f"  FAILED {branch_name} page {page}: {e}", file=sys.stderr)
+                return []
 
 
 def fetch_all_for_branch(branch_name):
