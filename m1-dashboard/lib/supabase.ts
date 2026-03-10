@@ -40,6 +40,7 @@ export type PricingRecommendation = {
   branch_name: string
   room_type: string
   date: string
+  remaining_rooms: number
   available_rooms: number
   total_rooms: number
   lead_time_days: number
@@ -52,6 +53,7 @@ export type PricingRecommendation = {
   delta_1d_pp: number
   delta_7d_pp: number
   sales_pace: 'fast' | 'normal' | 'slow'
+  sales_pace_detail: string
   action: 'price_down' | 'price_up' | 'monitor'
   urgency: 'critical' | 'high' | 'medium' | 'low'
   message: string

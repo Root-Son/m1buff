@@ -33,7 +33,13 @@ function getWeekLabel(weekStart: string) {
     return `${prevMonth}월 ${weekNumber}주`
   }
 
-  const weekNumber = Math.floor((start.getTime() - firstMonday.getTime()) / (7 * 24 * 60 * 60 * 1000)) + 1
+  let weekNumber = Math.floor((start.getTime() - firstMonday.getTime()) / (7 * 24 * 60 * 60 * 1000)) + 1
+
+  // 5주차 이상이면 다음달 1주차
+  if (weekNumber >= 5) {
+    const nextMonth = start.getMonth() + 2 > 12 ? 1 : start.getMonth() + 2
+    return `${nextMonth}월 ${weekNumber - 4}주`
+  }
 
   return `${month}월 ${weekNumber}주`
 }
@@ -160,26 +166,8 @@ function BranchIssuesCard({ issues }: { issues: any[] }) {
     setExpandedWeeks(newExpanded)
   }
 
-  // 지점별 price_down 총합 계산하여 정렬 (price_down이 많은 지점 우선)
-  const getTotalPriceDown = (item: any) => {
-    return (item.details || []).reduce((sum: number, d: any) => {
-      return sum + (d.summary?.price_down_count ?? 0)
-    }, 0)
-  }
-
-  const getSeverityPriority = (details: any[]) => {
-    if (details.some((d: any) => d.severity === 'high')) return 3
-    if (details.some((d: any) => d.severity === 'opportunity')) return 2
-    if (details.some((d: any) => d.severity === 'medium')) return 1
-    return 0
-  }
-
-  // price_down 건수 우선, 동점시 severity 우선
-  const sortedIssues = [...issues].sort((a, b) => {
-    const pdDiff = getTotalPriceDown(b) - getTotalPriceDown(a)
-    if (pdDiff !== 0) return pdDiff
-    return getSeverityPriority(b.details || []) - getSeverityPriority(a.details || [])
-  })
+  // 가나다순 정렬 (API에서 이미 정렬되지만 프론트에서도 보장)
+  const sortedIssues = [...issues].sort((a, b) => a.branch.localeCompare(b.branch, 'ko'))
 
   return (
     <div className="space-y-3">
@@ -199,7 +187,6 @@ function BranchIssuesCard({ issues }: { issues: any[] }) {
         // 지점 전체 요약 숫자
         const totalDown = details.reduce((s: number, d: any) => s + (d.summary?.price_down_count ?? 0), 0)
         const totalUp = details.reduce((s: number, d: any) => s + (d.summary?.price_up_count ?? 0), 0)
-        const totalMonitor = details.reduce((s: number, d: any) => s + (d.summary?.monitor_count ?? 0), 0)
 
         return (
           <div
@@ -208,30 +195,23 @@ function BranchIssuesCard({ issues }: { issues: any[] }) {
           >
             {/* Branch header */}
             <div
-              className="px-4 py-3 flex items-center justify-between cursor-pointer hover:bg-black/5 transition-colors"
+              className="px-4 py-3 cursor-pointer hover:bg-black/5 transition-colors"
               onClick={() => toggleBranch(item.branch)}
             >
-              <div className="flex items-center gap-3">
-                <span className="font-semibold text-gray-900 text-lg">{item.branch}</span>
-                <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${style.badge}`}>
-                  {SEVERITY_STYLES[mainSeverity]?.label || '정상'}
-                </span>
-              </div>
-              <div className="flex items-center gap-3">
-                <div className="hidden sm:flex items-center gap-2 text-xs">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <span className="font-semibold text-gray-900 text-lg">{item.branch}</span>
+                  <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${style.badge}`}>
+                    {SEVERITY_STYLES[mainSeverity]?.label || '정상'}
+                  </span>
                   {totalDown > 0 && (
-                    <span className="px-2 py-0.5 rounded bg-red-500 text-white font-medium">
+                    <span className="hidden sm:inline-flex px-2 py-0.5 rounded text-xs font-medium bg-red-500 text-white">
                       하향 {totalDown}
                     </span>
                   )}
                   {totalUp > 0 && (
-                    <span className="px-2 py-0.5 rounded bg-green-500 text-white font-medium">
+                    <span className="hidden sm:inline-flex px-2 py-0.5 rounded text-xs font-medium bg-green-500 text-white">
                       상향 {totalUp}
-                    </span>
-                  )}
-                  {totalMonitor > 0 && (
-                    <span className="px-2 py-0.5 rounded bg-gray-400 text-white font-medium">
-                      관찰 {totalMonitor}
                     </span>
                   )}
                 </div>
@@ -239,6 +219,12 @@ function BranchIssuesCard({ issues }: { issues: any[] }) {
                   {isExpanded ? '▲ 접기' : `▼ ${details.length}주 보기`}
                 </button>
               </div>
+              {/* ★ 한줄요약 (접힌 상태에서 표시) */}
+              {!isExpanded && item.branch_summary && (
+                <div className="text-sm text-gray-600 mt-1">
+                  {item.branch_summary}
+                </div>
+              )}
             </div>
 
             {/* Per-week breakdown */}
@@ -268,10 +254,10 @@ function BranchIssuesCard({ issues }: { issues: any[] }) {
                           <span className="text-green-600 font-medium">상향 {summary.price_up_count ?? 0}건</span>
                           {' / '}
                           <span className="text-gray-500 font-medium">관찰 {summary.monitor_count ?? 0}건</span>
-                          {summary.total_available_rooms != null && (
+                          {summary.total_remaining_rooms != null && (
                             <>
                               {' | '}
-                              <span className="text-gray-700 font-medium">잔여 {summary.total_available_rooms}실</span>
+                              <span className="text-gray-700 font-medium">잔여 {summary.total_remaining_rooms}실</span>
                             </>
                           )}
                         </div>
@@ -303,9 +289,9 @@ function BranchIssuesCard({ issues }: { issues: any[] }) {
                             <div className="mt-2 space-y-2">
                               {detail.recommendations.map((rec: any, ri: number) => {
                                 const recAction =
-                                  rec.action === 'down'
+                                  rec.action === 'price_down'
                                     ? { bg: 'bg-red-500 text-white', label: '하향' }
-                                    : rec.action === 'up'
+                                    : rec.action === 'price_up'
                                     ? { bg: 'bg-green-500 text-white', label: '상향' }
                                     : { bg: 'bg-gray-400 text-white', label: '관찰' }
 
@@ -316,7 +302,7 @@ function BranchIssuesCard({ issues }: { issues: any[] }) {
                                   >
                                     <div className="flex items-center gap-2 flex-wrap">
                                       <span className="font-medium text-gray-900">
-                                        {rec.room_type || rec.roomType || '-'}
+                                        {rec.room_type || '-'}
                                       </span>
                                       <span
                                         className={`inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium ${recAction.bg}`}
@@ -330,12 +316,14 @@ function BranchIssuesCard({ issues }: { issues: any[] }) {
                                     {rec.message && (
                                       <div className="text-xs text-gray-600 mt-1">{rec.message}</div>
                                     )}
-                                    {rec.current_price != null && rec.recommended_price != null && (
-                                      <div className="text-xs text-gray-500 mt-1">
-                                        현재가 {rec.current_price?.toLocaleString()}원 →{' '}
-                                        <span className="font-semibold text-gray-800">
-                                          {rec.recommended_price?.toLocaleString()}원
-                                        </span>
+                                    {rec.sales_pace_detail && (
+                                      <div className="text-xs text-gray-500 mt-0.5">
+                                        판매 페이스: {rec.sales_pace_detail}
+                                      </div>
+                                    )}
+                                    {rec.suggested_price != null && (
+                                      <div className="text-xs text-blue-700 font-medium mt-1">
+                                        → 제안가: {rec.suggested_price?.toLocaleString()}원
                                       </div>
                                     )}
                                   </div>
@@ -534,10 +522,10 @@ export default function WeeklyReviewsPage() {
       </div>
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-6">
-        {/* 1. 주간 요약 대시보드 (new) */}
+        {/* 1. 주간 요약 대시보드 */}
         <WeeklyExecutiveSummary summary={executiveSummary} />
 
-        {/* 2. 지점별 주요 이슈 (enhanced) */}
+        {/* 2. 지점별 주요 이슈 */}
         <section>
           <h2 className="text-lg font-bold text-gray-900 mb-4">지점별 주요 이슈</h2>
           <BranchIssuesCard issues={branchIssues} />

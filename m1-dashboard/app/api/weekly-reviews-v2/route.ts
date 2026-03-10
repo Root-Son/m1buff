@@ -1,4 +1,4 @@
-// Version: V2-SMART-PRICING
+// Version: V3-FIXED-PAGINATION
 export const dynamic = 'force-dynamic'
 export const revalidate = 0
 
@@ -13,7 +13,42 @@ import {
   calculatePricingRecommendation,
   determineSalesPace,
   generateExecutiveSummary,
+  generateBranchSummary,
 } from '@/lib/pricing-engine'
+
+// ===== Supabase 페이지네이션 헬퍼 (1000행 제한 우회) =====
+async function fetchAllRows(table: string, select: string, filters: { gte?: [string, string]; lte?: [string, string] }): Promise<any[]> {
+  const PAGE_SIZE = 1000
+  let allData: any[] = []
+  let page = 0
+  let hasMore = true
+
+  while (hasMore) {
+    let query = supabase
+      .from(table)
+      .select(select)
+
+    if (filters.gte) query = query.gte(filters.gte[0], filters.gte[1])
+    if (filters.lte) query = query.lte(filters.lte[0], filters.lte[1])
+
+    const { data, error } = await query.range(page * PAGE_SIZE, (page + 1) * PAGE_SIZE - 1)
+
+    if (error) {
+      console.error(`${table} query error (page ${page}):`, error)
+      break
+    }
+
+    if (data && data.length > 0) {
+      allData = allData.concat(data)
+      hasMore = data.length === PAGE_SIZE
+      page++
+    } else {
+      hasMore = false
+    }
+  }
+
+  return allData
+}
 
 export async function GET(request: NextRequest) {
   const searchParams = request.nextUrl.searchParams
@@ -47,8 +82,6 @@ export async function GET(request: NextRequest) {
     const weekStartStr = targetWeekStart.toISOString().split('T')[0]
     const weekEndStr = targetWeekEnd.toISOString().split('T')[0]
 
-    console.log('Weekly Reviews V2 - Week range:', weekStartStr, '~', weekEndStr)
-
     // Dynamic OCC date range: targetWeekEnd + 1 day to targetWeekEnd + 28 days
     const occStartDate = new Date(targetWeekEnd)
     occStartDate.setDate(occStartDate.getDate() + 1)
@@ -80,30 +113,23 @@ export async function GET(request: NextRequest) {
       .gte('reservation_created_at', prevWeekStartStr + ' 00:00:00')
       .lte('reservation_created_at', prevWeekEndStr + ' 23:59:59')
 
-    // OCC data - dynamic date range
-    const { data: occData, error: occError } = await supabase
-      .from('branch_room_occ')
-      .select('*')
-      .gte('date', occStartStr)
-      .lte('date', occEndStr)
+    // ★ OCC data - 페이지네이션으로 전체 가져오기 (1000행 제한 해결)
+    const occData = await fetchAllRows('branch_room_occ', '*', {
+      gte: ['date', occStartStr],
+      lte: ['date', occEndStr],
+    })
 
-    if (occError) {
-      console.error('OCC query error:', occError)
-    }
+    // Yolo prices (페이지네이션)
+    const yoloPrices = await fetchAllRows('yolo_prices', 'date, branch_name, room_type, price', {
+      gte: ['date', occStartStr],
+      lte: ['date', occEndStr],
+    })
 
-    // Yolo prices
-    const { data: yoloPrices } = await supabase
-      .from('yolo_prices')
-      .select('date, branch_name, room_type, price')
-      .gte('date', occStartStr)
-      .lte('date', occEndStr)
-
-    // Price guides
-    const { data: priceGuides } = await supabase
-      .from('price_guide')
-      .select('date, branch_name, room_type, min_price')
-      .gte('date', occStartStr)
-      .lte('date', occEndStr)
+    // Price guides (페이지네이션)
+    const priceGuides = await fetchAllRows('price_guide', 'date, branch_name, room_type, min_price', {
+      gte: ['date', occStartStr],
+      lte: ['date', occEndStr],
+    })
 
     // Monthly targets
     const targetMonth = targetWeekStart.getMonth() + 1
@@ -284,7 +310,6 @@ function analyzeBranchIssues(
   // Use weekEnd as the "today" reference for lead time calculation
   const referenceDate = new Date(endDate)
   referenceDate.setDate(referenceDate.getDate() + 1)
-  const referenceDateStr = referenceDate.toISOString().split('T')[0]
 
   // Forward 4 weeks
   for (let weekOffset = 1; weekOffset <= 4; weekOffset++) {
@@ -295,12 +320,12 @@ function analyzeBranchIssues(
     weekEndDate.setDate(weekEndDate.getDate() + 6)
 
     const weekStartStr = weekStartDate.toISOString().split('T')[0]
-    const weekEndStr = weekEndDate.toISOString().split('T')[0]
+    const weekEndStr2 = weekEndDate.toISOString().split('T')[0]
     const weekLabel = getWeekLabel(weekStartDate)
 
     // Filter OCC data for this week
     const weekOccData = occData.filter(row => {
-      return row.date >= weekStartStr && row.date <= weekEndStr
+      return row.date >= weekStartStr && row.date <= weekEndStr2
     })
 
     // Group OCC data by branch
@@ -324,7 +349,7 @@ function analyzeBranchIssues(
             price_down_count: 0,
             price_up_count: 0,
             monitor_count: 0,
-            total_available_rooms: 0,
+            total_remaining_rooms: 0,
             most_urgent_message: '데이터 없음',
           },
           severity: 'info' as const,
@@ -371,7 +396,8 @@ function analyzeBranchIssues(
       const priceDownItems = recommendations.filter(r => r.action === 'price_down')
       const priceUpItems = recommendations.filter(r => r.action === 'price_up')
       const monitorItems = recommendations.filter(r => r.action === 'monitor')
-      const totalAvailableRooms = recommendations.reduce((sum, r) => sum + r.available_rooms, 0)
+      // ★ remaining_rooms 사용 (미판매 잔여)
+      const totalRemainingRooms = recommendations.reduce((sum, r) => sum + r.remaining_rooms, 0)
 
       // Find most urgent recommendation
       const urgencyOrder: Record<string, number> = { critical: 0, high: 1, medium: 2, low: 3 }
@@ -405,7 +431,7 @@ function analyzeBranchIssues(
           price_down_count: priceDownItems.length,
           price_up_count: priceUpItems.length,
           monitor_count: monitorItems.length,
-          total_available_rooms: totalAvailableRooms,
+          total_remaining_rooms: totalRemainingRooms,
           most_urgent_message: mostUrgentMessage,
         },
         severity,
@@ -413,21 +439,30 @@ function analyzeBranchIssues(
     })
   }
 
-  return Object.entries(issuesByBranch).map(([branch, details]) => ({
-    branch,
-    details: details.length > 0 ? details : [{
-      week: '전체',
-      recommendations: [],
-      summary: {
-        price_down_count: 0,
-        price_up_count: 0,
-        monitor_count: 0,
-        total_available_rooms: 0,
-        most_urgent_message: '정상',
-      },
-      severity: 'normal',
-    }],
-  }))
+  // 지점별 한줄요약 추가, 가나다순 정렬
+  const result = Object.entries(issuesByBranch)
+    .map(([branch, details]) => {
+      const allRecs = details.flatMap((d: any) => d.recommendations || [])
+      return {
+        branch,
+        branch_summary: generateBranchSummary(allRecs),
+        details: details.length > 0 ? details : [{
+          week: '전체',
+          recommendations: [],
+          summary: {
+            price_down_count: 0,
+            price_up_count: 0,
+            monitor_count: 0,
+            total_remaining_rooms: 0,
+            most_urgent_message: '정상',
+          },
+          severity: 'normal',
+        }],
+      }
+    })
+    .sort((a, b) => a.branch.localeCompare(b.branch, 'ko'))
+
+  return result
 }
 
 function getWeekLabel(date: Date) {
@@ -476,7 +511,14 @@ function getWeekLabel(date: Date) {
     return `${nextMonth + 1}월 ${weekNumber}주`
   }
 
-  const weekNumber = Math.floor((date.getTime() - firstMonday.getTime()) / (7 * 24 * 60 * 60 * 1000)) + 1
+  let weekNumber = Math.floor((date.getTime() - firstMonday.getTime()) / (7 * 24 * 60 * 60 * 1000)) + 1
+
+  // ★ 5주차 이상이면 다음달 1주차로 표시
+  if (weekNumber >= 5) {
+    const nMonth = month === 11 ? 0 : month + 1
+    const adjustedWeekNum = weekNumber - 4
+    return `${nMonth + 1}월 ${adjustedWeekNum}주`
+  }
 
   return `${month + 1}월 ${weekNumber}주`
 }

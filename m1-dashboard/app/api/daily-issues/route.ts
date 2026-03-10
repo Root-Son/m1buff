@@ -46,41 +46,45 @@ export async function GET(request: NextRequest) {
       .gte('reservation_created_at', yesterdayStr + ' 00:00:00')
       .lte('reservation_created_at', yesterdayStr + ' 23:59:59')
 
-    // 6. OCC 데이터 가져오기 (분석 대상일부터 30일간)
-    const thirtyDaysLater = new Date(targetDate)
-    thirtyDaysLater.setDate(targetDate.getDate() + 30)
-    const thirtyDaysStr = thirtyDaysLater.toISOString().split('T')[0]
+    // 6. OCC 데이터 가져오기 (분석 대상일부터 7일간 = 당일 + 6일)
+    const sevenDaysLater = new Date(targetDate)
+    sevenDaysLater.setDate(targetDate.getDate() + 6)
+    const sevenDaysStr = sevenDaysLater.toISOString().split('T')[0]
 
     const { data: occData } = await supabase
       .from('branch_room_occ')
       .select('*')
       .gte('date', targetDateStr)
-      .lte('date', thirtyDaysStr)
+      .lte('date', sevenDaysStr)
+      .limit(5000)
 
     // 7. yolo_prices 데이터 가져오기 (같은 날짜 범위)
     const { data: yoloPrices } = await supabase
       .from('yolo_prices')
       .select('*')
       .gte('date', targetDateStr)
-      .lte('date', thirtyDaysStr)
+      .lte('date', sevenDaysStr)
+      .limit(5000)
 
     // 8. price_guide 데이터 가져오기 (같은 날짜 범위)
     const { data: priceGuides } = await supabase
       .from('price_guide')
       .select('*')
       .gte('date', targetDateStr)
-      .lte('date', thirtyDaysStr)
+      .lte('date', sevenDaysStr)
+      .limit(5000)
 
     // 9. 지점별 집계
     const todayByBranch = aggregateByBranch(todayData || [])
     const yesterdayByBranch = aggregateByBranch(yesterdayData || [])
 
-    // 10. 스마트 가격 추천 생성
+    // 10. 스마트 가격 추천 생성 (7일간, maxLeadDays=6)
     const smartRecommendations = generateSmartRecommendations(
       occData || [],
       yoloPrices || [],
       priceGuides || [],
-      targetDateStr
+      targetDateStr,
+      6  // 당일 + 6일 = 7일
     )
 
     // 11. 기존 분석 (이상 징후, 성과 지점)
@@ -106,6 +110,8 @@ export async function GET(request: NextRequest) {
         price_up: smartRecommendations.price_up,
         monitor: smartRecommendations.monitor,
       },
+      by_branch: smartRecommendations.by_branch,
+      branch_summaries: smartRecommendations.branch_summaries,
       anomalies: anomalies,
       top_performers: topPerformers,
       bottom_performers: bottomPerformers,
@@ -138,6 +144,8 @@ export async function GET(request: NextRequest) {
         price_up: smartRecommendations.price_up,
         monitor: smartRecommendations.monitor,
       },
+      by_branch: smartRecommendations.by_branch,
+      branch_summaries: smartRecommendations.branch_summaries,
       anomalies,
       top_performers: topPerformers,
       bottom_performers: bottomPerformers,

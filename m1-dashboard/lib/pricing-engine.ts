@@ -105,6 +105,26 @@ export function determineSalesPace(
   return 'normal'
 }
 
+// ===== 판매 페이스 상세 정보 =====
+export function getSalesPaceDetail(
+  delta_1d_pp: number,
+  delta_7d_pp: number,
+  leadTimeDays: number,
+  effectiveTotalRooms: number
+): { pace: 'fast' | 'normal' | 'slow'; detail: string } {
+  const pace = determineSalesPace(delta_1d_pp, delta_7d_pp, leadTimeDays)
+
+  // 7일간 판매객실 추정: delta_7d_pp(pp) / 100 * total_rooms
+  const roomsSold7d = effectiveTotalRooms > 0
+    ? Math.max(0, Math.round(effectiveTotalRooms * (delta_7d_pp / 100)))
+    : 0
+
+  const paceLabel = pace === 'fast' ? '빠름' : pace === 'slow' ? '느림' : '보통'
+  const detail = `${paceLabel} (7일간 판매: ~${roomsSold7d}실, 일간 ${delta_1d_pp >= 0 ? '+' : ''}${delta_1d_pp.toFixed(1)}pp)`
+
+  return { pace, detail }
+}
+
 // ===== 가격 추천 계산 =====
 export function calculatePricingRecommendation(params: {
   branch_name: string
@@ -131,8 +151,14 @@ export function calculatePricingRecommendation(params: {
   // total_rooms가 0이면 OCC 데이터에서 fallback
   const effectiveTotalRooms = total_rooms > 0 ? total_rooms : (available_rooms > 0 ? Math.round(available_rooms / Math.max(1 - occ, 0.01)) : 0)
 
-  // 잔여율
-  const availPct = effectiveTotalRooms > 0 ? available_rooms / effectiveTotalRooms : 0
+  // ★ 잔여객실 = 미판매 객실 (total × (1 - OCC))
+  // available_rooms는 "블락 제외 판매가능 풀"이므로 잔여(미판매)와 다름
+  const remaining_rooms = effectiveTotalRooms > 0
+    ? Math.max(0, Math.round(effectiveTotalRooms * (1 - occ)))
+    : 0
+
+  // 잔여율 (미판매 비율)
+  const availPct = effectiveTotalRooms > 0 ? remaining_rooms / effectiveTotalRooms : 0
 
   // 가격 차이 계산
   let priceDiffPct: number | null = null
@@ -140,8 +166,10 @@ export function calculatePricingRecommendation(params: {
     priceDiffPct = ((set_price - guardrail_price) / guardrail_price) * 100
   }
 
-  // 판매 페이스
-  const salesPace = determineSalesPace(delta_1d_pp, delta_7d_pp, lead_time_days)
+  // 판매 페이스 (상세 포함)
+  const salesPaceResult = getSalesPaceDetail(delta_1d_pp, delta_7d_pp, lead_time_days, effectiveTotalRooms)
+  const salesPace = salesPaceResult.pace
+  const salesPaceDetail = salesPaceResult.detail
 
   // ===== 가격 방향 결정 =====
   let action: 'price_down' | 'price_up' | 'monitor' = 'monitor'
@@ -184,13 +212,14 @@ export function calculatePricingRecommendation(params: {
 
   // 메시지 생성
   const message = generateDetailedMessage({
-    available_rooms, total_rooms: effectiveTotalRooms,
+    remaining_rooms, total_rooms: effectiveTotalRooms,
     lead_time_days, set_price, guardrail_price, priceDiffPct,
-    salesPace, action, suggestedPrice, occ
+    salesPaceDetail, action, suggestedPrice, occ
   })
 
   return {
     branch_name, room_type, date,
+    remaining_rooms,
     available_rooms, total_rooms: effectiveTotalRooms,
     lead_time_days,
     set_price, guardrail_price,
@@ -198,6 +227,7 @@ export function calculatePricingRecommendation(params: {
     occ, occ_1d_ago, occ_7d_ago,
     delta_1d_pp, delta_7d_pp,
     sales_pace: salesPace,
+    sales_pace_detail: salesPaceDetail,
     action, urgency,
     message,
     suggested_price: suggestedPrice
@@ -206,24 +236,22 @@ export function calculatePricingRecommendation(params: {
 
 // ===== 상세 메시지 생성 =====
 function generateDetailedMessage(params: {
-  available_rooms: number
+  remaining_rooms: number
   total_rooms: number
   lead_time_days: number
   set_price: number | null
   guardrail_price: number | null
   priceDiffPct: number | null
-  salesPace: 'fast' | 'normal' | 'slow'
+  salesPaceDetail: string
   action: 'price_down' | 'price_up' | 'monitor'
   suggestedPrice: number | null
   occ: number
 }): string {
   const {
-    available_rooms, total_rooms, lead_time_days,
+    remaining_rooms, total_rooms, lead_time_days,
     set_price, guardrail_price, priceDiffPct,
-    salesPace, action, suggestedPrice, occ
+    salesPaceDetail, action, suggestedPrice, occ
   } = params
-
-  const paceLabel = salesPace === 'fast' ? '빠름' : salesPace === 'slow' ? '느림' : '보통'
 
   // 가격 비교 텍스트
   let priceText: string
@@ -256,7 +284,7 @@ function generateDetailedMessage(params: {
     actionText = `현 수준 유지, 추이 관찰`
   }
 
-  return `잔여 ${available_rooms}실/${total_rooms}실 (OCC ${(occ * 100).toFixed(0)}%) | 리드타임 ${lead_time_days}일 | ${priceText} | 판매 페이스 ${paceLabel} → ${actionText}`
+  return `잔여 ${remaining_rooms}실/${total_rooms}실 (OCC ${(occ * 100).toFixed(0)}%) | 리드타임 ${lead_time_days}일 | ${priceText} | 판매 페이스 ${salesPaceDetail} → ${actionText}`
 }
 
 // ===== Executive Summary 생성 =====
@@ -267,7 +295,7 @@ export function generateExecutiveSummary(recommendations: PricingRecommendation[
   const criticalItems = recommendations.filter(r => r.urgency === 'critical')
 
   // 위험 객실수: 하향 권고 항목의 잔여 객실 합
-  const totalRoomsAtRisk = priceDownItems.reduce((sum, r) => sum + r.available_rooms, 0)
+  const totalRoomsAtRisk = priceDownItems.reduce((sum, r) => sum + r.remaining_rooms, 0)
 
   // 긴급 지점 (critical + high)
   const urgentBranches = [...new Set(
@@ -287,17 +315,59 @@ export function generateExecutiveSummary(recommendations: PricingRecommendation[
   }
 }
 
+// ===== 지점별 한줄 요약 생성 =====
+export function generateBranchSummary(recommendations: PricingRecommendation[]): string {
+  if (recommendations.length === 0) return '데이터 없음'
+
+  const avgOcc = recommendations.reduce((s, r) => s + r.occ, 0) / recommendations.length
+  const priceDownCount = recommendations.filter(r => r.action === 'price_down').length
+  const priceUpCount = recommendations.filter(r => r.action === 'price_up').length
+  const hasCritical = recommendations.some(r => r.urgency === 'critical')
+  const hasHigh = recommendations.some(r => r.urgency === 'high')
+
+  const parts: string[] = []
+
+  // OCC 상태
+  if (avgOcc >= 0.90) {
+    parts.push('대부분 완판 근접')
+  } else if (avgOcc >= 0.70) {
+    parts.push(`평균 OCC ${(avgOcc * 100).toFixed(0)}%로 양호`)
+  } else if (avgOcc >= 0.50) {
+    parts.push(`평균 OCC ${(avgOcc * 100).toFixed(0)}%`)
+  } else {
+    parts.push('전반적으로 OCC 낮음')
+  }
+
+  // 액션 요약
+  if (hasCritical || hasHigh) {
+    parts.push('긴급 가격 조정 필요')
+  } else if (priceDownCount > 0 && priceUpCount > 0) {
+    parts.push(`하향 ${priceDownCount}건, 상향 ${priceUpCount}건 검토`)
+  } else if (priceDownCount > 0) {
+    parts.push('가드레일과 여유 있기 때문에 낮추는 방안 검토')
+  } else if (priceUpCount > 0) {
+    parts.push('판매 속도 빠르므로 상향 검토')
+  } else {
+    parts.push('현재 가격 수준 유지 관찰')
+  }
+
+  return parts.join('. ')
+}
+
 // ===== 스마트 추천 생성 (일간이슈/주간리뷰 공통) =====
 export function generateSmartRecommendations(
   occData: any[],
   yoloPrices: any[],
   priceGuides: any[],
-  targetDateStr: string
+  targetDateStr: string,
+  maxLeadDays: number = 30
 ): {
   executive_summary: ExecutiveSummary
   price_down: PricingRecommendation[]
   price_up: PricingRecommendation[]
   monitor: PricingRecommendation[]
+  by_branch: Record<string, PricingRecommendation[]>
+  branch_summaries: Record<string, string>
 } {
   const today = new Date(targetDateStr)
   const recommendations: PricingRecommendation[] = []
@@ -320,8 +390,8 @@ export function generateSmartRecommendations(
     const stayDate = new Date(row.date)
     const leadTimeDays = Math.floor((stayDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24))
 
-    // 과거 날짜 또는 30일 초과는 스킵
-    if (leadTimeDays < 0 || leadTimeDays > 30) return
+    // 과거 날짜 또는 maxLeadDays 초과는 스킵
+    if (leadTimeDays < 0 || leadTimeDays > maxLeadDays) return
 
     const lookupKey = `${row.date}|${branchName}|${row.room_type}`
     const setPrice = yoloPriceMap.get(lookupKey) || null
@@ -355,10 +425,32 @@ export function generateSmartRecommendations(
     return a.lead_time_days - b.lead_time_days
   })
 
+  // 지점별 그룹핑 (가나다순)
+  const byBranch: Record<string, PricingRecommendation[]> = {}
+  sorted.forEach(rec => {
+    if (!byBranch[rec.branch_name]) {
+      byBranch[rec.branch_name] = []
+    }
+    byBranch[rec.branch_name].push(rec)
+  })
+
+  const sortedByBranch: Record<string, PricingRecommendation[]> = {}
+  Object.keys(byBranch).sort((a, b) => a.localeCompare(b, 'ko')).forEach(key => {
+    sortedByBranch[key] = byBranch[key]
+  })
+
+  // 지점별 한줄요약
+  const branchSummaries: Record<string, string> = {}
+  Object.entries(sortedByBranch).forEach(([branch, recs]) => {
+    branchSummaries[branch] = generateBranchSummary(recs)
+  })
+
   return {
     executive_summary: generateExecutiveSummary(sorted),
     price_down: sorted.filter(r => r.action === 'price_down'),
     price_up: sorted.filter(r => r.action === 'price_up'),
     monitor: sorted.filter(r => r.action === 'monitor'),
+    by_branch: sortedByBranch,
+    branch_summaries: branchSummaries,
   }
 }

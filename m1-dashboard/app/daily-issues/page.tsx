@@ -5,28 +5,9 @@ import { useState, useEffect } from 'react'
 // ── 요일 변환 헬퍼 ──
 const DAY_NAMES = ['일', '월', '화', '수', '목', '금', '토']
 
-function getDayOfWeek(dateStr: string): string {
-  const d = new Date(dateStr + 'T00:00:00')
-  return DAY_NAMES[d.getDay()]
-}
-
 function formatDateBadge(dateStr: string): string {
   const d = new Date(dateStr + 'T00:00:00')
   return `${d.getMonth() + 1}/${d.getDate()} ${DAY_NAMES[d.getDay()]}`
-}
-
-// ── 긴급도 스타일 매핑 ──
-const URGENCY_STYLES: Record<string, { border: string; badge: string; label: string }> = {
-  critical: { border: 'border-red-600', badge: 'bg-red-600 text-white', label: '긴급' },
-  high:     { border: 'border-red-400', badge: 'bg-orange-500 text-white', label: '높음' },
-  medium:   { border: 'border-yellow-500', badge: 'bg-yellow-400 text-gray-900', label: '보통' },
-  low:      { border: 'border-gray-300', badge: 'bg-gray-400 text-white', label: '낮음' },
-}
-
-const ACTION_STYLES: Record<string, { bg: string; label: string }> = {
-  down:    { bg: 'bg-red-500 text-white', label: '하향' },
-  up:      { bg: 'bg-green-500 text-white', label: '상향' },
-  monitor: { bg: 'bg-gray-400 text-white', label: '관찰' },
 }
 
 // ── ExecutiveSummaryDashboard ──
@@ -77,91 +58,141 @@ function ExecutiveSummaryDashboard({ summary }: { summary: any }) {
   )
 }
 
-// ── SmartPricingCard ──
-function SmartPricingCard({ item }: { item: any }) {
+// ── BranchDailyCard (지점별 1카드 + 일자별 펼침) ──
+function BranchDailyCard({ branchName, recommendations, summary }: {
+  branchName: string
+  recommendations: any[]
+  summary: string
+}) {
   const [isExpanded, setIsExpanded] = useState(false)
 
-  const urgency = URGENCY_STYLES[item.urgency] || URGENCY_STYLES.low
-  const action = item.action === 'down'
-    ? ACTION_STYLES.down
-    : item.action === 'up'
-    ? ACTION_STYLES.up
-    : ACTION_STYLES.monitor
+  // 일자별 그룹핑
+  const byDate: Record<string, any[]> = {}
+  const sortedRecs = [...recommendations].sort((a, b) => a.date.localeCompare(b.date))
+  sortedRecs.forEach(r => {
+    if (!byDate[r.date]) byDate[r.date] = []
+    byDate[r.date].push(r)
+  })
+
+  const priceDownCount = recommendations.filter(r => r.action === 'price_down').length
+  const priceUpCount = recommendations.filter(r => r.action === 'price_up').length
+  const hasCritical = recommendations.some(r => r.urgency === 'critical')
+  const hasHigh = recommendations.some(r => r.urgency === 'high')
+
+  const borderColor = hasCritical ? 'border-red-600' : hasHigh ? 'border-red-400' : priceDownCount > 0 ? 'border-yellow-500' : priceUpCount > 0 ? 'border-green-500' : 'border-gray-300'
 
   return (
-    <div className={`bg-white rounded-lg border-l-4 ${urgency.border} shadow-sm overflow-hidden`}>
-      {/* Header */}
-      <div className="px-4 pt-4 pb-2 flex items-center justify-between flex-wrap gap-2">
-        <div className="flex items-center gap-2 flex-wrap">
-          <span className="font-bold text-gray-900">{item.branch_name}</span>
-          <span className="text-sm text-gray-500">{item.room_type}</span>
-          <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-blue-100 text-blue-700">
-            {formatDateBadge(item.date)}
-          </span>
-        </div>
-        <div className="flex items-center gap-2">
-          <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-bold ${urgency.badge}`}>
-            {urgency.label}
-          </span>
-          <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-bold ${action.bg}`}>
-            {action.label}
-          </span>
-        </div>
-      </div>
-
-      {/* Message */}
-      <div className="px-4 pb-3">
-        <p className="text-sm font-medium text-gray-800 leading-relaxed">{item.message}</p>
-      </div>
-
-      {/* Expandable detail */}
-      <div className="border-t border-gray-100">
-        <button
-          onClick={() => setIsExpanded(!isExpanded)}
-          className="w-full px-4 py-2 text-xs text-gray-500 hover:bg-gray-50 flex items-center gap-1 transition-colors"
-        >
-          <span>{isExpanded ? '▼' : '▶'}</span>
-          <span>상세 수치 보기</span>
-        </button>
-        {isExpanded && (
-          <div className="px-4 pb-4 grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
-            <div className="bg-gray-50 rounded p-2">
-              <div className="text-gray-400">잔여/전체</div>
-              <div className="font-semibold text-gray-700">{item.available_rooms ?? '-'} / {item.total_rooms ?? '-'}실</div>
-            </div>
-            <div className="bg-gray-50 rounded p-2">
-              <div className="text-gray-400">OCC</div>
-              <div className="font-semibold text-gray-700">{item.occ != null ? `${(item.occ * 100).toFixed(1)}%` : '-'}</div>
-            </div>
-            <div className="bg-gray-50 rounded p-2">
-              <div className="text-gray-400">리드타임</div>
-              <div className="font-semibold text-gray-700">{item.lead_time_days ?? '-'}일</div>
-            </div>
-            <div className="bg-gray-50 rounded p-2">
-              <div className="text-gray-400">판매 페이스</div>
-              <div className="font-semibold text-gray-700">{item.sales_pace ?? '-'}</div>
-            </div>
-            <div className="bg-gray-50 rounded p-2">
-              <div className="text-gray-400">셋팅가</div>
-              <div className="font-semibold text-gray-700">{item.set_price?.toLocaleString() ?? '-'}원</div>
-            </div>
-            <div className="bg-gray-50 rounded p-2">
-              <div className="text-gray-400">가드레일가</div>
-              <div className="font-semibold text-gray-700">{item.guardrail_price?.toLocaleString() ?? '-'}원</div>
-            </div>
-            <div className="bg-gray-50 rounded p-2">
-              <div className="text-gray-400">가격 차이</div>
-              <div className="font-semibold text-gray-700">{item.price_diff_pct != null ? `${item.price_diff_pct > 0 ? '+' : ''}${item.price_diff_pct.toFixed(1)}%` : '-'}</div>
-            </div>
-            {item.suggested_price != null && (
-              <div className="bg-blue-50 rounded p-2">
-                <div className="text-blue-400">제안가</div>
-                <div className="font-bold text-blue-700">{item.suggested_price.toLocaleString()}원</div>
-              </div>
+    <div className={`bg-white rounded-lg border-l-4 ${borderColor} shadow-sm overflow-hidden`}>
+      {/* 접힌 상태: 지점명 + 뱃지 + 한줄요약 */}
+      <div
+        className="px-4 py-3 cursor-pointer hover:bg-gray-50 transition-colors"
+        onClick={() => setIsExpanded(!isExpanded)}
+      >
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className="font-bold text-gray-900">{branchName}</span>
+            {hasCritical && (
+              <span className="px-2 py-0.5 rounded text-xs font-bold bg-red-600 text-white animate-pulse">긴급</span>
+            )}
+            {priceDownCount > 0 && (
+              <span className="px-2 py-0.5 rounded text-xs font-bold bg-red-500 text-white">
+                하향 {priceDownCount}
+              </span>
+            )}
+            {priceUpCount > 0 && (
+              <span className="px-2 py-0.5 rounded text-xs font-bold bg-green-500 text-white">
+                상향 {priceUpCount}
+              </span>
             )}
           </div>
-        )}
+          <span className="text-xs text-gray-400 ml-2 shrink-0">
+            {isExpanded ? '▲ 접기' : '▼ 상세'}
+          </span>
+        </div>
+        <div className="text-sm text-gray-600 mt-1">{summary}</div>
       </div>
+
+      {/* 펼친 상태: 일자별 → 룸타입별 상세 */}
+      {isExpanded && (
+        <div className="border-t border-gray-100 px-4 py-3 space-y-3">
+          {Object.entries(byDate).map(([date, dateRecs]) => {
+            const leadTime = dateRecs[0]?.lead_time_days ?? 0
+            const dateDownCount = dateRecs.filter((r: any) => r.action === 'price_down').length
+            const dateUpCount = dateRecs.filter((r: any) => r.action === 'price_up').length
+
+            return (
+              <div key={date} className="bg-gray-50 rounded-lg p-3">
+                {/* 일자 헤더 */}
+                <div className="flex items-center justify-between mb-2">
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm font-bold text-gray-800">
+                      D+{leadTime}
+                    </span>
+                    <span className="text-xs text-blue-600 font-medium bg-blue-50 px-1.5 py-0.5 rounded">
+                      {formatDateBadge(date)}
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    {dateDownCount > 0 && (
+                      <span className="text-[10px] px-1.5 py-0.5 rounded bg-red-100 text-red-700 font-medium">
+                        하향 {dateDownCount}
+                      </span>
+                    )}
+                    {dateUpCount > 0 && (
+                      <span className="text-[10px] px-1.5 py-0.5 rounded bg-green-100 text-green-700 font-medium">
+                        상향 {dateUpCount}
+                      </span>
+                    )}
+                  </div>
+                </div>
+
+                {/* 룸타입별 상세 */}
+                <div className="space-y-1.5">
+                  {dateRecs.map((rec: any, i: number) => {
+                    const actionBg = rec.action === 'price_down'
+                      ? 'bg-red-500 text-white'
+                      : rec.action === 'price_up'
+                      ? 'bg-green-500 text-white'
+                      : 'bg-gray-300 text-gray-700'
+
+                    return (
+                      <div key={i} className="bg-white rounded px-3 py-2 border border-gray-100">
+                        <div className="flex items-center gap-2 flex-wrap mb-1">
+                          <span className="text-sm font-semibold text-gray-900">{rec.room_type}</span>
+                          <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold ${actionBg}`}>
+                            {rec.action === 'price_down' ? '하향' : rec.action === 'price_up' ? '상향' : '관찰'}
+                          </span>
+                          {(rec.urgency === 'critical' || rec.urgency === 'high') && (
+                            <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-red-600 text-white">
+                              {rec.urgency === 'critical' ? '긴급' : '높음'}
+                            </span>
+                          )}
+                        </div>
+                        <div className="text-xs text-gray-600 leading-relaxed">
+                          잔여 {rec.remaining_rooms ?? 0}실/{rec.total_rooms ?? 0}실 (OCC {rec.occ != null ? `${(rec.occ * 100).toFixed(0)}%` : '-'})
+                          {' | '}
+                          {rec.sales_pace_detail || rec.sales_pace || '-'}
+                          {rec.set_price != null && (
+                            <> | 셋팅가 {rec.set_price.toLocaleString()}원</>
+                          )}
+                          {rec.guardrail_price != null && rec.price_diff_pct != null && (
+                            <> (가드레일 대비 {rec.price_diff_pct >= 0 ? '+' : ''}{rec.price_diff_pct.toFixed(0)}%)</>
+                          )}
+                        </div>
+                        {rec.suggested_price != null && (
+                          <div className="text-xs font-medium text-blue-700 mt-1">
+                            → 제안가: {rec.suggested_price.toLocaleString()}원
+                          </div>
+                        )}
+                      </div>
+                    )
+                  })}
+                </div>
+              </div>
+            )
+          })}
+        </div>
+      )}
     </div>
   )
 }
@@ -174,7 +205,6 @@ export default function DailyIssuesPage() {
   const [loading, setLoading] = useState(true)
   const [showDatePicker, setShowDatePicker] = useState(false)
   const [newDate, setNewDate] = useState('')
-  const [showMonitor, setShowMonitor] = useState(false)
 
   useEffect(() => {
     fetchAvailableDates()
@@ -264,10 +294,9 @@ export default function DailyIssuesPage() {
     )
   }
 
-  const recs = issuesData.smart_recommendations || {}
-  const priceDown = recs.price_down || []
-  const priceUp = recs.price_up || []
-  const monitor = recs.monitor || []
+  const byBranch = issuesData.by_branch || {}
+  const branchSummaries = issuesData.branch_summaries || {}
+  const branchNames = Object.keys(byBranch)
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -276,7 +305,7 @@ export default function DailyIssuesPage() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
           <h1 className="text-2xl font-bold text-gray-900">일간 이슈</h1>
           <p className="text-sm text-gray-500 mt-1">
-            {issuesData.date} 기준 (vs {issuesData.compared_to})
+            {issuesData.date} 기준 | 당일 포함 7일간 분석 (vs {issuesData.compared_to})
           </p>
         </div>
       </header>
@@ -341,77 +370,30 @@ export default function DailyIssuesPage() {
         {/* 1. Executive Summary Dashboard */}
         <ExecutiveSummaryDashboard summary={issuesData.executive_summary} />
 
-        {/* 2. 가격 하향 권고 */}
+        {/* 2. 지점별 이슈 (가나다순, 7일간) */}
         <section>
-          <h2 className="text-lg font-bold text-gray-900 mb-4 flex items-center gap-2">
-            <span className="inline-block w-3 h-3 rounded-full bg-red-500" />
-            가격 하향 권고
-            <span className="text-sm font-normal text-gray-500">({priceDown.length}건)</span>
+          <h2 className="text-lg font-bold text-gray-900 mb-4">
+            지점별 이슈 <span className="text-sm font-normal text-gray-500">({branchNames.length}개 지점, 7일간)</span>
           </h2>
           <div className="space-y-3">
-            {priceDown.length > 0 ? (
-              priceDown.map((item: any, idx: number) => (
-                <SmartPricingCard key={idx} item={item} />
+            {branchNames.length > 0 ? (
+              branchNames.map((branchName: string) => (
+                <BranchDailyCard
+                  key={branchName}
+                  branchName={branchName}
+                  recommendations={byBranch[branchName]}
+                  summary={branchSummaries[branchName] || ''}
+                />
               ))
             ) : (
               <div className="text-center py-8 text-gray-400 bg-white rounded-lg border border-dashed border-gray-200">
-                가격 하향이 필요한 항목이 없습니다
+                분석 데이터가 없습니다
               </div>
             )}
           </div>
         </section>
 
-        {/* 3. 가격 상향 기회 */}
-        <section>
-          <h2 className="text-lg font-bold text-gray-900 mb-4 flex items-center gap-2">
-            <span className="inline-block w-3 h-3 rounded-full bg-green-500" />
-            가격 상향 기회
-            <span className="text-sm font-normal text-gray-500">({priceUp.length}건)</span>
-          </h2>
-          <div className="space-y-3">
-            {priceUp.length > 0 ? (
-              priceUp.map((item: any, idx: number) => (
-                <SmartPricingCard key={idx} item={item} />
-              ))
-            ) : (
-              <div className="text-center py-8 text-gray-400 bg-white rounded-lg border border-dashed border-gray-200">
-                가격 상향 기회가 없습니다
-              </div>
-            )}
-          </div>
-        </section>
-
-        {/* 4. 모니터링 (collapsible, hidden by default) */}
-        <section>
-          <div className="flex items-center gap-3 mb-4">
-            <h2 className="text-lg font-bold text-gray-900 flex items-center gap-2">
-              <span className="inline-block w-3 h-3 rounded-full bg-gray-400" />
-              모니터링
-              <span className="text-sm font-normal text-gray-500">({monitor.length}건)</span>
-            </h2>
-            <button
-              onClick={() => setShowMonitor(!showMonitor)}
-              className="px-3 py-1 text-xs font-medium rounded-full bg-gray-100 text-gray-600 hover:bg-gray-200 transition-colors"
-            >
-              {showMonitor ? '접기' : '펼치기'}
-            </button>
-          </div>
-          {showMonitor && (
-            <div className="space-y-3">
-              {monitor.length > 0 ? (
-                monitor.map((item: any, idx: number) => (
-                  <SmartPricingCard key={idx} item={item} />
-                ))
-              ) : (
-                <div className="text-center py-8 text-gray-400 bg-white rounded-lg border border-dashed border-gray-200">
-                  모니터링 항목이 없습니다
-                </div>
-              )}
-            </div>
-          )}
-        </section>
-
-        {/* 5. 이상 징후 */}
+        {/* 3. 이상 징후 */}
         <section>
           <h2 className="text-lg font-bold text-gray-900 mb-4">이상 징후</h2>
           <div className="space-y-3">
@@ -442,7 +424,7 @@ export default function DailyIssuesPage() {
           </div>
         </section>
 
-        {/* 6. Top/Bottom 성과 */}
+        {/* 4. Top/Bottom 성과 */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           <section>
             <h2 className="text-lg font-bold text-gray-900 mb-4">잘한 지점 Top 5</h2>
