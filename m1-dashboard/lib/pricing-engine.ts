@@ -351,6 +351,8 @@ function generateDetailedMessage(params: {
   if (action === 'price_down') {
     if (suggestedPrice) {
       actionText = `가드레일 수준(${suggestedPrice.toLocaleString()}원)까지 하향 검토`
+    } else if (set_price != null && guardrail_price != null && set_price <= guardrail_price) {
+      actionText = `이미 가드레일 이하 → 가드레일 조정 필요`
     } else {
       actionText = `가격 하향 검토 필요`
     }
