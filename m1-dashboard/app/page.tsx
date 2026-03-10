@@ -366,16 +366,12 @@ export default function Dashboard() {
           },
           {
             label: 'LoS (평균 숙박)',
-            data: roomTypeData.days.map((d: any) => {
-              const los = d.avg_los || 0
-              // LoS를 가격 축 범위에 맞게 스케일링 (예: 2박 → 200000원 정도로 표시)
-              return los > 0 ? los * 100000 : null
-            }),
+            data: roomTypeData.days.map((d: any) => d.avg_los || null),
             type: 'line',
             borderColor: 'rgba(139, 92, 246, 1)',
             borderWidth: 2,
             pointRadius: 4,
-            yAxisID: 'y1',
+            yAxisID: 'y2',
             borderDash: [3, 3],
             datalabels: {
               display: true,
@@ -383,9 +379,8 @@ export default function Dashboard() {
               align: 'top',
               offset: 8,
               font: { size: 11, weight: 'bold' },
-              formatter: (value: any, context: any) => {
-                const los = roomTypeData.days[context.dataIndex]?.avg_los || 0
-                return los > 0 ? los.toFixed(1) + '박' : ''
+              formatter: (value: any) => {
+                return value > 0 ? value.toFixed(1) + '박' : ''
               }
             },
             order: 0
@@ -475,6 +470,17 @@ export default function Dashboard() {
             title: { display: true, text: '가격 (원)' },
             grid: { drawOnChartArea: false },
             ticks: { callback: (v) => new Intl.NumberFormat('ko-KR').format(v as number) }
+          },
+          y2: {
+            position: 'right',
+            title: { display: true, text: 'LoS (박)' },
+            min: 0,
+            max: 5,
+            grid: { drawOnChartArea: false },
+            ticks: { 
+              callback: (v) => v.toFixed(1) + '박',
+              stepSize: 1
+            }
           }
         }
       }
