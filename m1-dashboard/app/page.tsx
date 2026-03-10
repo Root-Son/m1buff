@@ -325,10 +325,10 @@ export default function Dashboard() {
             label: 'OTA 비율',
             data: roomTypeData.days.map((d: any) => {
               const otaRatio = d.channel_ratios?.['OTA'] || 0
-              return d.occ * (otaRatio / 100) // OCC * OTA 비율
+              return otaRatio / 100 // 퍼센트를 0-1 범위로
             }),
-            backgroundColor: 'rgba(59, 130, 246, 0.9)',
-            borderColor: 'rgba(59, 130, 246, 1)',
+            backgroundColor: 'rgba(236, 72, 153, 0.7)',
+            borderColor: 'rgba(236, 72, 153, 1)',
             borderWidth: 2,
             yAxisID: 'y',
             order: 4
