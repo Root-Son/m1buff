@@ -149,7 +149,7 @@ async function createBranchChecklist(
   baseDate: string
 ): Promise<any> {
   // 지점별 액션 수 카운트
-  const downCount = recs.filter(r => r.action === 'price_down').length
+  const downCount = recs.filter(r => r.action === 'price_down' || r.action === 'guardrail_adjust').length
   const upCount = recs.filter(r => r.action === 'price_up').length
 
   // 아이콘 결정
