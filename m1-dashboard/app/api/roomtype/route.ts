@@ -181,8 +181,8 @@ export async function GET(request: Request) {
     // 9. 채널별 비중 집계 (date별, 룸타입별)
     const channelMap: Record<string, Record<string, number>> = {}
     channelData?.forEach(row => {
-      // date로 키 생성 (OCC 데이터와 매칭하기 위해)
-      const key = `${row.check_in_date}_${row.room_type}`
+      const dateStr = String(row.check_in_date).split('T')[0].split(' ')[0]
+      const key = `${dateStr}_${row.room_type}`
       const group = getChannelGroup(row.reservation_channel || '')
       
       if (!channelMap[key]) channelMap[key] = {}
