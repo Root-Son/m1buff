@@ -1,10 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { supabase } from '@/lib/supabase'
+import { generateSmartRecommendations, normalizeBranchName } from '@/lib/pricing-engine'
 
 export async function GET(request: NextRequest) {
   const searchParams = request.nextUrl.searchParams
   const requestedDate = searchParams.get('date')
-  
+
   try {
     // 1. "오늘" 정의: raw_bookings 가장 최근 날짜
     const { data: latestBooking } = await supabase
@@ -12,84 +13,111 @@ export async function GET(request: NextRequest) {
       .select('reservation_created_at')
       .order('reservation_created_at', { ascending: false })
       .limit(1)
-    
+
     if (!latestBooking || latestBooking.length === 0) {
       return NextResponse.json({ error: 'No data available' }, { status: 404 })
     }
-    
+
     const today = new Date(latestBooking[0].reservation_created_at)
-    
+
     // 2. 분석 대상: 어제 (사용자가 날짜 지정하면 그 날짜)
-    const targetDate = requestedDate 
+    const targetDate = requestedDate
       ? new Date(requestedDate)
       : new Date(today.setDate(today.getDate() - 1))
-    
+
     const targetDateStr = targetDate.toISOString().split('T')[0]
-    
+
     // 3. 어제 = 분석 대상의 전날
     const yesterday = new Date(targetDate)
     yesterday.setDate(yesterday.getDate() - 1)
     const yesterdayStr = yesterday.toISOString().split('T')[0]
-    
+
     // 4. 해당 날짜(어제) 데이터 가져오기
     const { data: todayData } = await supabase
       .from('raw_bookings')
       .select('*')
       .gte('reservation_created_at', targetDateStr + ' 00:00:00')
       .lte('reservation_created_at', targetDateStr + ' 23:59:59')
-    
+
     // 5. 전날(그저께) 데이터 가져오기
     const { data: yesterdayData } = await supabase
       .from('raw_bookings')
       .select('*')
       .gte('reservation_created_at', yesterdayStr + ' 00:00:00')
       .lte('reservation_created_at', yesterdayStr + ' 23:59:59')
-    
+
     // 6. OCC 데이터 가져오기 (분석 대상일부터 30일간)
     const thirtyDaysLater = new Date(targetDate)
     thirtyDaysLater.setDate(targetDate.getDate() + 30)
     const thirtyDaysStr = thirtyDaysLater.toISOString().split('T')[0]
-    
+
     const { data: occData } = await supabase
       .from('branch_room_occ')
       .select('*')
       .gte('date', targetDateStr)
       .lte('date', thirtyDaysStr)
-    
-    // 7. 지점별 집계
+
+    // 7. yolo_prices 데이터 가져오기 (같은 날짜 범위)
+    const { data: yoloPrices } = await supabase
+      .from('yolo_prices')
+      .select('*')
+      .gte('date', targetDateStr)
+      .lte('date', thirtyDaysStr)
+
+    // 8. price_guide 데이터 가져오기 (같은 날짜 범위)
+    const { data: priceGuides } = await supabase
+      .from('price_guide')
+      .select('*')
+      .gte('date', targetDateStr)
+      .lte('date', thirtyDaysStr)
+
+    // 9. 지점별 집계
     const todayByBranch = aggregateByBranch(todayData || [])
     const yesterdayByBranch = aggregateByBranch(yesterdayData || [])
-    
-    // 8. 이슈 분석
-    const urgentActions = analyzeUrgentActions(occData || [], targetDateStr)
-    const pricingOpportunities = analyzePricingOpportunities(occData || [], todayByBranch, yesterdayByBranch)
+
+    // 10. 스마트 가격 추천 생성
+    const smartRecommendations = generateSmartRecommendations(
+      occData || [],
+      yoloPrices || [],
+      priceGuides || [],
+      targetDateStr
+    )
+
+    // 11. 기존 분석 (이상 징후, 성과 지점)
     const anomalies = analyzeAnomalies(todayByBranch, yesterdayByBranch)
     const topPerformers = getTopPerformers(todayByBranch, yesterdayByBranch, 5)
     const bottomPerformers = getBottomPerformers(todayByBranch, yesterdayByBranch, 5)
-    
-    // 9. DB에 저장
+
+    const totalPickup = Object.values(todayByBranch).reduce((sum: number, b: any) => sum + b.pickup, 0)
+    const avgOcc = calculateAvgOcc(occData || [])
+
+    // 12. DB에 저장
     const { data: existingIssue } = await supabase
       .from('daily_issues')
       .select('id')
       .eq('issue_date', targetDateStr)
       .single()
-    
+
     const issueData = {
       issue_date: targetDateStr,
-      urgent_actions: urgentActions,
-      pricing_opportunities: pricingOpportunities,
+      executive_summary: smartRecommendations.executive_summary,
+      smart_recommendations: {
+        price_down: smartRecommendations.price_down,
+        price_up: smartRecommendations.price_up,
+        monitor: smartRecommendations.monitor,
+      },
       anomalies: anomalies,
       top_performers: topPerformers,
       bottom_performers: bottomPerformers,
-      total_pickup: Object.values(todayByBranch).reduce((sum: number, b: any) => sum + b.pickup, 0),
-      avg_occ: calculateAvgOcc(occData || []),
+      total_pickup: totalPickup,
+      avg_occ: avgOcc,
       data_summary: {
         branches_analyzed: Object.keys(todayByBranch).length,
         compared_to: yesterdayStr,
         generated_at: new Date().toISOString()
       }
     }
-    
+
     if (existingIssue) {
       await supabase
         .from('daily_issues')
@@ -100,13 +128,28 @@ export async function GET(request: NextRequest) {
         .from('daily_issues')
         .insert([issueData])
     }
-    
+
     return NextResponse.json({
       date: targetDateStr,
       compared_to: yesterdayStr,
-      ...issueData
+      executive_summary: smartRecommendations.executive_summary,
+      smart_recommendations: {
+        price_down: smartRecommendations.price_down,
+        price_up: smartRecommendations.price_up,
+        monitor: smartRecommendations.monitor,
+      },
+      anomalies,
+      top_performers: topPerformers,
+      bottom_performers: bottomPerformers,
+      total_pickup: totalPickup,
+      avg_occ: avgOcc,
+      data_summary: {
+        branches_analyzed: Object.keys(todayByBranch).length,
+        compared_to: yesterdayStr,
+        generated_at: new Date().toISOString()
+      }
     })
-    
+
   } catch (error: any) {
     console.error('Daily Issues API Error:', error)
     return NextResponse.json({ error: error.message }, { status: 500 })
@@ -116,266 +159,31 @@ export async function GET(request: NextRequest) {
 // 지점별 집계
 function aggregateByBranch(data: any[]) {
   const result: any = {}
-  
+
   data.forEach(row => {
-    const branch = row.branch_name
+    const branch = normalizeBranchName(row.branch_name)
     if (!result[branch]) {
       result[branch] = { pickup: 0, count: 0 }
     }
     result[branch].pickup += row.payment_amount || 0
     result[branch].count += 1
   })
-  
+
   return result
-}
-
-// 긴급 대응 필요 분석 (기간별 그룹핑)
-function analyzeUrgentActions(occData: any[], targetDate: string) {
-  const urgent: any[] = []
-  const today = new Date(targetDate)
-  
-  // 주차 계산 함수 (월요일 시작, ISO 8601 방식)
-  const getWeekLabel = (date: Date) => {
-    const month = date.getMonth() + 1
-    
-    // 해당 월의 첫 월요일 찾기
-    const firstDay = new Date(date.getFullYear(), date.getMonth(), 1)
-    let firstMonday = new Date(firstDay)
-    
-    // 첫 날이 월요일이 아니면 다음 월요일 찾기
-    const dayOfWeek = firstDay.getDay()
-    if (dayOfWeek === 0) {
-      // 일요일이면 다음날(월요일)
-      firstMonday.setDate(2)
-    } else if (dayOfWeek !== 1) {
-      // 월요일이 아니면 다음 월요일
-      firstMonday.setDate(1 + (8 - dayOfWeek))
-    }
-    
-    // 현재 날짜가 첫 월요일보다 이전이면 0주차 (이전 달 마지막 주)
-    if (date < firstMonday) {
-      // 이전 달로 계산
-      const prevMonth = date.getMonth()
-      const prevMonthFirstDay = new Date(date.getFullYear(), prevMonth, 1)
-      let prevFirstMonday = new Date(prevMonthFirstDay)
-      const prevDayOfWeek = prevMonthFirstDay.getDay()
-      if (prevDayOfWeek === 0) {
-        prevFirstMonday.setDate(2)
-      } else if (prevDayOfWeek !== 1) {
-        prevFirstMonday.setDate(1 + (8 - prevDayOfWeek))
-      }
-      
-      const weekNumber = Math.floor((date.getTime() - prevFirstMonday.getTime()) / (7 * 24 * 60 * 60 * 1000)) + 1
-      return `${prevMonth}월 ${weekNumber}주`
-    }
-    
-    const weekNumber = Math.floor((date.getTime() - firstMonday.getTime()) / (7 * 24 * 60 * 60 * 1000)) + 1
-    
-    return `${month}월 ${weekNumber}주`
-  }
-  
-  // 주말/평일 구분
-  const isWeekend = (date: Date) => {
-    const day = date.getDay()
-    return day === 0 || day === 6
-  }
-  
-  // 기간별로 데이터 그룹핑
-  const groupedData: Record<string, any[]> = {}
-  
-  occData.forEach(row => {
-    const stayDate = new Date(row.date)
-    const daysUntil = Math.floor((stayDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24))
-    
-    // 30일 이내만
-    if (daysUntil < 0 || daysUntil > 30) return
-    
-    const weekLabel = getWeekLabel(stayDate)
-    const dayType = isWeekend(stayDate) ? '주말' : '평일'
-    const periodKey = `${weekLabel} ${dayType}`
-    
-    if (!groupedData[periodKey]) {
-      groupedData[periodKey] = []
-    }
-    
-    groupedData[periodKey].push({
-      ...row,
-      days_until: daysUntil,
-      stay_date: row.date
-    })
-  })
-  
-  // 각 기간별로 분석
-  Object.entries(groupedData).forEach(([period, items]) => {
-    const avgOcc = items.reduce((sum, item) => sum + (item.occ || 0), 0) / items.length
-    const minDaysUntil = Math.min(...items.map(item => item.days_until))
-    const lowOccItems = items.filter(item => item.occ < 0.6)
-    const highOccItems = items.filter(item => item.occ >= 0.95)
-    
-    // 저점유율 경고
-    if (lowOccItems.length > 0) {
-      const severity = minDaysUntil <= 3 ? 'high' : minDaysUntil <= 7 ? 'medium' : 'low'
-      const branches = [...new Set(lowOccItems.map(item => item.branch_name))]
-      
-      urgent.push({
-        period,
-        type: 'low_occ',
-        severity,
-        avg_occ: avgOcc,
-        days_until: minDaysUntil,
-        affected_branches: branches,
-        total_affected: branches.length,
-        details: lowOccItems.map(item => ({  // 모든 사례
-          branch: item.branch_name,
-          room_type: item.room_type,
-          date: item.stay_date,
-          occ: item.occ,
-          adr: item.adr
-        })),
-        recommendation: minDaysUntil <= 3 
-          ? '긴급 프로모션 필요' 
-          : minDaysUntil <= 7
-          ? '가격 조정 검토'
-          : '모니터링 필요'
-      })
-    }
-    
-    // 고점유율 기회
-    if (highOccItems.length > 0 && minDaysUntil > 7) {
-      const branches = [...new Set(highOccItems.map(item => item.branch_name))]
-      
-      urgent.push({
-        period,
-        type: 'high_occ',
-        severity: 'opportunity',
-        avg_occ: avgOcc,
-        days_until: minDaysUntil,
-        affected_branches: branches,
-        total_affected: branches.length,
-        details: highOccItems.map(item => ({  // 모든 사례
-          branch: item.branch_name,
-          room_type: item.room_type,
-          date: item.stay_date,
-          occ: item.occ,
-          adr: item.adr
-        })),
-        recommendation: '가격 인상 기회'
-      })
-    }
-  })
-  
-  // 심각도 및 기간 순 정렬
-  return urgent.sort((a, b) => {
-    if (a.severity === 'high' && b.severity !== 'high') return -1
-    if (b.severity === 'high' && a.severity !== 'high') return 1
-    return a.days_until - b.days_until
-  })
-}
-
-// 가격 조정 기회 분석 (기간별)
-function analyzePricingOpportunities(occData: any[], todayByBranch: any, yesterdayByBranch: any) {
-  const opportunities: any[] = []
-  
-  const getWeekLabel = (date: Date) => {
-    const month = date.getMonth() + 1
-    
-    const firstDay = new Date(date.getFullYear(), date.getMonth(), 1)
-    let firstMonday = new Date(firstDay)
-    
-    const dayOfWeek = firstDay.getDay()
-    if (dayOfWeek === 0) {
-      firstMonday.setDate(2)
-    } else if (dayOfWeek !== 1) {
-      firstMonday.setDate(1 + (8 - dayOfWeek))
-    }
-    
-    if (date < firstMonday) {
-      const prevMonth = date.getMonth()
-      const prevMonthFirstDay = new Date(date.getFullYear(), prevMonth, 1)
-      let prevFirstMonday = new Date(prevMonthFirstDay)
-      const prevDayOfWeek = prevMonthFirstDay.getDay()
-      if (prevDayOfWeek === 0) {
-        prevFirstMonday.setDate(2)
-      } else if (prevDayOfWeek !== 1) {
-        prevFirstMonday.setDate(1 + (8 - prevDayOfWeek))
-      }
-      
-      const weekNumber = Math.floor((date.getTime() - prevFirstMonday.getTime()) / (7 * 24 * 60 * 60 * 1000)) + 1
-      return `${prevMonth}월 ${weekNumber}주`
-    }
-    
-    const weekNumber = Math.floor((date.getTime() - firstMonday.getTime()) / (7 * 24 * 60 * 60 * 1000)) + 1
-    
-    return `${month}월 ${weekNumber}주`
-  }
-  
-  const isWeekend = (date: Date) => {
-    const day = date.getDay()
-    return day === 0 || day === 6
-  }
-  
-  // 기간별 그룹핑
-  const groupedData: Record<string, any[]> = {}
-  
-  occData.forEach(row => {
-    const occChange = row.occ - (row.occ_1d_ago || 0)
-    
-    // 예약 속도 빠른 경우 (OCC 1일전 대비 10%p 이상 증가 & 아직 90% 미만)
-    if (occChange >= 0.10 && row.occ < 0.9) {
-      const stayDate = new Date(row.date)
-      const weekLabel = getWeekLabel(stayDate)
-      const dayType = isWeekend(stayDate) ? '주말' : '평일'
-      const periodKey = `${weekLabel} ${dayType}`
-      
-      if (!groupedData[periodKey]) {
-        groupedData[periodKey] = []
-      }
-      
-      groupedData[periodKey].push({
-        ...row,
-        occ_change: occChange
-      })
-    }
-  })
-  
-  // 각 기간별로 요약
-  Object.entries(groupedData).forEach(([period, items]) => {
-    const branches = [...new Set(items.map(item => item.branch_name))]
-    const avgOccChange = items.reduce((sum, item) => sum + item.occ_change, 0) / items.length
-    
-    opportunities.push({
-      period,
-      type: 'fast_booking',
-      avg_occ_change: avgOccChange,
-      affected_branches: branches,
-      total_affected: branches.length,
-      details: items.map(item => ({  // 모든 사례
-        branch: item.branch_name,
-        room_type: item.room_type,
-        date: item.date,
-        occ: item.occ,
-        occ_change: item.occ_change,
-        adr: item.adr
-      })),
-      recommendation: '수요 급증 - 가격 인상 검토'
-    })
-  })
-  
-  return opportunities
 }
 
 // 이상 징후 분석
 function analyzeAnomalies(todayByBranch: any, yesterdayByBranch: any) {
   const anomalies: any[] = []
-  
+
   Object.keys(todayByBranch).forEach(branch => {
     const today = todayByBranch[branch]
     const yesterday = yesterdayByBranch[branch]
-    
+
     if (!yesterday) return
-    
+
     const pickupChange = ((today.pickup - yesterday.pickup) / yesterday.pickup) * 100
-    
+
     // 픽업 급락 (30% 이상)
     if (pickupChange <= -30) {
       anomalies.push({
@@ -388,7 +196,7 @@ function analyzeAnomalies(todayByBranch: any, yesterdayByBranch: any) {
         message: `픽업 매출 ${Math.abs(pickupChange).toFixed(0)}% 급락`
       })
     }
-    
+
     // 픽업 급증 (50% 이상)
     if (pickupChange >= 50) {
       anomalies.push({
@@ -402,22 +210,22 @@ function analyzeAnomalies(todayByBranch: any, yesterdayByBranch: any) {
       })
     }
   })
-  
+
   return anomalies
 }
 
 // Top 성과 지점
 function getTopPerformers(todayByBranch: any, yesterdayByBranch: any, limit: number) {
   const performers: any[] = []
-  
+
   Object.keys(todayByBranch).forEach(branch => {
     const today = todayByBranch[branch]
     const yesterday = yesterdayByBranch[branch]
-    
+
     if (!yesterday || yesterday.pickup === 0) return
-    
+
     const change = ((today.pickup - yesterday.pickup) / yesterday.pickup) * 100
-    
+
     performers.push({
       branch,
       today_pickup: today.pickup,
@@ -426,7 +234,7 @@ function getTopPerformers(todayByBranch: any, yesterdayByBranch: any, limit: num
       change_amount: today.pickup - yesterday.pickup
     })
   })
-  
+
   return performers
     .sort((a, b) => b.change_pct - a.change_pct)
     .slice(0, limit)
@@ -435,15 +243,15 @@ function getTopPerformers(todayByBranch: any, yesterdayByBranch: any, limit: num
 // Bottom 성과 지점
 function getBottomPerformers(todayByBranch: any, yesterdayByBranch: any, limit: number) {
   const performers: any[] = []
-  
+
   Object.keys(todayByBranch).forEach(branch => {
     const today = todayByBranch[branch]
     const yesterday = yesterdayByBranch[branch]
-    
+
     if (!yesterday || yesterday.pickup === 0) return
-    
+
     const change = ((today.pickup - yesterday.pickup) / yesterday.pickup) * 100
-    
+
     performers.push({
       branch,
       today_pickup: today.pickup,
@@ -452,7 +260,7 @@ function getBottomPerformers(todayByBranch: any, yesterdayByBranch: any, limit: 
       change_amount: today.pickup - yesterday.pickup
     })
   })
-  
+
   return performers
     .sort((a, b) => a.change_pct - b.change_pct)
     .slice(0, limit)

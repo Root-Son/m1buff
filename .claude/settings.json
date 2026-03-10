@@ -1,0 +1,17 @@
+{
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "/Users/root1/m1buff/.claude/auto-push.sh",
+            "timeout": 30,
+            "statusMessage": "Auto committing & pushing..."
+          }
+        ]
+      }
+    ]
+  }
+}
