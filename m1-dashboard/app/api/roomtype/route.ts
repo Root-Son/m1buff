@@ -118,17 +118,10 @@ export async function GET(request: Request) {
     // 4. LoS 데이터 (평균 숙박일수)
     const { data: losData, error: losError } = await supabase
       .from('raw_bookings')
-      .select('check_in_date, room_type, nights')
+      .select('check_in_date, roomtype, nights')
       .eq('branch_name', branch)
       .gte('check_in_date', startDate)
       .lte('check_in_date', endDate)
-    
-    console.log('=== LoS Query ===')
-    console.log('Branch:', branch)
-    console.log('Date range:', startDate, '~', endDate)
-    console.log('LoS data count:', losData?.length || 0)
-    console.log('LoS sample:', losData?.slice(0, 3))
-    if (losError) console.error('LoS query error:', losError)
 
     // 5. 채널별 예약 데이터
     const { data: channelData, error: channelError } = await supabase
