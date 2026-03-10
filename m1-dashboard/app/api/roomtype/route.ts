@@ -200,10 +200,17 @@ export async function GET(request: Request) {
     })
 
     // 10. 데이터 병합
-    console.log('=== LoS/Channel Matching Debug ===')
-    console.log('Sample OCC dates:', data?.slice(0, 3).map(d => `${d.date}_${d.room_type}`))
-    console.log('Sample LoS keys:', Object.keys(losAverages).slice(0, 3))
-    console.log('Sample Channel keys:', Object.keys(channelRatios).slice(0, 3))
+    const _debug = {
+      losCount: losData?.length || 0,
+      losError: losError?.message || null,
+      losSample: losData?.slice(0, 2),
+      channelCount: channelData?.length || 0,
+      channelError: channelError?.message || null,
+      channelSample: channelData?.slice(0, 2),
+      branch,
+      startDate,
+      endDate,
+    }
     
     const mergedData = (data || []).map(row => {
       const yolo = yoloData?.find(y => 
