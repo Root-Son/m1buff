@@ -176,15 +176,23 @@ def process_branch_room_occ(df):
     }
     
     df = df.rename(columns=column_map)
-    
+
     # 지점명 통일
     df['branch_name'] = df['branch_name'].apply(normalize_branch_name)
-    
+
+    # 숫자 컬럼 쉼표 제거 및 숫자 변환
+    numeric_cols = ['available_rooms', 'sold_rooms', 'blocked_rooms', 'adr', 'revenue', 'rev_par',
+                    'occ', 'occ_asof', 'occ_1d_ago', 'occ_7d_ago', 'delta_1d_pp', 'delta_7d_pp']
+    for col in numeric_cols:
+        if col in df.columns:
+            df[col] = df[col].apply(lambda x: str(x).replace(',', '') if pd.notna(x) else x)
+            df[col] = pd.to_numeric(df[col], errors='coerce')
+
     # OCC 값들을 소수로 변환 (이미 소수면 그대로, 아니면 100으로 나누기)
     for col in ['occ', 'occ_asof', 'occ_1d_ago', 'occ_7d_ago']:
         if col in df.columns:
             df[col] = df[col].apply(lambda x: x if (pd.isna(x) or x <= 1) else x / 100)
-    
+
     # NULL 처리
     df = df.fillna(0)
     
