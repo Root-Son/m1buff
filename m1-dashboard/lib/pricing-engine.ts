@@ -305,6 +305,7 @@ export function calculatePricingRecommendation(params: {
     message,
     suggested_price: suggestedPrice,
     expected_occ: expectedOcc,
+    expected_final_occ: expectedFinalOcc,
     pace_vs_benchmark: paceVsBenchmark,
   }
 }
