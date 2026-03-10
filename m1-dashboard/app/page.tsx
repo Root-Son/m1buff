@@ -444,8 +444,14 @@ export default function Dashboard() {
             position: 'left',
             title: { display: true, text: 'OCC (%)' },
             min: 0,
-            max: 1,
-            ticks: { callback: (v) => ((v as number) * 100).toFixed(0) + '%' }
+            max: 1.15,
+            ticks: {
+              callback: (v) => {
+                const n = v as number
+                return n <= 1 ? (n * 100).toFixed(0) + '%' : ''
+              },
+              stepSize: 0.2
+            }
           },
           y1: {
             position: 'right',
