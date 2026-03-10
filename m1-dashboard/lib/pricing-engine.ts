@@ -418,7 +418,7 @@ export function generateBranchSummary(recommendations: PricingRecommendation[]):
   if (recommendations.length === 0) return '데이터 없음'
 
   const avgOcc = recommendations.reduce((s, r) => s + r.occ, 0) / recommendations.length
-  const priceDownCount = recommendations.filter(r => r.action === 'price_down').length
+  const priceDownCount = recommendations.filter(r => r.action === 'price_down' || r.action === 'guardrail_adjust').length
   const priceUpCount = recommendations.filter(r => r.action === 'price_up').length
   const hasCritical = recommendations.some(r => r.urgency === 'critical')
   const hasHigh = recommendations.some(r => r.urgency === 'high')
