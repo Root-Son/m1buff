@@ -59,9 +59,11 @@ def execute_redash_query(query_id, parameters=None):
             query_params[f'p_{k}'] = v
 
     response = requests.post(refresh_url, headers=headers, params=query_params)
+    print(f"  Refresh response: {response.status_code} - {response.text[:300]}")
 
     if response.status_code == 200:
         job = response.json()['job']
+        print(f"  Job status: {job.get('status')}, id: {job.get('id')}")
         result_url = f"{REDASH_URL}/api/jobs/{job['id']}"
         max_attempts = 120
 
