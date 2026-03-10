@@ -292,6 +292,8 @@ function buildChecklistText(rec: PricingRecommendation, emoji: string): string {
   if (rec.action === 'price_down') {
     if (rec.suggested_price) {
       actionText = `→ 가드레일(${rec.suggested_price.toLocaleString()}원)까지 하향`
+    } else if (rec.set_price != null && rec.guardrail_price != null && rec.set_price <= rec.guardrail_price) {
+      actionText = `→ 이미 가드레일 이하, 가드레일 조정 필요`
     } else {
       actionText = `→ 가격 하향 검토`
     }
