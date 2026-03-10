@@ -328,7 +328,6 @@ function generateDetailedMessage(params: {
   expectedSold?: number | null
   expectedFinalSold?: number | null
   paceVsBenchmark?: 'ahead' | 'normal' | 'behind' | null
-  lead_time_days: number
 }): string {
   const {
     remaining_rooms, total_rooms, lead_time_days,
