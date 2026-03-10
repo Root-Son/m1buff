@@ -164,8 +164,8 @@ export async function GET(request: Request) {
     // raw_bookings의 check_in_date와 매칭
     const losMap: Record<string, Record<string, number>> = {}
     losData?.forEach(row => {
-      // date로 키 생성 (OCC 데이터와 매칭하기 위해)
-      const key = `${row.check_in_date}_${row.room_type}`
+      const dateStr = String(row.check_in_date).split('T')[0].split(' ')[0]
+      const key = `${dateStr}_${row.room_type}`
       if (!losMap[key]) losMap[key] = { total: 0, count: 0 }
       losMap[key].total += row.nights || 0
       losMap[key].count += 1
