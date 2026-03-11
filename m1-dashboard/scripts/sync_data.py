@@ -100,110 +100,25 @@ def execute_redash_query(query_id, parameters=None):
         return pd.DataFrame(data['query_result']['data']['rows'])
 
 
-def get_redash_query_param_options(query_id, param_name):
-    """Redash 쿼리의 dropdown(query type) 파라미터 옵션 목록 가져오기"""
+def get_redash_branchid_default(query_id, param_name='branchId'):
+    """Redash 쿼리의 branchId 파라미터 기본값(전지점 복합ID) 가져오기"""
     headers = {'Authorization': f'Key {REDASH_API_KEY}'}
 
-    # 쿼리 정보에서 파라미터 정의 가져오기
     query_url = f"{REDASH_URL}/api/queries/{query_id}"
     resp = requests.get(query_url, headers=headers)
     resp.raise_for_status()
     query_data = resp.json()
 
-    # 파라미터 중 해당 이름의 queryId 찾기
     options = query_data.get('options', {})
     params = options.get('parameters', [])
 
-    target_param = None
     for p in params:
         if p.get('name') == param_name:
-            target_param = p
-            break
+            default_val = p.get('value', '')
+            print(f"  branchId 기본값: {default_val}")
+            return default_val
 
-    if not target_param:
-        print(f"  ⚠️ 파라미터 '{param_name}' 정의를 찾을 수 없음. 전체 파라미터: {[p.get('name') for p in params]}")
-        return []
-
-    print(f"  파라미터 '{param_name}' 정의: {target_param}")
-
-    # query type 파라미터: queryId로 dropdown 값 조회
-    source_query_id = target_param.get('queryId')
-    if not source_query_id:
-        # enum type일 수도 있음
-        enum_options = target_param.get('enumOptions')
-        if enum_options:
-            return [opt.strip() for opt in enum_options.split('\n') if opt.strip()]
-        print(f"  ⚠️ queryId 없음, enumOptions도 없음")
-        return []
-
-    print(f"  dropdown 소스 쿼리: {source_query_id}")
-
-    # 소스 쿼리의 최신 결과 가져오기
-    source_url = f"{REDASH_URL}/api/queries/{source_query_id}"
-    source_resp = requests.get(source_url, headers=headers)
-    source_resp.raise_for_status()
-    source_data = source_resp.json()
-
-    result_id = source_data.get('latest_query_data_id')
-    if not result_id:
-        print(f"  ⚠️ 소스 쿼리 {source_query_id}에 캐시 결과 없음")
-        return []
-
-    data_url = f"{REDASH_URL}/api/query_results/{result_id}"
-    data_resp = requests.get(data_url, headers=headers)
-    data_resp.raise_for_status()
-    rows = data_resp.json()['query_result']['data']['rows']
-
-    # 첫 번째 컬럼의 값들을 추출
-    if not rows:
-        return []
-
-    first_col = list(rows[0].keys())[0]
-    values = [row[first_col] for row in rows]
-
-    # 복합 ID (콤마 포함) 제거 — 개별 지점 ID만 사용 (중복 수집 방지)
-    individual_values = [v for v in values if isinstance(v, (int, float)) or (',' not in str(v))]
-    skipped = len(values) - len(individual_values)
-    if skipped > 0:
-        print(f"  ⚠️ 복합 ID {skipped}개 스킵 (중복 방지)")
-
-    print(f"  dropdown 옵션 ({len(individual_values)}개): {individual_values[:10]}{'...' if len(individual_values) > 10 else ''}")
-    return individual_values
-
-
-def execute_redash_query_all_branches(query_id, base_params, branch_param_name='branchId'):
-    """branchId 파라미터가 query type인 경우, 모든 지점별로 실행 후 합치기"""
-    print(f"🔄 쿼리 {query_id}: 모든 지점 데이터 수집 시작...")
-
-    # 1. branchId 드롭다운 옵션 가져오기
-    branch_values = get_redash_query_param_options(query_id, branch_param_name)
-
-    if not branch_values:
-        print(f"  ⚠️ 지점 목록을 가져올 수 없어 캐시 결과로 폴백합니다.")
-        return execute_redash_query(query_id, base_params)
-
-    # 2. 각 지점별 쿼리 실행
-    all_dfs = []
-    for i, branch_val in enumerate(branch_values):
-        params = {**base_params, branch_param_name: branch_val}
-        print(f"\n  [{i+1}/{len(branch_values)}] 지점: {branch_val}")
-        try:
-            df = execute_redash_query(query_id, params)
-            if len(df) > 0:
-                all_dfs.append(df)
-                print(f"    → {len(df)}건 수집")
-            else:
-                print(f"    → 데이터 없음")
-        except Exception as e:
-            print(f"    ❌ 실패: {e}")
-            continue
-
-    if not all_dfs:
-        raise Exception(f"모든 지점 쿼리 실패! 데이터 0건")
-
-    combined = pd.concat(all_dfs, ignore_index=True)
-    print(f"\n✅ 전체 {len(combined)}건 수집 완료! ({len(all_dfs)}/{len(branch_values)} 지점 성공)")
-    return combined
+    return None
 
 def get_google_sheet_data(gid: str, sheet_name: str):
     """Google Sheets에서 데이터 가져오기"""
