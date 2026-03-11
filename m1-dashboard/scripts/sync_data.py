@@ -290,7 +290,10 @@ def process_price_guide(df):
     df['min_price'] = pd.to_numeric(df['min_price'], errors='coerce')
     df = df.dropna(subset=['min_price'])
     df = df[df['min_price'] > 0]
-    
+
+    # 중복 제거
+    df = df.drop_duplicates(subset=['date', 'branch_name', 'room_type'], keep='last')
+
     return df.to_dict('records')
 
 def process_raw_bookings(df):
