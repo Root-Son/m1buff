@@ -346,9 +346,6 @@ def main():
         print(f"❌ raw_bookings 실패: {e}")
         errors.append(('raw_bookings', str(e)))
 
-    # 동기화 시각 기록
-    update_sync_timestamp()
-
     end_time = datetime.now()
     duration = (end_time - start_time).total_seconds()
 
