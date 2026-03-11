@@ -51,28 +51,11 @@ export async function GET(request: NextRequest) {
     sevenDaysLater.setDate(targetDate.getDate() + 6)
     const sevenDaysStr = sevenDaysLater.toISOString().split('T')[0]
 
-    const { data: occData } = await supabase
-      .from('branch_room_occ')
-      .select('*')
-      .gte('date', targetDateStr)
-      .lte('date', sevenDaysStr)
-      .limit(5000)
-
-    // 7. yolo_prices 데이터 가져오기 (같은 날짜 범위)
-    const { data: yoloPrices } = await supabase
-      .from('yolo_prices')
-      .select('*')
-      .gte('date', targetDateStr)
-      .lte('date', sevenDaysStr)
-      .limit(5000)
-
-    // 8. price_guide 데이터 가져오기 (같은 날짜 범위)
-    const { data: priceGuides } = await supabase
-      .from('price_guide')
-      .select('*')
-      .gte('date', targetDateStr)
-      .lte('date', sevenDaysStr)
-      .limit(5000)
+    const [occData, yoloPrices, priceGuides] = await Promise.all([
+      fetchAllRows('branch_room_occ', targetDateStr, sevenDaysStr),
+      fetchAllRows('yolo_prices', targetDateStr, sevenDaysStr),
+      fetchAllRows('price_guide', targetDateStr, sevenDaysStr),
+    ])
 
     // 9. 지점별 집계
     const todayByBranch = aggregateByBranch(todayData || [])
@@ -279,4 +262,32 @@ function calculateAvgOcc(occData: any[]) {
   if (occData.length === 0) return 0
   const sum = occData.reduce((acc, row) => acc + (row.occ || 0), 0)
   return sum / occData.length
+}
+
+// Supabase 페이지네이션 (1000행 제한 우회)
+async function fetchAllRows(table: string, dateFrom: string, dateTo: string): Promise<any[]> {
+  const allRows: any[] = []
+  const pageSize = 1000
+  let page = 0
+
+  while (true) {
+    const from = page * pageSize
+    const to = from + pageSize - 1
+
+    const { data, error } = await supabase
+      .from(table)
+      .select('*')
+      .gte('date', dateFrom)
+      .lte('date', dateTo)
+      .range(from, to)
+
+    if (error) break
+    if (!data || data.length === 0) break
+
+    allRows.push(...data)
+    if (data.length < pageSize) break
+    page++
+  }
+
+  return allRows
 }
