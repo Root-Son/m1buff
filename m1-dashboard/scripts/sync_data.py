@@ -282,21 +282,6 @@ def process_raw_bookings(df):
     return df.to_dict('records')
 
 
-def update_sync_timestamp():
-    """동기화 완료 시각을 sync_metadata 테이블에 기록"""
-    headers = {**supabase_headers(), 'Prefer': 'return=minimal,resolution=merge-duplicates'}
-    now = datetime.utcnow().strftime('%Y-%m-%dT%H:%M:%SZ')
-    data = {'key': 'last_sync', 'value': now}
-    resp = requests.post(
-        f"{SUPABASE_URL}/rest/v1/sync_metadata?on_conflict=key",
-        headers=headers,
-        json=data
-    )
-    if resp.status_code in [200, 201]:
-        print(f"✅ sync_metadata 업데이트: {now}")
-    else:
-        print(f"  ⚠️ sync_metadata 업데이트 실패 (무시): {resp.text[:100]}")
-
 
 def main():
     """메인 실행"""
