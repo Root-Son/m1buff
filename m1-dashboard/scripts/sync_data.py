@@ -368,16 +368,36 @@ def main():
         print(f"❌ price_guide 실패: {e}")
         errors.append(('price_guide', str(e)))
 
-    # 4. raw_bookings (Redash - 대용량, 지점별 순회)
+    # 4. raw_bookings (Redash - 전지점 한번에 조회 후 대시보드 지점만 필터)
     try:
-        print("\n[4/4] raw_bookings 동기화 (Redash - 전지점 순회)")
-        base_params = {
+        print("\n[4/4] raw_bookings 동기화 (Redash)")
+        # branchId 기본값(전지점 복합ID) 가져오기
+        default_branch_id = get_redash_branchid_default(QUERIES['raw_bookings'])
+        params_bookings = {
             'startDate': DATE_RANGES['raw_bookings']['start'],
             'endDate': DATE_RANGES['raw_bookings']['end'],
+            'branchId': default_branch_id,
         }
-        df_bookings = execute_redash_query_all_branches(
-            QUERIES['raw_bookings'], base_params, branch_param_name='branchId'
-        )
+        df_bookings = execute_redash_query(QUERIES['raw_bookings'], params_bookings)
+        print(f"  Redash 전체: {len(df_bookings)}건")
+
+        # 대시보드에서 사용하는 지점명만 필터링
+        DASHBOARD_BRANCHES = [
+            '강남예전로이움점', '강남예전시그니티점', '거북섬점', '낙산해변',
+            '당진터미널점', '호텔 동탄', '명동점', '부산기장점', '부산송도해변점',
+            '부산시청점', '부산역점', '부티크남포BIFF점', '부티크익선점', '서면점',
+            '속초등대해변점', '속초자이엘라더비치', '속초중앙점', '속초해변',
+            '속초해변 AB점', '속초해변C점', '송도달빛공원점', '스타즈울산점',
+            '웨이브파크점', '인천차이나타운', '제주공항점', '해운대역', '해운대패러그라프점'
+        ]
+        # normalize 후 매칭
+        if 'branch_name' in df_bookings.columns:
+            df_bookings['branch_name'] = df_bookings['branch_name'].apply(normalize_branch_name)
+            before = len(df_bookings)
+            df_bookings = df_bookings[df_bookings['branch_name'].isin(DASHBOARD_BRANCHES)]
+            print(f"  대시보드 지점 필터: {before}건 → {len(df_bookings)}건 ({len(df_bookings['branch_name'].unique())}개 지점)")
+            print(f"  지점 목록: {sorted(df_bookings['branch_name'].unique().tolist())}")
+
         data_bookings = process_raw_bookings(df_bookings)
         upload_to_supabase('raw_bookings', data_bookings)
     except Exception as e:
