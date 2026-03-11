@@ -55,12 +55,13 @@ def execute_redash_query(query_id, parameters=None):
 
     refresh_url = f"{REDASH_URL}/api/queries/{query_id}/refresh"
 
-    # 파라미터는 JSON body로 전달 (p_ prefix URL 방식은 refresh에서 작동 안함)
-    body = None
+    # Redash refresh는 p_ prefix URL params로 파라미터 전달
+    query_params = {}
     if parameters:
-        body = {'parameters': parameters}
+        for k, v in parameters.items():
+            query_params[f'p_{k}'] = v
 
-    response = requests.post(refresh_url, headers=headers, json=body)
+    response = requests.post(refresh_url, headers=headers, params=query_params)
 
     if response.status_code == 200:
         job = response.json()['job']
