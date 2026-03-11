@@ -216,7 +216,7 @@ function getWeekStart(date: Date): Date {
 
 // 지점명 정규화
 function normalizeBranchName(name: string): string {
-  // "호텔 동탄"은 DB 원본 그대로 사용
+  if (name === "동탄점(호텔)" || name === "호텔동탄" || name === "동탄호텔" || name === "동탄점") return "호텔 동탄"
   if (name === "웨이브파크_펜트") return "웨이브파크점"
   return name
 }
