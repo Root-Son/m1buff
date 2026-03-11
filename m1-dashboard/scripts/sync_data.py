@@ -41,7 +41,7 @@ DATE_RANGES = {
 SHEET_GIDS = {
     'branch_room_occ': '1130833605',
     'price_guide': '261469936',
-    'yolo_prices': '0'  # TODO: 실제 GID로 교체 필요
+    'yolo_prices': '1219169457'
 }
 
 def execute_redash_query(query_id, parameters=None):
