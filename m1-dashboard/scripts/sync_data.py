@@ -3,7 +3,7 @@ M1버프 현황판 - 자동 데이터 동기화 스크립트
 branch_room_occ: Google Sheets → upsert
 yolo_prices: Google Sheets → upsert
 price_guide: Google Sheets → upsert
-raw_bookings: Redash → 당월만 삭제 후 재삽입 (과거 데이터 보존)
+raw_bookings: Redash → 당월 created_at 기준 삭제 후 재삽입
 """
 
 import os
@@ -54,12 +54,13 @@ def execute_redash_query(query_id, parameters=None):
     headers = {'Authorization': f'Key {REDASH_API_KEY}'}
 
     refresh_url = f"{REDASH_URL}/api/queries/{query_id}/refresh"
-    query_params = {}
-    if parameters:
-        for k, v in parameters.items():
-            query_params[f'p_{k}'] = v
 
-    response = requests.post(refresh_url, headers=headers, params=query_params)
+    # 파라미터는 JSON body로 전달 (p_ prefix URL 방식은 refresh에서 작동 안함)
+    body = None
+    if parameters:
+        body = {'parameters': parameters}
+
+    response = requests.post(refresh_url, headers=headers, json=body)
 
     if response.status_code == 200:
         job = response.json()['job']
@@ -123,13 +124,13 @@ def supabase_headers():
     }
 
 
-def delete_raw_bookings_current_month(month_start):
-    """raw_bookings에서 당월 데이터만 삭제 (과거 보존)"""
-    print(f"  🗑️ raw_bookings 당월 삭제 (check_in_date >= {month_start})...")
+def delete_raw_bookings_by_created(month_start):
+    """raw_bookings에서 당월 생성분 삭제 (reservation_created_at 기준)"""
+    print(f"  🗑️ raw_bookings 당월 삭제 (reservation_created_at >= {month_start})...")
     headers = supabase_headers()
 
     resp = requests.delete(
-        f"{SUPABASE_URL}/rest/v1/raw_bookings?check_in_date=gte.{month_start}",
+        f"{SUPABASE_URL}/rest/v1/raw_bookings?reservation_created_at=gte.{month_start}",
         headers=headers
     )
     print(f"  삭제 → status={resp.status_code}")
@@ -278,6 +279,13 @@ def process_raw_bookings(df):
     if 'payment_amount' in df.columns:
         df['payment_amount'] = df['payment_amount'].apply(lambda x: str(x).replace(',', '') if pd.notna(x) else x)
         df['payment_amount'] = pd.to_numeric(df['payment_amount'], errors='coerce')
+    # reservation_no 기준 중복 제거
+    if 'reservation_no' in df.columns:
+        before_dedup = len(df)
+        df = df.drop_duplicates(subset=['reservation_no'], keep='last')
+        if before_dedup != len(df):
+            print(f"  중복 제거: {before_dedup}건 → {len(df)}건")
+
     df = df.fillna(0)
     return df.to_dict('records')
 
@@ -292,7 +300,7 @@ def main():
 
     print(f"\n{'='*60}")
     print(f"🚀 데이터 동기화 시작: {start_time.strftime('%Y-%m-%d %H:%M:%S')}")
-    print(f"   raw_bookings: 당월만 ({month_start} ~ {today_str})")
+    print(f"   raw_bookings: 당월 created_at 삭제+재삽입 ({month_start} ~ {today_str})")
     print(f"   기타 테이블: upsert (전체)")
     print(f"{'='*60}\n")
 
@@ -330,7 +338,7 @@ def main():
 
     # 4. raw_bookings (Redash → 당월만 삭제 후 insert)
     try:
-        print("\n[4/4] raw_bookings (Redash → 당월 삭제+insert)")
+        print("\n[4/4] raw_bookings (Redash → 당월 created_at 삭제+insert)")
         default_branch_id = get_redash_branchid_default(QUERIES['raw_bookings'])
         params = {
             'startDate': month_start,
@@ -340,7 +348,7 @@ def main():
         df = execute_redash_query(QUERIES['raw_bookings'], params)
         print(f"  Redash 조회: {len(df)}건")
         data = process_raw_bookings(df)
-        delete_raw_bookings_current_month(month_start)
+        delete_raw_bookings_by_created(month_start)
         insert_to_supabase('raw_bookings', data)
     except Exception as e:
         print(f"❌ raw_bookings 실패: {e}")
