@@ -157,19 +157,33 @@ def delete_all_from_supabase(table_name):
     return True
 
 
+# 테이블별 unique constraint (upsert 폴백용)
+UPSERT_KEYS = {
+    'branch_room_occ': 'date,branch_name,room_type',
+    'yolo_prices': 'date,branch_name,room_type',
+    'price_guide': 'date,branch_name,room_type',
+}
+
+
 def upload_to_supabase(table_name, data):
-    """Supabase에 데이터 업로드 (전체 삭제 후 삽입)"""
+    """Supabase에 데이터 업로드 (삭제+삽입 시도, 실패 시 upsert 폴백)"""
     print(f"🔄 {table_name} 업로드 중... ({len(data)}개)")
 
-    # 1. 전체 삭제
-    delete_all_from_supabase(table_name)
+    # 1. 전체 삭제 시도
+    deleted = delete_all_from_supabase(table_name)
 
-    # 2. 배치 삽입
+    # 2. 업로드 모드 결정
+    on_conflict = UPSERT_KEYS.get(table_name, '')
+    use_upsert = (not deleted) and bool(on_conflict)
+
+    if use_upsert:
+        print(f"  → UPSERT 모드 (on_conflict={on_conflict})")
+
     headers = {
         'apikey': SUPABASE_KEY,
         'Authorization': f'Bearer {SUPABASE_KEY}',
         'Content-Type': 'application/json',
-        'Prefer': 'return=minimal',
+        'Prefer': 'return=minimal,resolution=merge-duplicates' if use_upsert else 'return=minimal',
     }
 
     batch_size = 1000
@@ -180,6 +194,9 @@ def upload_to_supabase(table_name, data):
         batch_num = (i // batch_size) + 1
 
         url = f"{SUPABASE_URL}/rest/v1/{table_name}"
+        if use_upsert:
+            url += f"?on_conflict={on_conflict}"
+
         response = requests.post(url, headers=headers, json=batch)
 
         if response.status_code not in [200, 201]:
@@ -189,7 +206,7 @@ def upload_to_supabase(table_name, data):
         print(f"  - 배치 {batch_num}/{total_batches} 완료 ({len(batch)}개)")
         time.sleep(0.3)
 
-    print(f"✅ {table_name} 업로드 완료! (총 {len(data)}개)")
+    print(f"✅ {table_name} 업로드 완료! (총 {len(data)}개, {'upsert' if use_upsert else 'insert'})")
 
 
 def normalize_branch_name(name):
