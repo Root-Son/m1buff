@@ -50,14 +50,6 @@ def execute_redash_query(query_id, parameters=None):
 
     headers = {'Authorization': f'Key {REDASH_API_KEY}'}
 
-    # 쿼리 정보 조회 (파라미터 확인)
-    query_info_url = f"{REDASH_URL}/api/queries/{query_id}"
-    qi = requests.get(query_info_url, headers=headers)
-    if qi.status_code == 200:
-        q = qi.json()
-        opts = q.get('options', {}).get('parameters', [])
-        print(f"  쿼리 파라미터 정의: {[(p.get('name'), p.get('type')) for p in opts]}")
-
     # 1차: refresh (실행 요청)
     refresh_url = f"{REDASH_URL}/api/queries/{query_id}/refresh"
     query_params = {}
