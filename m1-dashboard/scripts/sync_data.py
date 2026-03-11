@@ -121,23 +121,29 @@ def delete_all_from_supabase(table_name):
         'Prefer': 'return=minimal',
     }
 
-    # 여러 조건으로 시도 (테이블마다 컬럼 구조가 다를 수 있음)
-    delete_conditions = [
-        'id=gt.0',
-        'date=gte.1900-01-01',
-        'branch_name=neq.IMPOSSIBLE_VALUE',  # 모든 행 매칭
-    ]
+    # Supabase TRUNCATE는 REST로 불가 → RPC 또는 neq 조건 사용
+    # branch_name != '' 로 전체 행 매칭 (빈 문자열인 행은 없을 것)
+    resp = requests.delete(
+        f"{SUPABASE_URL}/rest/v1/{table_name}?branch_name=neq.",
+        headers=headers
+    )
+    print(f"  삭제 시도 1 (branch_name=neq.) → status={resp.status_code}")
 
-    for condition in delete_conditions:
+    if resp.status_code not in [200, 204]:
+        # id 컬럼이 있는 경우 (raw_bookings)
         resp = requests.delete(
-            f"{SUPABASE_URL}/rest/v1/{table_name}?{condition}",
+            f"{SUPABASE_URL}/rest/v1/{table_name}?id=gt.0",
             headers=headers
         )
-        if resp.status_code in [200, 204]:
-            print(f"  ✅ 삭제 완료 ({condition}, status={resp.status_code})")
-            return
+        print(f"  삭제 시도 2 (id=gt.0) → status={resp.status_code}")
 
-    print(f"  ⚠️ 삭제 실패 (마지막 status={resp.status_code}, body={resp.text[:200]})")
+    # 삭제 확인: 데이터가 남아있는지 체크
+    check = requests.get(
+        f"{SUPABASE_URL}/rest/v1/{table_name}?select=count",
+        headers={**headers, 'Prefer': 'count=exact'},
+    )
+    count = check.headers.get('content-range', '').split('/')[-1]
+    print(f"  ✅ 삭제 후 남은 행: {count}")
 
 
 def upload_to_supabase(table_name, data):
