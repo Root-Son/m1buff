@@ -27,6 +27,7 @@ export default function Dashboard() {
   const [roomTypeData, setRoomTypeData] = useState<any>(null)
   const [monthlySummaryData, setMonthlySummaryData] = useState<any>(null)
   const [loading, setLoading] = useState(true)
+  const [lastUpdated, setLastUpdated] = useState<string>('')
   const [selectedBranch, setSelectedBranch] = useState('전지점') // 디폴트 전지점
   const [selectedRoomType, setSelectedRoomType] = useState('')
   const [selectedMonth, setSelectedMonth] = useState(2)
