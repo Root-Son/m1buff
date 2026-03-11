@@ -1,12 +1,9 @@
 """
 M1버프 현황판 - 자동 데이터 동기화 스크립트
-branch_room_occ: Google Sheets
-yolo_prices: Google Sheets
-price_guide: Google Sheets
-raw_bookings: Redash (당월 데이터만)
-
-※ 모든 테이블은 전체 삭제 후 재삽입 (취소 반영을 위해)
-※ raw_bookings 과거 데이터는 CSV 수동 업로드
+branch_room_occ: Google Sheets → upsert
+yolo_prices: Google Sheets → upsert
+price_guide: Google Sheets → upsert
+raw_bookings: Redash → 당월만 삭제 후 재삽입 (과거 데이터 보존)
 """
 
 import os
@@ -33,9 +30,7 @@ DASHBOARD_BRANCHES = [
 ]
 
 # Redash 쿼리 ID
-QUERIES = {
-    'raw_bookings': 711
-}
+QUERIES = { 'raw_bookings': 711 }
 
 # Google Sheets GID
 SHEET_GIDS = {
@@ -43,6 +38,14 @@ SHEET_GIDS = {
     'price_guide': '261469936',
     'yolo_prices': '1219169457'
 }
+
+# upsert용 unique constraint
+UPSERT_KEYS = {
+    'branch_room_occ': 'date,branch_name,room_type',
+    'yolo_prices': 'date,branch_name,room_type',
+    'price_guide': 'date,branch_name,room_type',
+}
+
 
 def execute_redash_query(query_id, parameters=None):
     """Redash 쿼리 실행 및 결과 가져오기"""
@@ -111,80 +114,36 @@ def get_google_sheet_data(gid: str, sheet_name: str):
     return df
 
 
-def delete_all_from_supabase(table_name):
-    """테이블 전체 데이터 삭제 (취소 반영을 위해 항상 전체 삭제 후 재삽입)"""
-    print(f"  🗑️ {table_name} 전체 데이터 삭제 중...")
-    headers = {
+def supabase_headers():
+    return {
         'apikey': SUPABASE_KEY,
         'Authorization': f'Bearer {SUPABASE_KEY}',
         'Content-Type': 'application/json',
         'Prefer': 'return=minimal',
     }
 
-    # RPC로 TRUNCATE 실행 (RLS 우회)
-    rpc_url = f"{SUPABASE_URL}/rest/v1/rpc/truncate_table"
-    resp = requests.post(
-        rpc_url,
-        headers=headers,
-        json={'table_name': table_name}
+
+def delete_raw_bookings_current_month(month_start):
+    """raw_bookings에서 당월 데이터만 삭제 (과거 보존)"""
+    print(f"  🗑️ raw_bookings 당월 삭제 (check_in_date >= {month_start})...")
+    headers = supabase_headers()
+
+    resp = requests.delete(
+        f"{SUPABASE_URL}/rest/v1/raw_bookings?check_in_date=gte.{month_start}",
+        headers=headers
     )
-    print(f"  TRUNCATE RPC → status={resp.status_code}")
+    print(f"  삭제 → status={resp.status_code}")
 
     if resp.status_code not in [200, 204]:
-        # RPC 없으면 service_role key로 직접 DELETE 시도
-        print(f"  RPC 실패, 직접 DELETE 시도...")
-        resp = requests.delete(
-            f"{SUPABASE_URL}/rest/v1/{table_name}?id=gt.0",
-            headers=headers
-        )
-        if resp.status_code not in [200, 204]:
-            resp = requests.delete(
-                f"{SUPABASE_URL}/rest/v1/{table_name}?branch_name=not.is.null",
-                headers=headers
-            )
-        print(f"  DELETE → status={resp.status_code}")
-
-    # 삭제 확인
-    check = requests.get(
-        f"{SUPABASE_URL}/rest/v1/{table_name}?select=count",
-        headers={**headers, 'Prefer': 'count=exact'},
-    )
-    remaining = check.headers.get('content-range', '').split('/')[-1]
-    print(f"  삭제 후 남은 행: {remaining}")
-    if remaining not in ['0', '*', '']:
-        print(f"  ⚠️ 삭제 실패! RLS가 DELETE를 차단할 수 있음. UPSERT로 전환합니다.")
-        return False
-    return True
+        print(f"  ⚠️ 삭제 응답: {resp.text[:200]}")
 
 
-# 테이블별 unique constraint (upsert 폴백용)
-UPSERT_KEYS = {
-    'branch_room_occ': 'date,branch_name,room_type',
-    'yolo_prices': 'date,branch_name,room_type',
-    'price_guide': 'date,branch_name,room_type',
-}
+def upsert_to_supabase(table_name, data):
+    """Supabase에 upsert (기존 데이터 업데이트, 신규 삽입)"""
+    on_conflict = UPSERT_KEYS[table_name]
+    print(f"🔄 {table_name} upsert 중... ({len(data)}개, on_conflict={on_conflict})")
 
-
-def upload_to_supabase(table_name, data):
-    """Supabase에 데이터 업로드 (삭제+삽입 시도, 실패 시 upsert 폴백)"""
-    print(f"🔄 {table_name} 업로드 중... ({len(data)}개)")
-
-    # 1. 전체 삭제 시도
-    deleted = delete_all_from_supabase(table_name)
-
-    # 2. 업로드 모드 결정
-    on_conflict = UPSERT_KEYS.get(table_name, '')
-    use_upsert = (not deleted) and bool(on_conflict)
-
-    if use_upsert:
-        print(f"  → UPSERT 모드 (on_conflict={on_conflict})")
-
-    headers = {
-        'apikey': SUPABASE_KEY,
-        'Authorization': f'Bearer {SUPABASE_KEY}',
-        'Content-Type': 'application/json',
-        'Prefer': 'return=minimal,resolution=merge-duplicates' if use_upsert else 'return=minimal',
-    }
+    headers = {**supabase_headers(), 'Prefer': 'return=minimal,resolution=merge-duplicates'}
 
     batch_size = 1000
     total_batches = (len(data) + batch_size - 1) // batch_size
@@ -193,10 +152,7 @@ def upload_to_supabase(table_name, data):
         batch = data[i:i+batch_size]
         batch_num = (i // batch_size) + 1
 
-        url = f"{SUPABASE_URL}/rest/v1/{table_name}"
-        if use_upsert:
-            url += f"?on_conflict={on_conflict}"
-
+        url = f"{SUPABASE_URL}/rest/v1/{table_name}?on_conflict={on_conflict}"
         response = requests.post(url, headers=headers, json=batch)
 
         if response.status_code not in [200, 201]:
@@ -206,46 +162,58 @@ def upload_to_supabase(table_name, data):
         print(f"  - 배치 {batch_num}/{total_batches} 완료 ({len(batch)}개)")
         time.sleep(0.3)
 
-    print(f"✅ {table_name} 업로드 완료! (총 {len(data)}개, {'upsert' if use_upsert else 'insert'})")
+    print(f"✅ {table_name} upsert 완료! (총 {len(data)}개)")
+
+
+def insert_to_supabase(table_name, data):
+    """Supabase에 단순 insert"""
+    print(f"🔄 {table_name} insert 중... ({len(data)}개)")
+
+    headers = supabase_headers()
+
+    batch_size = 1000
+    total_batches = (len(data) + batch_size - 1) // batch_size
+
+    for i in range(0, len(data), batch_size):
+        batch = data[i:i+batch_size]
+        batch_num = (i // batch_size) + 1
+
+        url = f"{SUPABASE_URL}/rest/v1/{table_name}"
+        response = requests.post(url, headers=headers, json=batch)
+
+        if response.status_code not in [200, 201]:
+            print(f"  ❌ 배치 {batch_num}/{total_batches} 실패: {response.text[:200]}")
+            response.raise_for_status()
+
+        print(f"  - 배치 {batch_num}/{total_batches} 완료 ({len(batch)}개)")
+        time.sleep(0.3)
+
+    print(f"✅ {table_name} insert 완료! (총 {len(data)}개)")
 
 
 def normalize_branch_name(name):
     """지점명 통일"""
     if pd.isna(name):
         return None
-
     cleaned = str(name).strip()
-
     mapping = {
         '동탄점': '호텔 동탄',
         '호텔동탄': '호텔 동탄',
         '동탄호텔': '호텔 동탄',
         '동탄점(호텔)': '호텔 동탄',
     }
-
     return mapping.get(cleaned, cleaned)
 
 
 def process_branch_room_occ(df):
-    """branch_room_occ 데이터 처리 (Google Sheets)"""
+    """branch_room_occ 데이터 처리"""
     column_map = {
-        '일자': 'date',
-        '지점': 'branch_name',
-        '객실타입': 'room_type',
-        'Available': 'available_rooms',
-        'Sold': 'sold_rooms',
-        '방막': 'blocked_rooms',
-        'ADR': 'adr',
-        'OCC': 'occ',
-        'Revenue': 'revenue',
-        'revPAR': 'rev_par',
-        'OCC_현재': 'occ_asof',
-        'OCC_1일전': 'occ_1d_ago',
-        'OCC_7일전': 'occ_7d_ago',
-        'delta_1일_pp': 'delta_1d_pp',
-        'delta_7일_pp': 'delta_7d_pp'
+        '일자': 'date', '지점': 'branch_name', '객실타입': 'room_type',
+        'Available': 'available_rooms', 'Sold': 'sold_rooms', '방막': 'blocked_rooms',
+        'ADR': 'adr', 'OCC': 'occ', 'Revenue': 'revenue', 'revPAR': 'rev_par',
+        'OCC_현재': 'occ_asof', 'OCC_1일전': 'occ_1d_ago', 'OCC_7일전': 'occ_7d_ago',
+        'delta_1일_pp': 'delta_1d_pp', 'delta_7일_pp': 'delta_7d_pp'
     }
-
     df = df.rename(columns=column_map)
     df['branch_name'] = df['branch_name'].apply(normalize_branch_name)
 
@@ -267,19 +235,12 @@ def process_branch_room_occ(df):
 
     df = df.fillna(0)
     df = df.drop_duplicates(subset=['date', 'branch_name', 'room_type'], keep='last')
-
     return df.to_dict('records')
 
 
 def process_yolo_prices(df):
-    """yolo_prices 데이터 처리 (Google Sheets)"""
-    column_map = {
-        '날짜': 'date',
-        '지점': 'branch_name',
-        '객실타입': 'room_type',
-        '금액': 'price'
-    }
-
+    """yolo_prices 데이터 처리"""
+    column_map = {'날짜': 'date', '지점': 'branch_name', '객실타입': 'room_type', '금액': 'price'}
     df = df.rename(columns=column_map)
     df['branch_name'] = df['branch_name'].apply(normalize_branch_name)
     df = df[df['room_type'].notna() & (df['room_type'] != '-')]
@@ -287,44 +248,54 @@ def process_yolo_prices(df):
     df['price'] = pd.to_numeric(df['price'], errors='coerce')
     df = df[df['price'] > 0]
     df = df.drop_duplicates(subset=['date', 'branch_name', 'room_type'], keep='last')
-
     return df.to_dict('records')
 
 
 def process_price_guide(df):
-    """price_guide 데이터 처리 (Google Sheets)"""
+    """price_guide 데이터 처리"""
     if df.columns[0] != 'date':
         df.columns = ['date', 'branch_name', 'room_type', 'min_price']
-
     df['branch_name'] = df['branch_name'].apply(normalize_branch_name)
     df = df[df['room_type'].notna() & (df['room_type'] != '-')]
     df = df[df['min_price'].notna() & (df['min_price'] != '-')]
-
     df['min_price'] = df['min_price'].apply(lambda x: str(x).replace(',', '') if pd.notna(x) else x)
     df['min_price'] = pd.to_numeric(df['min_price'], errors='coerce')
     df = df.dropna(subset=['min_price'])
     df = df[df['min_price'] > 0]
     df = df.drop_duplicates(subset=['date', 'branch_name', 'room_type'], keep='last')
-
     return df.to_dict('records')
 
 
 def process_raw_bookings(df):
-    """raw_bookings 데이터 처리 (Redash)"""
+    """raw_bookings 데이터 처리"""
     df['branch_name'] = df['branch_name'].apply(normalize_branch_name)
 
     # 대시보드 지점만 필터
     before = len(df)
     df = df[df['branch_name'].isin(DASHBOARD_BRANCHES)]
     print(f"  대시보드 지점 필터: {before}건 → {len(df)}건 ({len(df['branch_name'].unique())}개 지점)")
-    print(f"  지점 목록: {sorted(df['branch_name'].unique().tolist())}")
 
     if 'payment_amount' in df.columns:
         df['payment_amount'] = df['payment_amount'].apply(lambda x: str(x).replace(',', '') if pd.notna(x) else x)
         df['payment_amount'] = pd.to_numeric(df['payment_amount'], errors='coerce')
     df = df.fillna(0)
-
     return df.to_dict('records')
+
+
+def update_sync_timestamp():
+    """동기화 완료 시각을 sync_metadata 테이블에 기록"""
+    headers = {**supabase_headers(), 'Prefer': 'return=minimal,resolution=merge-duplicates'}
+    now = datetime.utcnow().strftime('%Y-%m-%dT%H:%M:%SZ')
+    data = {'key': 'last_sync', 'value': now}
+    resp = requests.post(
+        f"{SUPABASE_URL}/rest/v1/sync_metadata?on_conflict=key",
+        headers=headers,
+        json=data
+    )
+    if resp.status_code in [200, 201]:
+        print(f"✅ sync_metadata 업데이트: {now}")
+    else:
+        print(f"  ⚠️ sync_metadata 업데이트 실패 (무시): {resp.text[:100]}")
 
 
 def main():
@@ -336,57 +307,62 @@ def main():
 
     print(f"\n{'='*60}")
     print(f"🚀 데이터 동기화 시작: {start_time.strftime('%Y-%m-%d %H:%M:%S')}")
-    print(f"   raw_bookings 범위: {month_start} ~ {today_str} (당월)")
+    print(f"   raw_bookings: 당월만 ({month_start} ~ {today_str})")
+    print(f"   기타 테이블: upsert (전체)")
     print(f"{'='*60}\n")
 
     errors = []
 
-    # 1. branch_room_occ (Google Sheets)
+    # 1. branch_room_occ (Google Sheets → upsert)
     try:
-        print("\n[1/4] branch_room_occ 동기화 (Google Sheets)")
-        df_occ = get_google_sheet_data(SHEET_GIDS['branch_room_occ'], 'branch_room_occ')
-        data_occ = process_branch_room_occ(df_occ)
-        upload_to_supabase('branch_room_occ', data_occ)
+        print("\n[1/4] branch_room_occ (Google Sheets → upsert)")
+        df = get_google_sheet_data(SHEET_GIDS['branch_room_occ'], 'branch_room_occ')
+        data = process_branch_room_occ(df)
+        upsert_to_supabase('branch_room_occ', data)
     except Exception as e:
         print(f"❌ branch_room_occ 실패: {e}")
         errors.append(('branch_room_occ', str(e)))
 
-    # 2. yolo_prices (Google Sheets)
+    # 2. yolo_prices (Google Sheets → upsert)
     try:
-        print("\n[2/4] yolo_prices 동기화 (Google Sheets)")
-        df_yolo = get_google_sheet_data(SHEET_GIDS['yolo_prices'], 'yolo_prices')
-        data_yolo = process_yolo_prices(df_yolo)
-        upload_to_supabase('yolo_prices', data_yolo)
+        print("\n[2/4] yolo_prices (Google Sheets → upsert)")
+        df = get_google_sheet_data(SHEET_GIDS['yolo_prices'], 'yolo_prices')
+        data = process_yolo_prices(df)
+        upsert_to_supabase('yolo_prices', data)
     except Exception as e:
         print(f"❌ yolo_prices 실패: {e}")
         errors.append(('yolo_prices', str(e)))
 
-    # 3. price_guide (Google Sheets)
+    # 3. price_guide (Google Sheets → upsert)
     try:
-        print("\n[3/4] price_guide 동기화 (Google Sheets)")
-        df_guide = get_google_sheet_data(SHEET_GIDS['price_guide'], 'price_guide')
-        data_guide = process_price_guide(df_guide)
-        upload_to_supabase('price_guide', data_guide)
+        print("\n[3/4] price_guide (Google Sheets → upsert)")
+        df = get_google_sheet_data(SHEET_GIDS['price_guide'], 'price_guide')
+        data = process_price_guide(df)
+        upsert_to_supabase('price_guide', data)
     except Exception as e:
         print(f"❌ price_guide 실패: {e}")
         errors.append(('price_guide', str(e)))
 
-    # 4. raw_bookings (Redash - 당월 데이터만)
+    # 4. raw_bookings (Redash → 당월만 삭제 후 insert)
     try:
-        print("\n[4/4] raw_bookings 동기화 (Redash - 당월만)")
+        print("\n[4/4] raw_bookings (Redash → 당월 삭제+insert)")
         default_branch_id = get_redash_branchid_default(QUERIES['raw_bookings'])
-        params_bookings = {
+        params = {
             'startDate': month_start,
             'endDate': today_str,
             'branchId': default_branch_id,
         }
-        df_bookings = execute_redash_query(QUERIES['raw_bookings'], params_bookings)
-        print(f"  Redash 조회: {len(df_bookings)}건")
-        data_bookings = process_raw_bookings(df_bookings)
-        upload_to_supabase('raw_bookings', data_bookings)
+        df = execute_redash_query(QUERIES['raw_bookings'], params)
+        print(f"  Redash 조회: {len(df)}건")
+        data = process_raw_bookings(df)
+        delete_raw_bookings_current_month(month_start)
+        insert_to_supabase('raw_bookings', data)
     except Exception as e:
         print(f"❌ raw_bookings 실패: {e}")
         errors.append(('raw_bookings', str(e)))
+
+    # 동기화 시각 기록
+    update_sync_timestamp()
 
     end_time = datetime.now()
     duration = (end_time - start_time).total_seconds()
