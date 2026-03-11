@@ -121,18 +121,23 @@ def delete_all_from_supabase(table_name):
         'Prefer': 'return=minimal',
     }
 
-    # id > 0 으로 시도
-    resp = requests.delete(
-        f"{SUPABASE_URL}/rest/v1/{table_name}?id=gt.0",
-        headers=headers
-    )
-    if resp.status_code not in [200, 204]:
-        # date 컬럼으로 시도
+    # 여러 조건으로 시도 (테이블마다 컬럼 구조가 다를 수 있음)
+    delete_conditions = [
+        'id=gt.0',
+        'date=gte.1900-01-01',
+        'branch_name=neq.IMPOSSIBLE_VALUE',  # 모든 행 매칭
+    ]
+
+    for condition in delete_conditions:
         resp = requests.delete(
-            f"{SUPABASE_URL}/rest/v1/{table_name}?date=gte.1900-01-01",
+            f"{SUPABASE_URL}/rest/v1/{table_name}?{condition}",
             headers=headers
         )
-    print(f"  ✅ 삭제 완료 (status={resp.status_code})")
+        if resp.status_code in [200, 204]:
+            print(f"  ✅ 삭제 완료 ({condition}, status={resp.status_code})")
+            return
+
+    print(f"  ⚠️ 삭제 실패 (마지막 status={resp.status_code}, body={resp.text[:200]})")
 
 
 def upload_to_supabase(table_name, data):
