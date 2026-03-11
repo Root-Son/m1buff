@@ -121,23 +121,14 @@ def delete_all_from_supabase(table_name):
         'Prefer': 'return=minimal',
     }
 
-    # Supabase TRUNCATE는 REST로 불가 → RPC 또는 neq 조건 사용
-    # branch_name != '' 로 전체 행 매칭 (빈 문자열인 행은 없을 것)
+    # branch_name is not null → 모든 행 매칭 (NULL인 행은 없을 것)
     resp = requests.delete(
-        f"{SUPABASE_URL}/rest/v1/{table_name}?branch_name=neq.",
+        f"{SUPABASE_URL}/rest/v1/{table_name}?branch_name=not.is.null",
         headers=headers
     )
-    print(f"  삭제 시도 1 (branch_name=neq.) → status={resp.status_code}")
+    print(f"  삭제 (branch_name=not.is.null) → status={resp.status_code}")
 
-    if resp.status_code not in [200, 204]:
-        # id 컬럼이 있는 경우 (raw_bookings)
-        resp = requests.delete(
-            f"{SUPABASE_URL}/rest/v1/{table_name}?id=gt.0",
-            headers=headers
-        )
-        print(f"  삭제 시도 2 (id=gt.0) → status={resp.status_code}")
-
-    # 삭제 확인: 데이터가 남아있는지 체크
+    # 삭제 확인
     check = requests.get(
         f"{SUPABASE_URL}/rest/v1/{table_name}?select=count",
         headers={**headers, 'Prefer': 'count=exact'},
