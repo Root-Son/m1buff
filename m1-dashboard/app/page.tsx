@@ -503,7 +503,7 @@ export default function Dashboard() {
           <div className="flex items-center justify-between">
             <div>
               <h1 className="text-2xl font-bold text-gray-900">📊 M1버프 현황판</h1>
-              <p className="text-sm text-gray-500 mt-1">실시간 현황</p>
+              <p className="text-sm text-gray-500 mt-1">실시간 현황{lastUpdated && <span className="ml-2 text-gray-400">| last updated: {lastUpdated}</span>}</p>
             </div>
             <div className="flex items-center gap-2">
               <a
