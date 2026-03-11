@@ -121,20 +121,40 @@ def delete_all_from_supabase(table_name):
         'Prefer': 'return=minimal',
     }
 
-    # branch_name is not null → 모든 행 매칭 (NULL인 행은 없을 것)
-    resp = requests.delete(
-        f"{SUPABASE_URL}/rest/v1/{table_name}?branch_name=not.is.null",
-        headers=headers
+    # RPC로 TRUNCATE 실행 (RLS 우회)
+    rpc_url = f"{SUPABASE_URL}/rest/v1/rpc/truncate_table"
+    resp = requests.post(
+        rpc_url,
+        headers=headers,
+        json={'table_name': table_name}
     )
-    print(f"  삭제 (branch_name=not.is.null) → status={resp.status_code}")
+    print(f"  TRUNCATE RPC → status={resp.status_code}")
+
+    if resp.status_code not in [200, 204]:
+        # RPC 없으면 service_role key로 직접 DELETE 시도
+        print(f"  RPC 실패, 직접 DELETE 시도...")
+        resp = requests.delete(
+            f"{SUPABASE_URL}/rest/v1/{table_name}?id=gt.0",
+            headers=headers
+        )
+        if resp.status_code not in [200, 204]:
+            resp = requests.delete(
+                f"{SUPABASE_URL}/rest/v1/{table_name}?branch_name=not.is.null",
+                headers=headers
+            )
+        print(f"  DELETE → status={resp.status_code}")
 
     # 삭제 확인
     check = requests.get(
         f"{SUPABASE_URL}/rest/v1/{table_name}?select=count",
         headers={**headers, 'Prefer': 'count=exact'},
     )
-    count = check.headers.get('content-range', '').split('/')[-1]
-    print(f"  ✅ 삭제 후 남은 행: {count}")
+    remaining = check.headers.get('content-range', '').split('/')[-1]
+    print(f"  삭제 후 남은 행: {remaining}")
+    if remaining not in ['0', '*', '']:
+        print(f"  ⚠️ 삭제 실패! RLS가 DELETE를 차단할 수 있음. UPSERT로 전환합니다.")
+        return False
+    return True
 
 
 def upload_to_supabase(table_name, data):
