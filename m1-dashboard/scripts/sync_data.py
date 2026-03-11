@@ -274,6 +274,7 @@ def process_yolo_prices(df):
     df['price'] = df['price'].apply(lambda x: str(x).replace(',', '') if pd.notna(x) else x)
     df['price'] = pd.to_numeric(df['price'], errors='coerce')
     df = df[df['price'] > 0]
+    df = df.drop_duplicates(subset=['date', 'branch_name', 'room_type'], keep='last')
 
     return df.to_dict('records')
 
