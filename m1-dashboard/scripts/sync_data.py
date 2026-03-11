@@ -160,8 +160,15 @@ def get_redash_query_param_options(query_id, param_name):
 
     first_col = list(rows[0].keys())[0]
     values = [row[first_col] for row in rows]
-    print(f"  dropdown 옵션 ({len(values)}개): {values[:10]}{'...' if len(values) > 10 else ''}")
-    return values
+
+    # 복합 ID (콤마 포함) 제거 — 개별 지점 ID만 사용 (중복 수집 방지)
+    individual_values = [v for v in values if isinstance(v, (int, float)) or (',' not in str(v))]
+    skipped = len(values) - len(individual_values)
+    if skipped > 0:
+        print(f"  ⚠️ 복합 ID {skipped}개 스킵 (중복 방지)")
+
+    print(f"  dropdown 옵션 ({len(individual_values)}개): {individual_values[:10]}{'...' if len(individual_values) > 10 else ''}")
+    return individual_values
 
 
 def execute_redash_query_all_branches(query_id, base_params, branch_param_name='branchId'):
