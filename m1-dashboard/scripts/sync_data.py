@@ -446,15 +446,16 @@ def main():
         print(f"❌ price_guide 실패: {e}")
         errors.append(('price_guide', str(e)))
 
-    # 4. raw_bookings (Redash - 대용량)
+    # 4. raw_bookings (Redash - 대용량, 지점별 순회)
     try:
-        print("\n[4/4] raw_bookings 동기화 (Redash - 대용량)")
-        params_bookings = {
+        print("\n[4/4] raw_bookings 동기화 (Redash - 전지점 순회)")
+        base_params = {
             'startDate': DATE_RANGES['raw_bookings']['start'],
             'endDate': DATE_RANGES['raw_bookings']['end'],
-            'branch': '%'
         }
-        df_bookings = execute_redash_query(QUERIES['raw_bookings'], params_bookings)
+        df_bookings = execute_redash_query_all_branches(
+            QUERIES['raw_bookings'], base_params, branch_param_name='branchId'
+        )
         data_bookings = process_raw_bookings(df_bookings)
         upload_to_supabase('raw_bookings', data_bookings)
     except Exception as e:
