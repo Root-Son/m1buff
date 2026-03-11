@@ -1,9 +1,12 @@
 """
 M1버프 현황판 - 자동 데이터 동기화 스크립트
 branch_room_occ: Google Sheets
-yolo_prices: Redash
-price_guide: Google Sheets  
-raw_bookings: Redash
+yolo_prices: Google Sheets
+price_guide: Google Sheets
+raw_bookings: Redash (당월 데이터만)
+
+※ 모든 테이블은 전체 삭제 후 재삽입 (취소 반영을 위해)
+※ raw_bookings 과거 데이터는 CSV 수동 업로드
 """
 
 import os
@@ -19,22 +22,19 @@ SUPABASE_URL = os.environ['SUPABASE_URL']
 SUPABASE_KEY = os.environ['SUPABASE_KEY']
 SHEET_ID = os.environ['SHEET_ID']
 
-# Redash 쿼리 ID (yolo_prices, raw_bookings만 사용)
-QUERIES = {
-    'yolo_prices': 728,
-    'raw_bookings': 711
-}
+# 대시보드 지점 목록
+DASHBOARD_BRANCHES = [
+    '강남예전로이움점', '강남예전시그니티점', '거북섬점', '낙산해변',
+    '당진터미널점', '호텔 동탄', '명동점', '부산기장점', '부산송도해변점',
+    '부산시청점', '부산역점', '부티크남포BIFF점', '부티크익선점', '서면점',
+    '속초등대해변점', '속초자이엘라더비치', '속초중앙점', '속초해변',
+    '속초해변 AB점', '속초해변C점', '송도달빛공원점', '스타즈울산점',
+    '웨이브파크점', '인천차이나타운', '제주공항점', '해운대역', '해운대패러그라프점'
+]
 
-# 날짜 범위 설정
-DATE_RANGES = {
-    'yolo_prices': {
-        'start': '2026-01-01',
-        'end': date.today().strftime('%Y-%m-%d')
-    },
-    'raw_bookings': {
-        'start': '2025-01-01',
-        'end': date.today().strftime('%Y-%m-%d')
-    }
+# Redash 쿼리 ID
+QUERIES = {
+    'raw_bookings': 711
 }
 
 # Google Sheets GID
@@ -50,7 +50,6 @@ def execute_redash_query(query_id, parameters=None):
 
     headers = {'Authorization': f'Key {REDASH_API_KEY}'}
 
-    # 1차: refresh (실행 요청)
     refresh_url = f"{REDASH_URL}/api/queries/{query_id}/refresh"
     query_params = {}
     if parameters:
@@ -62,9 +61,8 @@ def execute_redash_query(query_id, parameters=None):
     if response.status_code == 200:
         job = response.json()['job']
         result_url = f"{REDASH_URL}/api/jobs/{job['id']}"
-        max_attempts = 120
 
-        for attempt in range(max_attempts):
+        for attempt in range(120):
             result = requests.get(result_url, headers=headers).json()
 
             if result['job']['status'] == 3:
@@ -82,26 +80,12 @@ def execute_redash_query(query_id, parameters=None):
 
         raise Exception(f"쿼리 {query_id} 타임아웃!")
     else:
-        # refresh 실패 시 → 최신 캐시된 결과 가져오기
-        print(f"  ⚠️ refresh 실패 ({response.status_code}), 최신 캐시 결과 시도...")
-        print(f"  Response body: {response.text[:300]}")
-        query_url = f"{REDASH_URL}/api/queries/{query_id}"
-        query_info = requests.get(query_url, headers=headers)
-        query_info.raise_for_status()
-        query_data = query_info.json()
-
-        result_id = query_data.get('latest_query_data_id')
-        if not result_id:
-            raise Exception(f"쿼리 {query_id}: refresh 실패 + 캐시 결과 없음 (status={response.status_code}, body={response.text[:200]})")
-
-        data_url = f"{REDASH_URL}/api/query_results/{result_id}"
-        data = requests.get(data_url, headers=headers).json()
-        print(f"✅ 쿼리 {query_id} 캐시 결과 사용!")
-        return pd.DataFrame(data['query_result']['data']['rows'])
+        print(f"  ⚠️ refresh 실패 ({response.status_code}): {response.text[:300]}")
+        raise Exception(f"쿼리 {query_id} refresh 실패 (status={response.status_code})")
 
 
 def get_redash_branchid_default(query_id, param_name='branchId'):
-    """Redash 쿼리의 branchId 파라미터 기본값(전지점 복합ID) 가져오기"""
+    """Redash 쿼리의 branchId 파라미터 기본값 가져오기"""
     headers = {'Authorization': f'Key {REDASH_API_KEY}'}
 
     query_url = f"{REDASH_URL}/api/queries/{query_id}"
@@ -109,10 +93,7 @@ def get_redash_branchid_default(query_id, param_name='branchId'):
     resp.raise_for_status()
     query_data = resp.json()
 
-    options = query_data.get('options', {})
-    params = options.get('parameters', [])
-
-    for p in params:
+    for p in query_data.get('options', {}).get('parameters', []):
         if p.get('name') == param_name:
             default_val = p.get('value', '')
             print(f"  branchId 기본값: {default_val}")
@@ -120,55 +101,55 @@ def get_redash_branchid_default(query_id, param_name='branchId'):
 
     return None
 
+
 def get_google_sheet_data(gid: str, sheet_name: str):
     """Google Sheets에서 데이터 가져오기"""
     print(f"🔄 Google Sheets ({sheet_name}) 데이터 가져오는 중...")
-    
     csv_url = f"https://docs.google.com/spreadsheets/d/{SHEET_ID}/export?format=csv&gid={gid}"
-    
     df = pd.read_csv(csv_url)
     print(f"✅ Google Sheets ({sheet_name}) 데이터 {len(df)}개 로드!")
-    
     return df
 
-# 테이블별 unique constraint 컬럼 (upsert용)
-UPSERT_KEYS = {
-    'branch_room_occ': 'date,branch_name,room_type',
-    'yolo_prices': 'date,branch_name,room_type',
-    'price_guide': 'date,branch_name,room_type',
-    # raw_bookings는 unique constraint 없을 수 있으므로 delete+insert
-}
 
-def upload_to_supabase(table_name, data):
-    """Supabase에 데이터 업로드 (upsert 또는 delete+insert)"""
-    print(f"🔄 {table_name} 테이블 업로드 중... ({len(data)}개)")
-
-    base_headers = {
+def delete_all_from_supabase(table_name):
+    """테이블 전체 데이터 삭제 (취소 반영을 위해 항상 전체 삭제 후 재삽입)"""
+    print(f"  🗑️ {table_name} 전체 데이터 삭제 중...")
+    headers = {
         'apikey': SUPABASE_KEY,
         'Authorization': f'Bearer {SUPABASE_KEY}',
         'Content-Type': 'application/json',
+        'Prefer': 'return=minimal',
     }
 
-    on_conflict = UPSERT_KEYS.get(table_name, '')
-
-    # unique constraint가 없는 테이블은 delete+insert
-    if not on_conflict:
-        print(f"  - 기존 데이터 삭제 중...")
-        delete_response = requests.delete(
-            f"{SUPABASE_URL}/rest/v1/{table_name}?id=gt.0",
-            headers={**base_headers, 'Prefer': 'return=minimal'}
+    # id > 0 으로 시도
+    resp = requests.delete(
+        f"{SUPABASE_URL}/rest/v1/{table_name}?id=gt.0",
+        headers=headers
+    )
+    if resp.status_code not in [200, 204]:
+        # date 컬럼으로 시도
+        resp = requests.delete(
+            f"{SUPABASE_URL}/rest/v1/{table_name}?date=gte.1900-01-01",
+            headers=headers
         )
-        if delete_response.status_code not in [200, 204]:
-            # id 컬럼이 없을 수 있으니 date로도 시도
-            delete_response = requests.delete(
-                f"{SUPABASE_URL}/rest/v1/{table_name}?date=gte.1900-01-01",
-                headers={**base_headers, 'Prefer': 'return=minimal'}
-            )
-        print(f"  ✅ 기존 데이터 삭제 완료 (status={delete_response.status_code})")
+    print(f"  ✅ 삭제 완료 (status={resp.status_code})")
 
-    headers = {**base_headers, 'Prefer': 'return=minimal,resolution=merge-duplicates'} if on_conflict else {**base_headers, 'Prefer': 'return=minimal'}
 
-    # 배치 업로드 (1000개씩)
+def upload_to_supabase(table_name, data):
+    """Supabase에 데이터 업로드 (전체 삭제 후 삽입)"""
+    print(f"🔄 {table_name} 업로드 중... ({len(data)}개)")
+
+    # 1. 전체 삭제
+    delete_all_from_supabase(table_name)
+
+    # 2. 배치 삽입
+    headers = {
+        'apikey': SUPABASE_KEY,
+        'Authorization': f'Bearer {SUPABASE_KEY}',
+        'Content-Type': 'application/json',
+        'Prefer': 'return=minimal',
+    }
+
     batch_size = 1000
     total_batches = (len(data) + batch_size - 1) // batch_size
 
@@ -177,12 +158,10 @@ def upload_to_supabase(table_name, data):
         batch_num = (i // batch_size) + 1
 
         url = f"{SUPABASE_URL}/rest/v1/{table_name}"
-        if on_conflict:
-            url += f"?on_conflict={on_conflict}"
         response = requests.post(url, headers=headers, json=batch)
 
         if response.status_code not in [200, 201]:
-            print(f"  ❌ 배치 {batch_num}/{total_batches} 실패: {response.text}")
+            print(f"  ❌ 배치 {batch_num}/{total_batches} 실패: {response.text[:200]}")
             response.raise_for_status()
 
         print(f"  - 배치 {batch_num}/{total_batches} 완료 ({len(batch)}개)")
@@ -190,25 +169,26 @@ def upload_to_supabase(table_name, data):
 
     print(f"✅ {table_name} 업로드 완료! (총 {len(data)}개)")
 
+
 def normalize_branch_name(name):
     """지점명 통일"""
     if pd.isna(name):
         return None
-    
+
     cleaned = str(name).strip()
-    
+
     mapping = {
         '동탄점': '호텔 동탄',
         '호텔동탄': '호텔 동탄',
         '동탄호텔': '호텔 동탄',
         '동탄점(호텔)': '호텔 동탄',
     }
-    
+
     return mapping.get(cleaned, cleaned)
+
 
 def process_branch_room_occ(df):
     """branch_room_occ 데이터 처리 (Google Sheets)"""
-    # 컬럼명 매핑
     column_map = {
         '일자': 'date',
         '지점': 'branch_name',
@@ -219,20 +199,17 @@ def process_branch_room_occ(df):
         'ADR': 'adr',
         'OCC': 'occ',
         'Revenue': 'revenue',
-        'revPAR': 'rev_par',  # ← 언더스코어
+        'revPAR': 'rev_par',
         'OCC_현재': 'occ_asof',
         'OCC_1일전': 'occ_1d_ago',
         'OCC_7일전': 'occ_7d_ago',
-        'delta_1일_pp': 'delta_1d_pp',  # ← _pp 추가
-        'delta_7일_pp': 'delta_7d_pp'   # ← _pp 추가
+        'delta_1일_pp': 'delta_1d_pp',
+        'delta_7일_pp': 'delta_7d_pp'
     }
-    
-    df = df.rename(columns=column_map)
 
-    # 지점명 통일
+    df = df.rename(columns=column_map)
     df['branch_name'] = df['branch_name'].apply(normalize_branch_name)
 
-    # 숫자 컬럼 쉼표 제거 및 숫자 변환
     numeric_cols = ['available_rooms', 'sold_rooms', 'blocked_rooms', 'adr', 'revenue', 'rev_par',
                     'occ', 'occ_asof', 'occ_1d_ago', 'occ_7d_ago', 'delta_1d_pp', 'delta_7d_pp']
     for col in numeric_cols:
@@ -240,56 +217,30 @@ def process_branch_room_occ(df):
             df[col] = df[col].apply(lambda x: str(x).replace(',', '') if pd.notna(x) else x)
             df[col] = pd.to_numeric(df[col], errors='coerce')
 
-    # OCC 값들을 소수로 변환 (퍼센트 → 0~1 범위, DB가 numeric(5,4))
     for col in ['occ', 'occ_asof', 'occ_1d_ago', 'occ_7d_ago']:
         if col in df.columns:
             df[col] = df[col].apply(lambda x: x / 100 if (pd.notna(x) and abs(x) > 1) else x)
-
-    # OCC 값을 0~1 범위로 클램핑 (DB overflow 방지)
-    for col in ['occ', 'occ_asof', 'occ_1d_ago', 'occ_7d_ago']:
-        if col in df.columns:
             df[col] = df[col].clip(0, 1)
 
-    # delta_pp도 퍼센트→소수 변환 (DB가 numeric(5,4), max 9.9999)
     for col in ['delta_1d_pp', 'delta_7d_pp']:
         if col in df.columns:
             df[col] = df[col].apply(lambda x: x / 100 if (pd.notna(x) and abs(x) > 1) else x)
 
-    # NULL 처리
     df = df.fillna(0)
-
-    # 중복 제거 (date, branch_name, room_type 기준)
-    before = len(df)
     df = df.drop_duplicates(subset=['date', 'branch_name', 'room_type'], keep='last')
-    if len(df) < before:
-        print(f"  ℹ️ 중복 {before - len(df)}개 제거 → {len(df)}개")
-
-    # 디버깅: 이상값 확인
-    for col in ['occ', 'occ_asof', 'occ_1d_ago', 'occ_7d_ago']:
-        if col in df.columns:
-            bad = df[df[col] > 1]
-            if len(bad) > 0:
-                print(f"  ⚠️ {col}: {len(bad)}개 행이 1 초과 (max={df[col].max()})")
-    for col in ['delta_1d_pp', 'delta_7d_pp']:
-        if col in df.columns:
-            bad = df[df[col].abs() > 9.9]
-            if len(bad) > 0:
-                print(f"  ⚠️ {col}: {len(bad)}개 행이 abs>9.9 (max={df[col].max()}, min={df[col].min()})")
-    for col in ['revenue', 'adr', 'rev_par']:
-        if col in df.columns:
-            print(f"  ℹ️ {col}: max={df[col].max()}, min={df[col].min()}")
 
     return df.to_dict('records')
 
+
 def process_yolo_prices(df):
-    """yolo_prices 데이터 처리 (Redash)"""
+    """yolo_prices 데이터 처리 (Google Sheets)"""
     column_map = {
         '날짜': 'date',
         '지점': 'branch_name',
         '객실타입': 'room_type',
         '금액': 'price'
     }
-    
+
     df = df.rename(columns=column_map)
     df['branch_name'] = df['branch_name'].apply(normalize_branch_name)
     df = df[df['room_type'].notna() & (df['room_type'] != '-')]
@@ -300,28 +251,35 @@ def process_yolo_prices(df):
 
     return df.to_dict('records')
 
+
 def process_price_guide(df):
     """price_guide 데이터 처리 (Google Sheets)"""
     if df.columns[0] != 'date':
         df.columns = ['date', 'branch_name', 'room_type', 'min_price']
-    
+
     df['branch_name'] = df['branch_name'].apply(normalize_branch_name)
     df = df[df['room_type'].notna() & (df['room_type'] != '-')]
     df = df[df['min_price'].notna() & (df['min_price'] != '-')]
-    
+
     df['min_price'] = df['min_price'].apply(lambda x: str(x).replace(',', '') if pd.notna(x) else x)
     df['min_price'] = pd.to_numeric(df['min_price'], errors='coerce')
     df = df.dropna(subset=['min_price'])
     df = df[df['min_price'] > 0]
-
-    # 중복 제거
     df = df.drop_duplicates(subset=['date', 'branch_name', 'room_type'], keep='last')
 
     return df.to_dict('records')
 
+
 def process_raw_bookings(df):
     """raw_bookings 데이터 처리 (Redash)"""
     df['branch_name'] = df['branch_name'].apply(normalize_branch_name)
+
+    # 대시보드 지점만 필터
+    before = len(df)
+    df = df[df['branch_name'].isin(DASHBOARD_BRANCHES)]
+    print(f"  대시보드 지점 필터: {before}건 → {len(df)}건 ({len(df['branch_name'].unique())}개 지점)")
+    print(f"  지점 목록: {sorted(df['branch_name'].unique().tolist())}")
+
     if 'payment_amount' in df.columns:
         df['payment_amount'] = df['payment_amount'].apply(lambda x: str(x).replace(',', '') if pd.notna(x) else x)
         df['payment_amount'] = pd.to_numeric(df['payment_amount'], errors='coerce')
@@ -329,13 +287,19 @@ def process_raw_bookings(df):
 
     return df.to_dict('records')
 
+
 def main():
     """메인 실행"""
     start_time = datetime.now()
+    today = date.today()
+    month_start = today.replace(day=1).strftime('%Y-%m-%d')
+    today_str = today.strftime('%Y-%m-%d')
+
     print(f"\n{'='*60}")
     print(f"🚀 데이터 동기화 시작: {start_time.strftime('%Y-%m-%d %H:%M:%S')}")
+    print(f"   raw_bookings 범위: {month_start} ~ {today_str} (당월)")
     print(f"{'='*60}\n")
-    
+
     errors = []
 
     # 1. branch_room_occ (Google Sheets)
@@ -348,7 +312,7 @@ def main():
         print(f"❌ branch_room_occ 실패: {e}")
         errors.append(('branch_room_occ', str(e)))
 
-    # 2. yolo_prices (Google Sheets — Redash 쿼리 파라미터 호환성 문제로 전환)
+    # 2. yolo_prices (Google Sheets)
     try:
         print("\n[2/4] yolo_prices 동기화 (Google Sheets)")
         df_yolo = get_google_sheet_data(SHEET_GIDS['yolo_prices'], 'yolo_prices')
@@ -368,36 +332,17 @@ def main():
         print(f"❌ price_guide 실패: {e}")
         errors.append(('price_guide', str(e)))
 
-    # 4. raw_bookings (Redash - 전지점 한번에 조회 후 대시보드 지점만 필터)
+    # 4. raw_bookings (Redash - 당월 데이터만)
     try:
-        print("\n[4/4] raw_bookings 동기화 (Redash)")
-        # branchId 기본값(전지점 복합ID) 가져오기
+        print("\n[4/4] raw_bookings 동기화 (Redash - 당월만)")
         default_branch_id = get_redash_branchid_default(QUERIES['raw_bookings'])
         params_bookings = {
-            'startDate': DATE_RANGES['raw_bookings']['start'],
-            'endDate': DATE_RANGES['raw_bookings']['end'],
+            'startDate': month_start,
+            'endDate': today_str,
             'branchId': default_branch_id,
         }
         df_bookings = execute_redash_query(QUERIES['raw_bookings'], params_bookings)
-        print(f"  Redash 전체: {len(df_bookings)}건")
-
-        # 대시보드에서 사용하는 지점명만 필터링
-        DASHBOARD_BRANCHES = [
-            '강남예전로이움점', '강남예전시그니티점', '거북섬점', '낙산해변',
-            '당진터미널점', '호텔 동탄', '명동점', '부산기장점', '부산송도해변점',
-            '부산시청점', '부산역점', '부티크남포BIFF점', '부티크익선점', '서면점',
-            '속초등대해변점', '속초자이엘라더비치', '속초중앙점', '속초해변',
-            '속초해변 AB점', '속초해변C점', '송도달빛공원점', '스타즈울산점',
-            '웨이브파크점', '인천차이나타운', '제주공항점', '해운대역', '해운대패러그라프점'
-        ]
-        # normalize 후 매칭
-        if 'branch_name' in df_bookings.columns:
-            df_bookings['branch_name'] = df_bookings['branch_name'].apply(normalize_branch_name)
-            before = len(df_bookings)
-            df_bookings = df_bookings[df_bookings['branch_name'].isin(DASHBOARD_BRANCHES)]
-            print(f"  대시보드 지점 필터: {before}건 → {len(df_bookings)}건 ({len(df_bookings['branch_name'].unique())}개 지점)")
-            print(f"  지점 목록: {sorted(df_bookings['branch_name'].unique().tolist())}")
-
+        print(f"  Redash 조회: {len(df_bookings)}건")
         data_bookings = process_raw_bookings(df_bookings)
         upload_to_supabase('raw_bookings', data_bookings)
     except Exception as e:
@@ -409,7 +354,7 @@ def main():
 
     print(f"\n{'='*60}")
     if errors:
-        print(f"⚠️ 동기화 일부 실패 ({len(errors)}/{4}): {[e[0] for e in errors]}")
+        print(f"⚠️ 동기화 일부 실패 ({len(errors)}/4): {[e[0] for e in errors]}")
         print(f"소요시간: {duration:.1f}초 = {duration/60:.1f}분")
         print(f"{'='*60}\n")
         raise Exception(f"동기화 실패: {errors}")
