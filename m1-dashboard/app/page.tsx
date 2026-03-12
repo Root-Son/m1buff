@@ -75,10 +75,10 @@ export default function Dashboard() {
   const weekRange = getWeekRange(currentWeek)
 
   const weeklyChartRef = useRef<HTMLCanvasElement>(null)
-  const channelChartRef = useRef<HTMLCanvasElement>(null)
+  const channelChartRefs = useRef<(HTMLCanvasElement | null)[]>([])
   const roomTypeChartRef = useRef<HTMLCanvasElement>(null)
   const weeklyChartInstance = useRef<Chart | null>(null)
-  const channelChartInstance = useRef<Chart | null>(null)
+  const channelChartInstances = useRef<(Chart | null)[]>([])
   const roomTypeChartInstance = useRef<Chart | null>(null)
 
   useEffect(() => {
@@ -97,11 +97,12 @@ export default function Dashboard() {
   }, [weeklyData])
 
   useEffect(() => {
-    if (channelData?.channels) {
-      renderChannelChart()
+    if (channelData?.days) {
+      renderChannelCharts()
     }
     return () => {
-      channelChartInstance.current?.destroy()
+      channelChartInstances.current.forEach(c => c?.destroy())
+      channelChartInstances.current = []
     }
   }, [channelData])
 
@@ -271,64 +272,64 @@ export default function Dashboard() {
     weeklyChartInstance.current = new Chart(ctx, config)
   }
 
-  const renderChannelChart = () => {
-    if (!channelChartRef.current || !channelData?.channels) return
+  const renderChannelCharts = () => {
+    if (!channelData?.days) return
 
-    channelChartInstance.current?.destroy()
+    channelChartInstances.current.forEach(c => c?.destroy())
+    channelChartInstances.current = []
 
-    const ctx = channelChartRef.current.getContext('2d')
-    if (!ctx) return
+    channelData.days.forEach((day: any, i: number) => {
+      const canvas = channelChartRefs.current[i]
+      if (!canvas) return
 
-    const channels = channelData.channels.filter((c: any) => c.ratio >= 0.5)
+      const ctx = canvas.getContext('2d')
+      if (!ctx) return
 
-    const config: ChartConfiguration = {
-      type: 'doughnut',
-      data: {
-        labels: channels.map((c: any) => c.channel),
-        datasets: [{
-          data: channels.map((c: any) => c.amount),
-          backgroundColor: channels.map((c: any) => c.color),
-          borderWidth: 2,
-          borderColor: '#fff',
-        }],
-      },
-      options: {
-        responsive: true,
-        maintainAspectRatio: false,
-        plugins: {
-          datalabels: {
-            color: '#fff',
-            font: { size: 12, weight: 'bold' },
-            formatter: (value: any, context: any) => {
-              const total = context.dataset.data.reduce((a: number, b: number) => a + b, 0)
-              const pct = ((value / total) * 100).toFixed(1)
-              const label = context.chart.data.labels?.[context.dataIndex] || ''
-              return `${label}\n${pct}%`
+      const channels = day.channels.filter((c: any) => c.ratio >= 1)
+      if (channels.length === 0) return
+
+      const chart = new Chart(ctx, {
+        type: 'doughnut',
+        data: {
+          labels: channels.map((c: any) => c.channel),
+          datasets: [{
+            data: channels.map((c: any) => c.amount),
+            backgroundColor: channels.map((c: any) => c.color),
+            borderWidth: 1.5,
+            borderColor: '#fff',
+          }],
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          cutout: '55%',
+          plugins: {
+            datalabels: {
+              color: '#374151',
+              font: { size: 9, weight: 'bold' },
+              formatter: (value: any, context: any) => {
+                const total = context.dataset.data.reduce((a: number, b: number) => a + b, 0)
+                const pct = ((value / total) * 100).toFixed(0)
+                return Number(pct) >= 10 ? `${pct}%` : ''
+              },
             },
-            display: (context: any) => {
-              const total = context.dataset.data.reduce((a: number, b: number) => a + b, 0)
-              return (context.dataset.data[context.dataIndex] / total) * 100 >= 5
-            },
-          },
-          tooltip: {
-            callbacks: {
-              label: (ctx) => {
-                const amount = new Intl.NumberFormat('ko-KR').format(ctx.parsed as number)
-                const total = (ctx.dataset.data as number[]).reduce((a, b) => a + b, 0)
-                const pct = ((ctx.parsed / total) * 100).toFixed(1)
-                return `${ctx.label}: ${amount} (${pct}%)`
+            tooltip: {
+              callbacks: {
+                label: (ctx) => {
+                  const amount = new Intl.NumberFormat('ko-KR').format(ctx.parsed as number)
+                  const total = (ctx.dataset.data as number[]).reduce((a, b) => a + b, 0)
+                  const pct = ((ctx.parsed / total) * 100).toFixed(1)
+                  return `${ctx.label}: ${amount} (${pct}%)`
+                }
               }
-            }
-          },
-          legend: {
-            position: 'right',
-            labels: { font: { size: 12 }, padding: 12 }
+            },
+            legend: { display: false }
           }
         }
-      }
-    }
+      })
 
-    channelChartInstance.current = new Chart(ctx, config)
+      channelChartInstances.current.push(chart)
+    })
   }
 
   const renderRoomTypeChart = () => {
@@ -974,70 +975,59 @@ export default function Dashboard() {
           </div>
         </div>
 
-        {/* 채널별 픽업 매출 비중 */}
+        {/* 일간 채널별 픽업 매출 비중 */}
         <div className="bg-white p-6 rounded-lg shadow-sm border mb-8">
           <div className="flex items-center justify-between mb-4">
             <div>
-              <h2 className="text-lg font-bold text-gray-900">채널별 픽업 매출 비중</h2>
+              <h2 className="text-lg font-bold text-gray-900">일간 채널별 픽업 매출 비중</h2>
               <p className="text-sm text-gray-500 mt-1">
                 {weekRange.label} | 총 {channelData?.totalAmount?.toLocaleString('ko-KR') || 0}원 ({channelData?.totalBookings?.toLocaleString('ko-KR') || 0}건)
               </p>
             </div>
             <div className="flex items-center gap-2">
-              <button
-                onClick={() => setCurrentWeek(currentWeek - 1)}
-                className="p-2 hover:bg-gray-100 rounded-lg border"
-              >
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-                </svg>
+              <button onClick={() => setCurrentWeek(currentWeek - 1)} className="p-2 hover:bg-gray-100 rounded-lg border">
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" /></svg>
               </button>
-              <span className="text-sm font-medium min-w-[120px] text-center">
-                {weekRange.label}
-              </span>
-              <button
-                onClick={() => setCurrentWeek(currentWeek + 1)}
-                className="p-2 hover:bg-gray-100 rounded-lg border"
-              >
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                </svg>
+              <span className="text-sm font-medium min-w-[120px] text-center">{weekRange.label}</span>
+              <button onClick={() => setCurrentWeek(currentWeek + 1)} className="p-2 hover:bg-gray-100 rounded-lg border">
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" /></svg>
               </button>
             </div>
           </div>
-          <div className="flex gap-6">
-            <div className="h-72 flex-1">
-              <canvas ref={channelChartRef}></canvas>
+          {/* 범례 */}
+          {channelData?.channels && (
+            <div className="flex flex-wrap gap-3 mb-4 pb-3 border-b">
+              {channelData.channels.map((c: any) => (
+                <div key={c.channel} className="flex items-center gap-1.5 text-xs text-gray-600">
+                  <span className="w-2.5 h-2.5 rounded-full inline-block" style={{ backgroundColor: c.color }}></span>
+                  {c.channel} ({c.ratio.toFixed(0)}%)
+                </div>
+              ))}
             </div>
-            {channelData?.channels && (
-              <div className="w-64 overflow-auto max-h-72">
-                <table className="w-full text-sm">
-                  <thead>
-                    <tr className="text-gray-500 border-b">
-                      <th className="text-left py-1">채널</th>
-                      <th className="text-right py-1">매출</th>
-                      <th className="text-right py-1">비중</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {channelData.channels.map((c: any) => (
-                      <tr key={c.channel} className="border-b border-gray-50">
-                        <td className="py-1.5 flex items-center gap-1.5">
-                          <span className="w-3 h-3 rounded-full inline-block" style={{ backgroundColor: c.color }}></span>
-                          {c.channel}
-                        </td>
-                        <td className="text-right py-1.5 text-gray-700">
-                          {(c.amount / 10000).toFixed(0)}만
-                        </td>
-                        <td className="text-right py-1.5 font-medium">
-                          {c.ratio.toFixed(1)}%
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            )}
+          )}
+          {/* 7개 미니 도넛 */}
+          <div className="grid grid-cols-7 gap-3">
+            {channelData?.days?.map((day: any, i: number) => {
+              const date = new Date(day.date)
+              const dayName = ['일', '월', '화', '수', '목', '금', '토'][date.getDay()]
+              const isWeekend = date.getDay() === 0 || date.getDay() === 6
+              return (
+                <div key={day.date} className={`text-center ${isWeekend ? 'bg-blue-50' : 'bg-gray-50'} rounded-lg p-2`}>
+                  <div className={`text-xs font-medium ${isWeekend ? 'text-blue-600' : 'text-gray-500'}`}>
+                    {date.getMonth() + 1}/{date.getDate()} ({dayName})
+                  </div>
+                  <div className="h-28 my-1">
+                    <canvas ref={el => { channelChartRefs.current[i] = el }}></canvas>
+                  </div>
+                  <div className="text-xs font-semibold text-gray-700">
+                    {(day.total / 10000).toFixed(0)}만
+                  </div>
+                  <div className="text-[10px] text-gray-400">
+                    {day.channels?.[0]?.channel} {day.channels?.[0]?.ratio?.toFixed(0)}%
+                  </div>
+                </div>
+              )
+            })}
           </div>
         </div>
 
