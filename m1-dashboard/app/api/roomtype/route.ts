@@ -115,21 +115,26 @@ export async function GET(request: Request) {
     
     if (error) throw error
 
-    // 4. LoS 데이터 (평균 숙박일수)
-    const { data: losData, error: losError } = await supabase
-      .from('raw_bookings')
-      .select('check_in_date, roomtype, nights')
-      .eq('branch_name', branch)
-      .gte('check_in_date', startDate)
-      .lte('check_in_date', endDate)
-
-    // 5. 채널별 예약 데이터
-    const { data: channelData, error: channelError } = await supabase
-      .from('raw_bookings')
-      .select('check_in_date, roomtype, reservation_channel')
-      .eq('branch_name', branch)
-      .gte('check_in_date', startDate)
-      .lte('check_in_date', endDate)
+    // 4. raw_bookings 전체 조회 (LoS + 채널 비중용, 1000행 제한 우회)
+    let allBookings: any[] = []
+    let from = 0
+    const pageSize = 1000
+    while (true) {
+      const { data: page, error: pageError } = await supabase
+        .from('raw_bookings')
+        .select('check_in_date, roomtype, nights, reservation_channel')
+        .eq('branch_name', branch)
+        .gte('check_in_date', startDate)
+        .lte('check_in_date', endDate)
+        .range(from, from + pageSize - 1)
+      if (pageError) throw pageError
+      if (!page || page.length === 0) break
+      allBookings = allBookings.concat(page)
+      if (page.length < pageSize) break
+      from += pageSize
+    }
+    const losData = allBookings
+    const channelData = allBookings
 
     // 6. YOLO 가격 가져오기
     const { data: yoloData } = await supabase
