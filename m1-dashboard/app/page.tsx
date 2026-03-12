@@ -592,6 +592,19 @@ export default function Dashboard() {
                 <div className="text-2xl font-bold text-gray-900 mt-2">
                   {week.ci_amount?.toLocaleString('ko-KR') || 0}
                 </div>
+                {week.avg_occ > 0 && (
+                  <div className="mt-2 pt-2 border-t">
+                    <div className="flex justify-between items-center">
+                      <span className="text-xs text-gray-500">평균 OCC</span>
+                      <span className={`text-sm font-semibold ${week.avg_occ >= 80 ? 'text-red-600' : week.avg_occ >= 60 ? 'text-orange-600' : 'text-green-600'}`}>
+                        {week.avg_occ.toFixed(1)}%
+                      </span>
+                    </div>
+                    <div className="text-xs text-gray-400 mt-0.5">
+                      잔여 {(week.total_available - week.total_sold).toLocaleString('ko-KR')}실
+                    </div>
+                  </div>
+                )}
               </div>
             ))}
           </div>

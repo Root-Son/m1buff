@@ -42,16 +42,42 @@ export async function GET(request: NextRequest) {
 
     const achievement = totalTarget > 0 ? (totalCI / totalTarget) * 100 : 0
 
-    // RPC에서 start_date, end_date가 이미 있으므로 그대로 사용
-    const weeksWithLabels = (data || []).map((week: any) => {
+    // 주차별 OCC 조회
+    const weeksWithLabels = await Promise.all((data || []).map(async (week: any) => {
       const startDate = new Date(week.start_date)
       const endDate = new Date(week.end_date)
-      
+      const startStr = week.start_date
+      const endStr = week.end_date
+
+      let occQuery = supabase
+        .from('branch_room_occ')
+        .select('occ, available_rooms, sold_rooms')
+        .gte('date', startStr)
+        .lte('date', endStr)
+
+      if (branch !== 'all') {
+        occQuery = occQuery.eq('branch_name', branch)
+      }
+
+      const { data: occData } = await occQuery
+
+      // 총 available / 총 sold 로 가중평균 OCC 계산
+      let totalAvailable = 0
+      let totalSold = 0
+      occData?.forEach((row: any) => {
+        totalAvailable += row.available_rooms || 0
+        totalSold += row.sold_rooms || 0
+      })
+      const avgOcc = totalAvailable > 0 ? totalSold / totalAvailable : 0
+
       return {
         ...week,
-        label: `${startDate.getDate()}~${endDate.getDate()}`
+        label: `${startDate.getDate()}~${endDate.getDate()}`,
+        avg_occ: Math.round(avgOcc * 1000) / 10, // 소수점 1자리 %
+        total_available: totalAvailable,
+        total_sold: totalSold,
       }
-    })
+    }))
 
     return NextResponse.json({
       branch,
