@@ -858,7 +858,30 @@ export default function Dashboard() {
 
         {/* 최근 7일 차트 */}
         <div className="bg-white p-6 rounded-lg shadow-sm border mb-8">
-          <h2 className="text-lg font-bold text-gray-900 mb-4">최근 일주일 매출 추이</h2>
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-lg font-bold text-gray-900">최근 일주일 매출 추이</h2>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => setCurrentWeek(currentWeek - 1)}
+                className="p-2 hover:bg-gray-100 rounded-lg border"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                </svg>
+              </button>
+              <span className="text-sm font-medium min-w-[120px] text-center">
+                {weekRange.label}
+              </span>
+              <button
+                onClick={() => setCurrentWeek(currentWeek + 1)}
+                className="p-2 hover:bg-gray-100 rounded-lg border"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                </svg>
+              </button>
+            </div>
+          </div>
           <div className="h-80">
             <canvas ref={weeklyChartRef}></canvas>
           </div>
