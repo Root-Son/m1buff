@@ -3,7 +3,7 @@ M1버프 현황판 - 자동 데이터 동기화 스크립트
 branch_room_occ: Google Sheets → upsert
 yolo_prices: Google Sheets → upsert
 price_guide: Google Sheets → upsert
-raw_bookings: Redash → 당월 created_at 기준 삭제 후 재삽입
+raw_bookings: Redash → upsert (reservation_no 기준)
 """
 
 import os
@@ -44,6 +44,7 @@ UPSERT_KEYS = {
     'branch_room_occ': 'date,branch_name,room_type',
     'yolo_prices': 'date,branch_name,room_type',
     'price_guide': 'date,branch_name,room_type',
+    'raw_bookings': 'reservation_no',
 }
 
 
@@ -124,20 +125,6 @@ def supabase_headers():
         'Prefer': 'return=minimal',
     }
 
-
-def delete_raw_bookings_by_created(month_start):
-    """raw_bookings에서 당월 생성분 삭제 (reservation_created_at 기준)"""
-    print(f"  🗑️ raw_bookings 당월 삭제 (reservation_created_at >= {month_start})...")
-    headers = supabase_headers()
-
-    resp = requests.delete(
-        f"{SUPABASE_URL}/rest/v1/raw_bookings?reservation_created_at=gte.{month_start}",
-        headers=headers
-    )
-    print(f"  삭제 → status={resp.status_code}")
-
-    if resp.status_code not in [200, 204]:
-        print(f"  ⚠️ 삭제 응답: {resp.text[:200]}")
 
 
 def upsert_to_supabase(table_name, data):
@@ -301,7 +288,7 @@ def main():
 
     print(f"\n{'='*60}")
     print(f"🚀 데이터 동기화 시작: {start_time.strftime('%Y-%m-%d %H:%M:%S')}")
-    print(f"   raw_bookings: 당월 created_at 삭제+재삽입 ({month_start} ~ {today_str})")
+    print(f"   raw_bookings: upsert (reservation_no 기준, {month_start} ~ {today_str})")
     print(f"   기타 테이블: upsert (전체)")
     print(f"{'='*60}\n")
 
@@ -337,9 +324,9 @@ def main():
         print(f"❌ price_guide 실패: {e}")
         errors.append(('price_guide', str(e)))
 
-    # 4. raw_bookings (Redash → 당월만 삭제 후 insert)
+    # 4. raw_bookings (Redash → upsert, reservation_no 기준)
     try:
-        print("\n[4/4] raw_bookings (Redash → 당월 created_at 삭제+insert)")
+        print("\n[4/4] raw_bookings (Redash → upsert)")
         default_branch_id = get_redash_branchid_default(QUERIES['raw_bookings'])
         params = {
             'startDate': month_start,
@@ -349,8 +336,7 @@ def main():
         df = execute_redash_query(QUERIES['raw_bookings'], params)
         print(f"  Redash 조회: {len(df)}건")
         data = process_raw_bookings(df)
-        delete_raw_bookings_by_created(month_start)
-        insert_to_supabase('raw_bookings', data)
+        upsert_to_supabase('raw_bookings', data)
     except Exception as e:
         print(f"❌ raw_bookings 실패: {e}")
         errors.append(('raw_bookings', str(e)))
