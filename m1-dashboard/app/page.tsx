@@ -30,9 +30,9 @@ export default function Dashboard() {
   const [lastUpdated, setLastUpdated] = useState<string>('')
   const [selectedBranch, setSelectedBranch] = useState('전지점') // 디폴트 전지점
   const [selectedRoomType, setSelectedRoomType] = useState('')
-  const [selectedMonth, setSelectedMonth] = useState(2)
+  const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth() + 1)
   const [toplineMonth, setToplineMonth] = useState(3) // Topline 월 필터
-  const [currentWeek, setCurrentWeek] = useState(1) // 1 = 이번주
+  const [currentWeek, setCurrentWeek] = useState(0) // 0 = 이번주
   const [roomTypeWeekOffset, setRoomTypeWeekOffset] = useState<number | null>(0) // 0 = 이번주 디폴트
   const [selectedDate, setSelectedDate] = useState<string>('') // 일 실적 날짜 선택
 
