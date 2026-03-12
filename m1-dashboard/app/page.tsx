@@ -26,6 +26,7 @@ export default function Dashboard() {
   const [toplineData, setToplineData] = useState<any>(null)
   const [roomTypeData, setRoomTypeData] = useState<any>(null)
   const [monthlySummaryData, setMonthlySummaryData] = useState<any>(null)
+  const [channelData, setChannelData] = useState<any>(null)
   const [loading, setLoading] = useState(true)
   const [lastUpdated, setLastUpdated] = useState<string>('')
   const [selectedBranch, setSelectedBranch] = useState('전지점') // 디폴트 전지점
@@ -74,8 +75,10 @@ export default function Dashboard() {
   const weekRange = getWeekRange(currentWeek)
 
   const weeklyChartRef = useRef<HTMLCanvasElement>(null)
+  const channelChartRef = useRef<HTMLCanvasElement>(null)
   const roomTypeChartRef = useRef<HTMLCanvasElement>(null)
   const weeklyChartInstance = useRef<Chart | null>(null)
+  const channelChartInstance = useRef<Chart | null>(null)
   const roomTypeChartInstance = useRef<Chart | null>(null)
 
   useEffect(() => {
@@ -92,6 +95,15 @@ export default function Dashboard() {
       weeklyChartInstance.current?.destroy()
     }
   }, [weeklyData])
+
+  useEffect(() => {
+    if (channelData?.channels) {
+      renderChannelChart()
+    }
+    return () => {
+      channelChartInstance.current?.destroy()
+    }
+  }, [channelData])
 
   useEffect(() => {
     // 이번주가 디폴트이므로 항상 렌더링
@@ -155,21 +167,23 @@ export default function Dashboard() {
       const prevWeekStartStr = prevWeekRange.start.toISOString().split('T')[0]
       const prevWeekEndStr = prevWeekRange.end.toISOString().split('T')[0]
       
-      const [daily, prevDaily, monthly, weekly, prevWeekly, topline] = await Promise.all([
+      const [daily, prevDaily, monthly, weekly, prevWeekly, topline, channel] = await Promise.all([
         fetch(`/api/daily?branch=${branch}${dateParam}`).then(r => r.json()),
         fetch(`/api/daily?branch=${branch}&date=${prevDateStr}`).then(r => r.json()),
         fetch(`/api/monthly?branch=${branch}&month=${selectedMonth}`).then(r => r.json()),
         fetch(`/api/weekly?branch=${branch}&startDate=${weekStartStr}&endDate=${weekEndStr}`).then(r => r.json()),
         fetch(`/api/weekly?branch=${branch}&startDate=${prevWeekStartStr}&endDate=${prevWeekEndStr}`).then(r => r.json()),
         fetch(`/api/topline?branch=${branch}&month=${toplineMonth}`).then(r => r.json()),
+        fetch(`/api/channel-breakdown?branch=${branch}&startDate=${weekStartStr}&endDate=${weekEndStr}`).then(r => r.json()),
       ])
-      
+
       setDailyData(daily)
       setPrevDailyData(prevDaily)
       setMonthlyData(monthly)
       setWeeklyData(weekly)
       setPrevWeeklyData(prevWeekly)
       setToplineData(topline)
+      setChannelData(channel)
     } catch (error) {
       console.error('데이터 로드 실패:', error)
     } finally {
@@ -255,6 +269,66 @@ export default function Dashboard() {
     }
 
     weeklyChartInstance.current = new Chart(ctx, config)
+  }
+
+  const renderChannelChart = () => {
+    if (!channelChartRef.current || !channelData?.channels) return
+
+    channelChartInstance.current?.destroy()
+
+    const ctx = channelChartRef.current.getContext('2d')
+    if (!ctx) return
+
+    const channels = channelData.channels.filter((c: any) => c.ratio >= 0.5)
+
+    const config: ChartConfiguration = {
+      type: 'doughnut',
+      data: {
+        labels: channels.map((c: any) => c.channel),
+        datasets: [{
+          data: channels.map((c: any) => c.amount),
+          backgroundColor: channels.map((c: any) => c.color),
+          borderWidth: 2,
+          borderColor: '#fff',
+        }],
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          datalabels: {
+            color: '#fff',
+            font: { size: 12, weight: 'bold' },
+            formatter: (value: any, context: any) => {
+              const total = context.dataset.data.reduce((a: number, b: number) => a + b, 0)
+              const pct = ((value / total) * 100).toFixed(1)
+              const label = context.chart.data.labels?.[context.dataIndex] || ''
+              return `${label}\n${pct}%`
+            },
+            display: (context: any) => {
+              const total = context.dataset.data.reduce((a: number, b: number) => a + b, 0)
+              return (context.dataset.data[context.dataIndex] / total) * 100 >= 5
+            },
+          },
+          tooltip: {
+            callbacks: {
+              label: (ctx) => {
+                const amount = new Intl.NumberFormat('ko-KR').format(ctx.parsed as number)
+                const total = (ctx.dataset.data as number[]).reduce((a, b) => a + b, 0)
+                const pct = ((ctx.parsed / total) * 100).toFixed(1)
+                return `${ctx.label}: ${amount} (${pct}%)`
+              }
+            }
+          },
+          legend: {
+            position: 'right',
+            labels: { font: { size: 12 }, padding: 12 }
+          }
+        }
+      }
+    }
+
+    channelChartInstance.current = new Chart(ctx, config)
   }
 
   const renderRoomTypeChart = () => {
@@ -897,6 +971,73 @@ export default function Dashboard() {
           </div>
           <div className="h-80">
             <canvas ref={weeklyChartRef}></canvas>
+          </div>
+        </div>
+
+        {/* 채널별 픽업 매출 비중 */}
+        <div className="bg-white p-6 rounded-lg shadow-sm border mb-8">
+          <div className="flex items-center justify-between mb-4">
+            <div>
+              <h2 className="text-lg font-bold text-gray-900">채널별 픽업 매출 비중</h2>
+              <p className="text-sm text-gray-500 mt-1">
+                {weekRange.label} | 총 {channelData?.totalAmount?.toLocaleString('ko-KR') || 0}원 ({channelData?.totalBookings?.toLocaleString('ko-KR') || 0}건)
+              </p>
+            </div>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => setCurrentWeek(currentWeek - 1)}
+                className="p-2 hover:bg-gray-100 rounded-lg border"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                </svg>
+              </button>
+              <span className="text-sm font-medium min-w-[120px] text-center">
+                {weekRange.label}
+              </span>
+              <button
+                onClick={() => setCurrentWeek(currentWeek + 1)}
+                className="p-2 hover:bg-gray-100 rounded-lg border"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                </svg>
+              </button>
+            </div>
+          </div>
+          <div className="flex gap-6">
+            <div className="h-72 flex-1">
+              <canvas ref={channelChartRef}></canvas>
+            </div>
+            {channelData?.channels && (
+              <div className="w-64 overflow-auto max-h-72">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="text-gray-500 border-b">
+                      <th className="text-left py-1">채널</th>
+                      <th className="text-right py-1">매출</th>
+                      <th className="text-right py-1">비중</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {channelData.channels.map((c: any) => (
+                      <tr key={c.channel} className="border-b border-gray-50">
+                        <td className="py-1.5 flex items-center gap-1.5">
+                          <span className="w-3 h-3 rounded-full inline-block" style={{ backgroundColor: c.color }}></span>
+                          {c.channel}
+                        </td>
+                        <td className="text-right py-1.5 text-gray-700">
+                          {(c.amount / 10000).toFixed(0)}만
+                        </td>
+                        <td className="text-right py-1.5 font-medium">
+                          {c.ratio.toFixed(1)}%
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
           </div>
         </div>
 
