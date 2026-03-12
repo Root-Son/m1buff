@@ -1,14 +1,14 @@
 name: 데이터 자동 동기화
 on:
   schedule:
-    # KST 07시 (UTC 22시 전날)
-    - cron: '0 22 * * *'
-    # KST 14시 (UTC 5시)
-    - cron: '0 5 * * *'
-    # KST 18시 (UTC 9시)
-    - cron: '0 9 * * *'
-    # KST 24시 (UTC 15시)
-    - cron: '0 15 * * *'
+    # KST 07시 대비 → 06:30 시작 (UTC 21:30)
+    - cron: '30 21 * * *'
+    # KST 14시 대비 → 13:30 시작 (UTC 4:30)
+    - cron: '30 4 * * *'
+    # KST 18시 대비 → 17:30 시작 (UTC 8:30)
+    - cron: '30 8 * * *'
+    # KST 24시 대비 → 23:30 시작 (UTC 14:30)
+    - cron: '30 14 * * *'
   workflow_dispatch:  # 수동 실행 가능
 jobs:
   sync:
