@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { supabase } from '@/lib/supabase'
+import { normalizeBranchName } from '@/lib/pricing-engine'
 
 export async function GET(request: NextRequest) {
   const searchParams = request.nextUrl.searchParams
@@ -25,20 +26,20 @@ export async function GET(request: NextRequest) {
     // 월 전체 체크인 매출 (RPC 주차별 합계)
     const totalCI = (data || []).reduce((sum: number, week: any) => sum + (week.ci_amount || 0), 0)
 
-    // 목표 매출 (전지점 제외)
-    let targetQuery = supabase
+    // 목표 매출 (전지점 제외, branch_name 정규화 매칭)
+    const { data: targetData } = await supabase
       .from('targets')
-      .select('target_amount')
+      .select('branch_name, target_amount')
       .eq('month', month)
       .eq('year', year)
       .neq('branch_name', '전지점')
 
-    if (branch !== 'all') {
-      targetQuery = targetQuery.eq('branch_name', branch)
-    }
-
-    const { data: targetData } = await targetQuery
-    const totalTarget = targetData?.reduce((sum, row) => sum + (row.target_amount || 0), 0) || 0
+    const totalTarget = (targetData || [])
+      .filter(row => {
+        if (branch === 'all') return true
+        return normalizeBranchName(row.branch_name) === branch
+      })
+      .reduce((sum, row) => sum + (row.target_amount || 0), 0)
 
     const achievement = totalTarget > 0 ? (totalCI / totalTarget) * 100 : 0
 

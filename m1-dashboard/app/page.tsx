@@ -161,13 +161,11 @@ export default function Dashboard() {
     }
   }, [roomTypeData])
 
-  const updateLastUpdated = () => {
-    const now = new Date()
-    const mm = String(now.getMonth() + 1).padStart(2, '0')
-    const dd = String(now.getDate()).padStart(2, '0')
-    const hh = String(now.getHours()).padStart(2, '0')
-    const min = String(now.getMinutes()).padStart(2, '0')
-    setLastUpdated(`${mm}-${dd} ${hh}:${min}`)
+  const fetchLastSyncTime = async () => {
+    try {
+      const data = await fetch('/api/sync-status').then(r => r.json())
+      if (data.last_synced) setLastUpdated(data.last_synced)
+    } catch {}
   }
 
   const fetchDailyData = async () => {
@@ -190,7 +188,7 @@ export default function Dashboard() {
       console.error('일 실적 로드 실패:', error)
     } finally {
       setLoading(false)
-      updateLastUpdated()
+      fetchLastSyncTime()
     }
   }
 
