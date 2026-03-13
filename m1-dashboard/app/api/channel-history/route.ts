@@ -15,55 +15,84 @@ const CHANNEL_GROUPS: Record<string, string> = {
   '내부채널_대관': '기타', '내부채널_임시': '기타',
 }
 
+// 월 단위로 쪼개서 집계 (타임아웃 방지)
+async function fetchAndAggregate(startDate: string, endDate: string) {
+  const groups: Record<string, number> = {}
+  let total = 0
+  let count = 0
+  let from = 0
+  const pageSize = 1000
+
+  while (true) {
+    const { data: page, error } = await supabase
+      .from('raw_booking_history')
+      .select('reservation_channel, payment_amount')
+      .gte('check_in_date', startDate)
+      .lte('check_in_date', endDate)
+      .range(from, from + pageSize - 1)
+
+    if (error) throw error
+    if (!page || page.length === 0) break
+
+    page.forEach((row: any) => {
+      const group = CHANNEL_GROUPS[row.reservation_channel] || '기타'
+      const amount = row.payment_amount || 0
+      groups[group] = (groups[group] || 0) + amount
+      total += amount
+      count++
+    })
+
+    if (page.length < pageSize) break
+    from += pageSize
+  }
+
+  return { groups, total, count }
+}
+
 export async function GET(request: NextRequest) {
   const searchParams = request.nextUrl.searchParams
   const startYear = parseInt(searchParams.get('startYear') || '2023')
   const endYear = parseInt(searchParams.get('endYear') || '2026')
 
   try {
-    // 연도별 채널 집계
-    const yearlyData: Record<number, Record<string, number>> = {}
+    const yearlyData: Record<number, any> = {}
 
     for (let year = startYear; year <= endYear; year++) {
-      const startDate = `${year}-01-01`
-      const endDate = `${year}-12-31`
+      const yearGroups: Record<string, number> = {}
+      let yearTotal = 0
+      let yearCount = 0
 
-      let allBookings: any[] = []
-      let from = 0
-      const pageSize = 1000
+      // 분기별로 쪼개서 조회
+      const quarters = [
+        [`${year}-01-01`, `${year}-03-31`],
+        [`${year}-04-01`, `${year}-06-30`],
+        [`${year}-07-01`, `${year}-09-30`],
+        [`${year}-10-01`, `${year}-12-31`],
+      ]
 
-      while (true) {
-        const { data: page, error } = await supabase
-          .from('raw_booking_history')
-          .select('reservation_channel, payment_amount')
-          .gte('reservation_created_at', startDate)
-          .lte('reservation_created_at', endDate + 'T23:59:59')
-          .range(from, from + pageSize - 1)
-
-        if (error) throw error
-        if (!page || page.length === 0) break
-        allBookings = allBookings.concat(page)
-        if (page.length < pageSize) break
-        from += pageSize
+      for (const [qStart, qEnd] of quarters) {
+        const { groups, total, count } = await fetchAndAggregate(qStart, qEnd)
+        Object.entries(groups).forEach(([g, amt]) => {
+          yearGroups[g] = (yearGroups[g] || 0) + amt
+        })
+        yearTotal += total
+        yearCount += count
       }
 
-      const groups: Record<string, number> = {}
-      let total = 0
-      allBookings.forEach((row: any) => {
-        const group = CHANNEL_GROUPS[row.reservation_channel] || '기타'
-        const amount = row.payment_amount || 0
-        groups[group] = (groups[group] || 0) + amount
-        total += amount
-      })
+      // 비율 변환
+      const channels = Object.entries(yearGroups)
+        .sort((a, b) => b[1] - a[1])
+        .map(([group, amount]) => ({
+          channel: group,
+          amount,
+          ratio: yearTotal > 0 ? (amount / yearTotal) * 100 : 0,
+        }))
 
-      // 비율로 변환
-      const ratios: Record<string, number> = {}
-      Object.entries(groups).forEach(([g, amt]) => {
-        ratios[g] = total > 0 ? (amt / total) * 100 : 0
-      })
-      ratios['_total'] = total
-      ratios['_count'] = allBookings.length
-      yearlyData[year] = ratios
+      yearlyData[year] = {
+        total: yearTotal,
+        count: yearCount,
+        channels,
+      }
     }
 
     return NextResponse.json({ yearlyData })
