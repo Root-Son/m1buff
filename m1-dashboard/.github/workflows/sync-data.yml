@@ -1,15 +1,7 @@
 name: 데이터 자동 동기화
 on:
-  schedule:
-    # KST 07시 대비 → 06:30 시작 (UTC 21:30)
-    - cron: '30 21 * * *'
-    # KST 14시 대비 → 13:30 시작 (UTC 4:30)
-    - cron: '30 4 * * *'
-    # KST 18시 대비 → 17:30 시작 (UTC 8:30)
-    - cron: '30 8 * * *'
-    # KST 24시 대비 → 23:30 시작 (UTC 14:30)
-    - cron: '30 14 * * *'
-  workflow_dispatch:  # 수동 실행 가능
+  # 스케줄은 Vercel Cron이 workflow_dispatch로 트리거
+  workflow_dispatch:  # 수동 실행 + Vercel Cron 트리거
 jobs:
   sync:
     runs-on: ubuntu-latest

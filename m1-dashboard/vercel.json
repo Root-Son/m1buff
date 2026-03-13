@@ -3,6 +3,22 @@
     {
       "path": "/api/cron/daily-report",
       "schedule": "0 1 * * *"
+    },
+    {
+      "path": "/api/cron/trigger-sync",
+      "schedule": "30 21 * * *"
+    },
+    {
+      "path": "/api/cron/trigger-sync",
+      "schedule": "30 4 * * *"
+    },
+    {
+      "path": "/api/cron/trigger-sync",
+      "schedule": "30 8 * * *"
+    },
+    {
+      "path": "/api/cron/trigger-sync",
+      "schedule": "30 14 * * *"
     }
   ]
 }
