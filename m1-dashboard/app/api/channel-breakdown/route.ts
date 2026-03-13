@@ -64,7 +64,7 @@ export async function GET(request: NextRequest) {
     while (true) {
       let query = supabase
         .from('raw_bookings')
-        .select('reservation_created_at, reservation_channel, payment_amount')
+        .select('reservation_created_at, reservation_channel, payment_amount, nights')
         .gte('reservation_created_at', startDate)
         .lte('reservation_created_at', endDate + 'T23:59:59')
         .range(from, from + pageSize - 1)
@@ -92,16 +92,18 @@ export async function GET(request: NextRequest) {
       totalAmount += amount
     })
 
-    // 일별 채널 그룹 집계 (매출 + 건수)
-    const dailyMap: Record<string, Record<string, { amount: number; count: number }>> = {}
+    // 일별 채널 그룹 집계 (매출 + 건수 + 총박수)
+    const dailyMap: Record<string, Record<string, { amount: number; count: number; totalNights: number }>> = {}
     allBookings.forEach((row: any) => {
       const dateStr = String(row.reservation_created_at).split('T')[0].split(' ')[0]
       const group = CHANNEL_GROUPS[row.reservation_channel] || '기타'
       const amount = row.payment_amount || 0
+      const nights = row.nights || 1
       if (!dailyMap[dateStr]) dailyMap[dateStr] = {}
-      if (!dailyMap[dateStr][group]) dailyMap[dateStr][group] = { amount: 0, count: 0 }
+      if (!dailyMap[dateStr][group]) dailyMap[dateStr][group] = { amount: 0, count: 0, totalNights: 0 }
       dailyMap[dateStr][group].amount += amount
       dailyMap[dateStr][group].count += 1
+      dailyMap[dateStr][group].totalNights += nights
     })
 
     // 정렬 (매출 높은 순)
@@ -124,11 +126,11 @@ export async function GET(request: NextRequest) {
           total: dayTotal,
           channels: Object.entries(groups)
             .sort((a, b) => b[1].amount - a[1].amount)
-            .map(([group, { amount, count }]) => ({
+            .map(([group, { amount, count, totalNights }]) => ({
               channel: group,
               amount,
               count,
-              avg_price: count > 0 ? Math.round(amount / count) : 0,
+              adr: totalNights > 0 ? Math.round(amount / totalNights) : 0,
               ratio: dayTotal > 0 ? (amount / dayTotal) * 100 : 0,
               color: CHANNEL_COLORS[group] || '#D1D5DB',
             }))

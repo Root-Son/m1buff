@@ -356,10 +356,10 @@ export default function Dashboard() {
               callbacks: {
                 label: (ctx) => {
                   const ch = channels[ctx.dataIndex]
-                  const avgPrice = new Intl.NumberFormat('ko-KR').format(ch.avg_price || 0)
+                  const adr = new Intl.NumberFormat('ko-KR').format(ch.adr || 0)
                   const total = (ctx.dataset.data as number[]).reduce((a, b) => a + b, 0)
                   const pct = ((ctx.parsed / total) * 100).toFixed(1)
-                  return `${ctx.label}: 평균 ${avgPrice}원 (${ch.count}건, ${pct}%)`
+                  return `${ctx.label}: ADR ${adr}원 (${ch.count}건, ${pct}%)`
                 }
               }
             },
