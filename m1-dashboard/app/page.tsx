@@ -133,6 +133,11 @@ export default function Dashboard() {
         `/api/roomtype?branch=${branch}&weekOffset=${roomTypeWeekOffset}&roomType=${selectedRoomType}`
       )
       const data = await response.json()
+      // 첫 로드 시 룸타입 미선택이면 첫 번째 룸타입 자동 선택
+      if (!selectedRoomType && data.roomTypes?.length > 0) {
+        setSelectedRoomType(data.roomTypes[0])
+        return // setSelectedRoomType이 useEffect를 다시 트리거
+      }
       setRoomTypeData(data)
     } catch (error) {
       console.error('룸타입 데이터 로드 실패:', error)
