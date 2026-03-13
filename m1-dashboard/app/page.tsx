@@ -81,11 +81,26 @@ export default function Dashboard() {
   const channelChartInstances = useRef<(Chart | null)[]>([])
   const roomTypeChartInstance = useRef<Chart | null>(null)
 
+  // 일 실적: 지점, 날짜 변경 시만
   useEffect(() => {
-    fetchData()
-    fetchRoomTypeData() // 초기 로드 시에도 실행
-    fetchMonthlySummary() // 월별 요약 데이터
-  }, [selectedBranch, selectedDate, selectedMonth, toplineMonth, currentWeek])
+    fetchDailyData()
+  }, [selectedBranch, selectedDate])
+
+  // 월 실적: 지점, 월 변경 시만
+  useEffect(() => {
+    fetchMonthlyData()
+    fetchMonthlySummary()
+  }, [selectedBranch, selectedMonth])
+
+  // 주간 실적 + 채널 비중: 지점, 주차 변경 시만
+  useEffect(() => {
+    fetchWeeklyAndChannelData()
+  }, [selectedBranch, currentWeek])
+
+  // 탑라인: 지점, 탑라인 월 변경 시만
+  useEffect(() => {
+    fetchToplineData()
+  }, [selectedBranch, toplineMonth])
 
   useEffect(() => {
     if (weeklyData) {
@@ -146,55 +161,79 @@ export default function Dashboard() {
     }
   }, [roomTypeData])
 
-  const fetchData = async () => {
+  const updateLastUpdated = () => {
+    const now = new Date()
+    const mm = String(now.getMonth() + 1).padStart(2, '0')
+    const dd = String(now.getDate()).padStart(2, '0')
+    const hh = String(now.getHours()).padStart(2, '0')
+    const min = String(now.getMinutes()).padStart(2, '0')
+    setLastUpdated(`${mm}-${dd} ${hh}:${min}`)
+  }
+
+  const fetchDailyData = async () => {
     setLoading(true)
     try {
       const branch = selectedBranch === '전지점' ? 'all' : selectedBranch
       const dateParam = selectedDate ? `&date=${selectedDate}` : ''
-      
-      // 전일 날짜 계산
       const currentDate = selectedDate ? new Date(selectedDate) : new Date()
       const prevDate = new Date(currentDate)
       prevDate.setDate(currentDate.getDate() - 1)
       const prevDateStr = prevDate.toISOString().split('T')[0]
-      
-      // 주간 실적 날짜 계산
-      const weekRange = getWeekRange(currentWeek)
-      const weekStartStr = weekRange.start.toISOString().split('T')[0]
-      const weekEndStr = weekRange.end.toISOString().split('T')[0]
-      
-      // 전주 날짜 계산
-      const prevWeekRange = getWeekRange(currentWeek - 1)
-      const prevWeekStartStr = prevWeekRange.start.toISOString().split('T')[0]
-      const prevWeekEndStr = prevWeekRange.end.toISOString().split('T')[0]
-      
-      const [daily, prevDaily, monthly, weekly, prevWeekly, topline, channel] = await Promise.all([
+
+      const [daily, prevDaily] = await Promise.all([
         fetch(`/api/daily?branch=${branch}${dateParam}`).then(r => r.json()),
         fetch(`/api/daily?branch=${branch}&date=${prevDateStr}`).then(r => r.json()),
-        fetch(`/api/monthly?branch=${branch}&month=${selectedMonth}`).then(r => r.json()),
-        fetch(`/api/weekly?branch=${branch}&startDate=${weekStartStr}&endDate=${weekEndStr}`).then(r => r.json()),
-        fetch(`/api/weekly?branch=${branch}&startDate=${prevWeekStartStr}&endDate=${prevWeekEndStr}`).then(r => r.json()),
-        fetch(`/api/topline?branch=${branch}&month=${toplineMonth}`).then(r => r.json()),
-        fetch(`/api/channel-breakdown?branch=${branch}&startDate=${weekStartStr}&endDate=${weekEndStr}`).then(r => r.json()),
       ])
-
       setDailyData(daily)
       setPrevDailyData(prevDaily)
-      setMonthlyData(monthly)
-      setWeeklyData(weekly)
-      setPrevWeeklyData(prevWeekly)
-      setToplineData(topline)
-      setChannelData(channel)
     } catch (error) {
-      console.error('데이터 로드 실패:', error)
+      console.error('일 실적 로드 실패:', error)
     } finally {
       setLoading(false)
-      const now = new Date()
-      const mm = String(now.getMonth() + 1).padStart(2, '0')
-      const dd = String(now.getDate()).padStart(2, '0')
-      const hh = String(now.getHours()).padStart(2, '0')
-      const min = String(now.getMinutes()).padStart(2, '0')
-      setLastUpdated(`${mm}-${dd} ${hh}:${min}`)
+      updateLastUpdated()
+    }
+  }
+
+  const fetchMonthlyData = async () => {
+    try {
+      const branch = selectedBranch === '전지점' ? 'all' : selectedBranch
+      const data = await fetch(`/api/monthly?branch=${branch}&month=${selectedMonth}`).then(r => r.json())
+      setMonthlyData(data)
+    } catch (error) {
+      console.error('월 실적 로드 실패:', error)
+    }
+  }
+
+  const fetchWeeklyAndChannelData = async () => {
+    try {
+      const branch = selectedBranch === '전지점' ? 'all' : selectedBranch
+      const wr = getWeekRange(currentWeek)
+      const weekStartStr = wr.start.toISOString().split('T')[0]
+      const weekEndStr = wr.end.toISOString().split('T')[0]
+      const prevWr = getWeekRange(currentWeek - 1)
+      const prevWeekStartStr = prevWr.start.toISOString().split('T')[0]
+      const prevWeekEndStr = prevWr.end.toISOString().split('T')[0]
+
+      const [weekly, prevWeekly, channel] = await Promise.all([
+        fetch(`/api/weekly?branch=${branch}&startDate=${weekStartStr}&endDate=${weekEndStr}`).then(r => r.json()),
+        fetch(`/api/weekly?branch=${branch}&startDate=${prevWeekStartStr}&endDate=${prevWeekEndStr}`).then(r => r.json()),
+        fetch(`/api/channel-breakdown?branch=${branch}&startDate=${weekStartStr}&endDate=${weekEndStr}`).then(r => r.json()),
+      ])
+      setWeeklyData(weekly)
+      setPrevWeeklyData(prevWeekly)
+      setChannelData(channel)
+    } catch (error) {
+      console.error('주간 실적 로드 실패:', error)
+    }
+  }
+
+  const fetchToplineData = async () => {
+    try {
+      const branch = selectedBranch === '전지점' ? 'all' : selectedBranch
+      const data = await fetch(`/api/topline?branch=${branch}&month=${toplineMonth}`).then(r => r.json())
+      setToplineData(data)
+    } catch (error) {
+      console.error('탑라인 로드 실패:', error)
     }
   }
 
@@ -328,7 +367,7 @@ export default function Dashboard() {
         }
       })
 
-      channelChartInstances.current.push(chart)
+      channelChartInstances.current.push(chart as any)
     })
   }
 
