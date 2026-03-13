@@ -1049,7 +1049,7 @@ export default function Dashboard() {
             {channelData?.days?.map((day: any, i: number) => {
               const date = new Date(day.date)
               const dayName = ['일', '월', '화', '수', '목', '금', '토'][date.getDay()]
-              const isWeekend = date.getDay() === 0 || date.getDay() === 6
+              const isWeekend = date.getDay() === 5 || date.getDay() === 6
               return (
                 <div key={day.date} className={`text-center ${isWeekend ? 'bg-blue-50' : 'bg-gray-50'} rounded-lg p-2`}>
                   <div className={`text-xs font-medium ${isWeekend ? 'text-blue-600' : 'text-gray-500'}`}>
