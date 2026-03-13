@@ -355,10 +355,11 @@ export default function Dashboard() {
             tooltip: {
               callbacks: {
                 label: (ctx) => {
-                  const amount = new Intl.NumberFormat('ko-KR').format(ctx.parsed as number)
+                  const ch = channels[ctx.dataIndex]
+                  const avgPrice = new Intl.NumberFormat('ko-KR').format(ch.avg_price || 0)
                   const total = (ctx.dataset.data as number[]).reduce((a, b) => a + b, 0)
                   const pct = ((ctx.parsed / total) * 100).toFixed(1)
-                  return `${ctx.label}: ${amount} (${pct}%)`
+                  return `${ctx.label}: 평균 ${avgPrice}원 (${ch.count}건, ${pct}%)`
                 }
               }
             },

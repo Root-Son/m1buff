@@ -92,14 +92,16 @@ export async function GET(request: NextRequest) {
       totalAmount += amount
     })
 
-    // 일별 채널 그룹 집계
-    const dailyMap: Record<string, Record<string, number>> = {}
+    // 일별 채널 그룹 집계 (매출 + 건수)
+    const dailyMap: Record<string, Record<string, { amount: number; count: number }>> = {}
     allBookings.forEach((row: any) => {
       const dateStr = String(row.reservation_created_at).split('T')[0].split(' ')[0]
       const group = CHANNEL_GROUPS[row.reservation_channel] || '기타'
       const amount = row.payment_amount || 0
       if (!dailyMap[dateStr]) dailyMap[dateStr] = {}
-      dailyMap[dateStr][group] = (dailyMap[dateStr][group] || 0) + amount
+      if (!dailyMap[dateStr][group]) dailyMap[dateStr][group] = { amount: 0, count: 0 }
+      dailyMap[dateStr][group].amount += amount
+      dailyMap[dateStr][group].count += 1
     })
 
     // 정렬 (매출 높은 순)
@@ -116,15 +118,17 @@ export async function GET(request: NextRequest) {
     const days = Object.entries(dailyMap)
       .sort(([a], [b]) => a.localeCompare(b))
       .map(([date, groups]) => {
-        const dayTotal = Object.values(groups).reduce((s, v) => s + v, 0)
+        const dayTotal = Object.values(groups).reduce((s, v) => s + v.amount, 0)
         return {
           date,
           total: dayTotal,
           channels: Object.entries(groups)
-            .sort((a, b) => b[1] - a[1])
-            .map(([group, amount]) => ({
+            .sort((a, b) => b[1].amount - a[1].amount)
+            .map(([group, { amount, count }]) => ({
               channel: group,
               amount,
+              count,
+              avg_price: count > 0 ? Math.round(amount / count) : 0,
               ratio: dayTotal > 0 ? (amount / dayTotal) * 100 : 0,
               color: CHANNEL_COLORS[group] || '#D1D5DB',
             }))
