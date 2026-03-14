@@ -353,6 +353,20 @@ def main():
     else:
         print(f"✅ 동기화 완료! (소요시간: {duration:.1f}초 = {duration/60:.1f}분)")
         print(f"{'='*60}\n")
+        # sync_logs에 성공 기록
+        try:
+            resp = requests.post(
+                f"{SUPABASE_URL}/rest/v1/sync_logs",
+                headers={
+                    'apikey': SUPABASE_KEY,
+                    'Authorization': f'Bearer {SUPABASE_KEY}',
+                    'Content-Type': 'application/json',
+                },
+                json={'table_name': 'all', 'status': 'success', 'rows_affected': 0}
+            )
+            print(f"  sync_logs 기록: {resp.status_code}")
+        except Exception as e:
+            print(f"  sync_logs 기록 실패 (무시): {e}")
 
 if __name__ == '__main__':
     main()
