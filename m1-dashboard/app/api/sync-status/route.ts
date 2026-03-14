@@ -14,14 +14,8 @@ export async function GET() {
     }
 
     if (data && data.length > 0) {
-      const dt = new Date(data[0].created_at)
-      // KST 변환
-      const kst = new Date(dt.getTime() + 9 * 60 * 60 * 1000)
-      const mm = String(kst.getMonth() + 1).padStart(2, '0')
-      const dd = String(kst.getDate()).padStart(2, '0')
-      const hh = String(kst.getHours()).padStart(2, '0')
-      const min = String(kst.getMinutes()).padStart(2, '0')
-      return NextResponse.json({ last_synced: `${mm}-${dd} ${hh}:${min}` })
+      // 컬럼 확인용 - 임시
+      return NextResponse.json({ columns: Object.keys(data[0]), row: data[0] })
     }
 
     return NextResponse.json({ last_synced: null })
