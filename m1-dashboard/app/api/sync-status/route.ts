@@ -6,8 +6,6 @@ export async function GET() {
     const { data, error: queryError } = await supabase
       .from('sync_logs')
       .select('*')
-      .eq('status', 'success')
-      .order('created_at', { ascending: false })
       .limit(1)
 
     if (queryError) {
