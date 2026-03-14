@@ -3,12 +3,17 @@ import { supabase } from '@/lib/supabase'
 
 export async function GET() {
   try {
-    const { data } = await supabase
+    const { data, error: queryError } = await supabase
       .from('sync_logs')
-      .select('created_at')
+      .select('*')
       .eq('status', 'success')
       .order('created_at', { ascending: false })
       .limit(1)
+
+    if (queryError) {
+      console.error('sync_logs query error:', queryError)
+      return NextResponse.json({ error: queryError.message, debug: 'query_failed' }, { status: 500 })
+    }
 
     if (data && data.length > 0) {
       const dt = new Date(data[0].created_at)
