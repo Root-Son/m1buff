@@ -10,7 +10,7 @@ export async function GET(request: NextRequest) {
   try {
     // GitHub Actions workflow_dispatch 트리거
     const res = await fetch(
-      `https://api.github.com/repos/${process.env.GITHUB_REPO}/actions/workflows/sync-data.yml/dispatches`,
+      `https://api.github.com/repos/${process.env.GITHUB_REPO}/actions/workflows/main.yml/dispatches`,
       {
         method: 'POST',
         headers: {
