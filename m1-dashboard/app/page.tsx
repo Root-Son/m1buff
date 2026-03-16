@@ -81,6 +81,11 @@ export default function Dashboard() {
   const channelChartInstances = useRef<(Chart | null)[]>([])
   const roomTypeChartInstance = useRef<Chart | null>(null)
 
+  // 동기화 시간: 초기 로드 시 1회
+  useEffect(() => {
+    fetchLastSyncTime()
+  }, [])
+
   // 일 실적: 지점, 날짜 변경 시만
   useEffect(() => {
     fetchDailyData()

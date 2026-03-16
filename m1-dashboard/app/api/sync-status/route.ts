@@ -7,18 +7,18 @@ export async function GET() {
   try {
     const { data, error } = await supabase
       .from('sync_logs')
-      .select('synced_at, created_at')
+      .select('synced_at')
       .eq('status', 'success')
-      .order('created_at', { ascending: false })
+      .order('synced_at', { ascending: false })
       .limit(1)
 
     if (error) {
+      console.error('sync-status error:', error)
       return NextResponse.json({ error: error.message }, { status: 500 })
     }
 
     if (data && data.length > 0) {
-      // synced_at이 있으면 사용, 없으면 created_at 사용
-      const timestamp = data[0].synced_at || data[0].created_at
+      const timestamp = data[0].synced_at
       if (!timestamp) {
         return NextResponse.json({ last_synced: null })
       }
