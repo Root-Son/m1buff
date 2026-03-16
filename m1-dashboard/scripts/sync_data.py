@@ -362,7 +362,7 @@ def main():
                     'Authorization': f'Bearer {SUPABASE_KEY}',
                     'Content-Type': 'application/json',
                 },
-                json={'table_name': 'all', 'status': 'success', 'rows_affected': 0}
+                json={'table_name': 'all', 'status': 'success', 'rows_affected': 0, 'synced_at': datetime.utcnow().strftime('%Y-%m-%dT%H:%M:%SZ')}
             )
             print(f"  sync_logs 기록: {resp.status_code}")
         except Exception as e:

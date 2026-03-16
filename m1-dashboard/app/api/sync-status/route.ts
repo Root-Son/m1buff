@@ -1,13 +1,15 @@
 import { NextResponse } from 'next/server'
 import { supabase } from '@/lib/supabase'
 
+export const dynamic = 'force-dynamic'
+
 export async function GET() {
   try {
     const { data, error } = await supabase
       .from('sync_logs')
-      .select('synced_at')
+      .select('synced_at, created_at')
       .eq('status', 'success')
-      .order('synced_at', { ascending: false })
+      .order('created_at', { ascending: false })
       .limit(1)
 
     if (error) {
@@ -15,7 +17,12 @@ export async function GET() {
     }
 
     if (data && data.length > 0) {
-      const dt = new Date(data[0].synced_at)
+      // synced_at이 있으면 사용, 없으면 created_at 사용
+      const timestamp = data[0].synced_at || data[0].created_at
+      if (!timestamp) {
+        return NextResponse.json({ last_synced: null })
+      }
+      const dt = new Date(timestamp)
       // KST 변환
       const kst = new Date(dt.getTime() + 9 * 60 * 60 * 1000)
       const mm = String(kst.getMonth() + 1).padStart(2, '0')
