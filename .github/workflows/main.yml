@@ -1,8 +1,12 @@
 name: 데이터 자동 동기화
 
 on:
-  # 스케줄은 Vercel Cron이 workflow_dispatch로 트리거
-  workflow_dispatch:  # 수동 실행 + Vercel Cron 트리거
+  schedule:
+    - cron: '30 21 * * *'  # KST 06:30
+    - cron: '30 4 * * *'   # KST 13:30
+    - cron: '30 8 * * *'   # KST 17:30
+    - cron: '30 14 * * *'  # KST 23:30
+  workflow_dispatch:  # 수동 실행 + Vercel Cron 백업
 
 jobs:
   sync:
