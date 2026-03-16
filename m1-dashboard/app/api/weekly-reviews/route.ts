@@ -534,12 +534,12 @@ function getTopAchievers(actualsByBranch: any, targets: any[], limit: number) {
   
   Object.keys(actualsByBranch).forEach(branch => {
     const actual = actualsByBranch[branch].pickup
-    const target = targets.find((t: any) => t.branch_name === branch)
-    
+    const target = targets.find((t: any) => normalizeBranchName(t.branch_name) === branch)
+
     if (!target || !target.target_amount) return
-    
+
     const achievement = (actual / target.target_amount) * 100
-    
+
     achievers.push({
       branch,
       actual,
@@ -547,19 +547,19 @@ function getTopAchievers(actualsByBranch: any, targets: any[], limit: number) {
       achievement_pct: achievement,
     })
   })
-  
+
   console.log('Top Achievers result:', achievers.length)
-  
+
   return achievers.sort((a, b) => b.achievement_pct - a.achievement_pct).slice(0, limit)
 }
 
 // 목표 달성률 Bottom
 function getBottomAchievers(actualsByBranch: any, targets: any[], limit: number) {
   const achievers: any[] = []
-  
+
   Object.keys(actualsByBranch).forEach(branch => {
     const actual = actualsByBranch[branch].pickup
-    const target = targets.find((t: any) => t.branch_name === branch)
+    const target = targets.find((t: any) => normalizeBranchName(t.branch_name) === branch)
     
     if (!target || !target.target_amount) return
     
