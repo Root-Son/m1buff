@@ -712,15 +712,36 @@ export default function Dashboard() {
                 </div>
                 {week.avg_occ > 0 && (
                   <div className="mt-2 pt-2 border-t">
-                    <div className="flex justify-between items-center">
-                      <span className="text-xs text-gray-500">평균 OCC</span>
-                      <span className={`text-sm font-semibold ${week.avg_occ >= 80 ? 'text-red-600' : week.avg_occ >= 60 ? 'text-orange-600' : 'text-green-600'}`}>
-                        {week.avg_occ.toFixed(1)}%
-                      </span>
-                    </div>
-                    <div className="text-xs text-gray-400 mt-0.5">
-                      잔여 {(week.total_available - week.total_sold).toLocaleString('ko-KR')}실
-                    </div>
+                    <div className="text-xs text-gray-400 mb-1">잔여 {(week.total_available - week.total_sold).toLocaleString('ko-KR')}실</div>
+                    <table className="w-full text-xs">
+                      <thead>
+                        <tr className="text-gray-400">
+                          <th className="text-left font-normal"></th>
+                          <th className="text-right font-normal">평일</th>
+                          <th className="text-right font-normal">주말</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        <tr>
+                          <td className="text-gray-500 py-0.5">OCC</td>
+                          <td className={`text-right font-semibold ${week.weekday_occ >= 80 ? 'text-red-600' : week.weekday_occ >= 60 ? 'text-orange-600' : 'text-green-600'}`}>
+                            {week.weekday_occ?.toFixed(1)}%
+                          </td>
+                          <td className={`text-right font-semibold ${week.weekend_occ >= 80 ? 'text-red-600' : week.weekend_occ >= 60 ? 'text-orange-600' : 'text-green-600'}`}>
+                            {week.weekend_occ?.toFixed(1)}%
+                          </td>
+                        </tr>
+                        <tr>
+                          <td className="text-gray-500 py-0.5">ADR</td>
+                          <td className="text-right font-semibold text-gray-700">
+                            {(week.weekday_adr || 0).toLocaleString('ko-KR')}
+                          </td>
+                          <td className="text-right font-semibold text-gray-700">
+                            {(week.weekend_adr || 0).toLocaleString('ko-KR')}
+                          </td>
+                        </tr>
+                      </tbody>
+                    </table>
                   </div>
                 )}
               </div>

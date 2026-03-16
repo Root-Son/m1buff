@@ -52,7 +52,7 @@ export async function GET(request: NextRequest) {
 
       let occQuery = supabase
         .from('branch_room_occ')
-        .select('occ, available_rooms, sold_rooms')
+        .select('date, occ, available_rooms, sold_rooms, revenue')
         .gte('date', startStr)
         .lte('date', endStr)
 
@@ -62,21 +62,36 @@ export async function GET(request: NextRequest) {
 
       const { data: occData } = await occQuery
 
-      // 총 available / 총 sold 로 가중평균 OCC 계산
-      let totalAvailable = 0
-      let totalSold = 0
+      // 평일/주말(금,토) 분리 집계
+      let wdAvail = 0, wdSold = 0, wdRev = 0
+      let weAvail = 0, weSold = 0, weRev = 0
       occData?.forEach((row: any) => {
-        totalAvailable += row.available_rooms || 0
-        totalSold += row.sold_rooms || 0
+        const day = new Date(row.date).getDay()
+        const isWeekend = day === 5 || day === 6 // 금,토
+        const avail = row.available_rooms || 0
+        const sold = row.sold_rooms || 0
+        const rev = row.revenue || 0
+        if (isWeekend) {
+          weAvail += avail; weSold += sold; weRev += rev
+        } else {
+          wdAvail += avail; wdSold += sold; wdRev += rev
+        }
       })
+
+      const totalAvailable = wdAvail + weAvail
+      const totalSold = wdSold + weSold
       const avgOcc = totalAvailable > 0 ? totalSold / totalAvailable : 0
 
       return {
         ...week,
         label: `${startDate.getDate()}~${endDate.getDate()}`,
-        avg_occ: Math.round(avgOcc * 1000) / 10, // 소수점 1자리 %
+        avg_occ: Math.round(avgOcc * 1000) / 10,
         total_available: totalAvailable,
         total_sold: totalSold,
+        weekday_occ: wdAvail > 0 ? Math.round((wdSold / wdAvail) * 1000) / 10 : 0,
+        weekend_occ: weAvail > 0 ? Math.round((weSold / weAvail) * 1000) / 10 : 0,
+        weekday_adr: wdSold > 0 ? Math.round(wdRev / wdSold) : 0,
+        weekend_adr: weSold > 0 ? Math.round(weRev / weSold) : 0,
       }
     }))
 
