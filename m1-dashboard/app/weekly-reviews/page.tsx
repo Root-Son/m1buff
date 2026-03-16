@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import React, { useState, useEffect } from 'react'
 
 // 주차 레이블 생성 함수
 function getWeekLabel(weekStart: string) {
@@ -219,10 +219,62 @@ function BranchIssuesCard({ issues }: { issues: any[] }) {
                   {isExpanded ? '▲ 접기' : `▼ ${details.length}주 보기`}
                 </button>
               </div>
-              {/* ★ 한줄요약 (접힌 상태에서 표시) */}
-              {!isExpanded && item.branch_summary && (
-                <div className="text-sm text-gray-600 mt-1">
-                  {item.branch_summary}
+              {/* 4주 OCC/ADR 미니 테이블 (접힌 상태) */}
+              {!isExpanded && details.length > 0 && (
+                <div className="mt-2">
+                  <table className="w-full text-xs">
+                    <thead>
+                      <tr className="text-gray-400">
+                        <th className="text-left font-normal py-0.5"></th>
+                        {details.map((d: any, i: number) => (
+                          <th key={i} className="text-center font-normal py-0.5 px-1" colSpan={2}>{d.week}</th>
+                        ))}
+                      </tr>
+                      <tr className="text-gray-300">
+                        <th className="text-left font-normal"></th>
+                        {details.map((_: any, i: number) => (
+                          <React.Fragment key={i}>
+                            <th className="text-center font-normal px-0.5">평일</th>
+                            <th className="text-center font-normal px-0.5">주말</th>
+                          </React.Fragment>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <tr>
+                        <td className="text-gray-500 py-0.5 pr-2">OCC</td>
+                        {details.map((d: any, i: number) => {
+                          const oa = d.occ_adr || {}
+                          return (
+                            <React.Fragment key={i}>
+                              <td className={`text-center font-semibold px-0.5 ${(oa.weekday_occ || 0) >= 80 ? 'text-red-600' : (oa.weekday_occ || 0) >= 60 ? 'text-orange-600' : 'text-green-600'}`}>
+                                {(oa.weekday_occ || 0).toFixed(0)}%
+                              </td>
+                              <td className={`text-center font-semibold px-0.5 ${(oa.weekend_occ || 0) >= 80 ? 'text-red-600' : (oa.weekend_occ || 0) >= 60 ? 'text-orange-600' : 'text-green-600'}`}>
+                                {(oa.weekend_occ || 0).toFixed(0)}%
+                              </td>
+                            </React.Fragment>
+                          )
+                        })}
+                      </tr>
+                      <tr>
+                        <td className="text-gray-500 py-0.5 pr-2">ADR</td>
+                        {details.map((d: any, i: number) => {
+                          const oa = d.occ_adr || {}
+                          return (
+                            <React.Fragment key={i}>
+                              <td className="text-center font-semibold text-gray-700 px-0.5">
+                                {((oa.weekday_adr || 0) / 1000).toFixed(0)}k
+                              </td>
+                              <td className="text-center font-semibold text-gray-700 px-0.5">
+                                {((oa.weekend_adr || 0) / 1000).toFixed(0)}k
+                              </td>
+                            </React.Fragment>
+                          )
+                        })}
+                      </tr>
+                    </tbody>
+                  </table>
                 </div>
               )}
             </div>

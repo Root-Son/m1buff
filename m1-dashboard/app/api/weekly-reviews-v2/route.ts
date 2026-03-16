@@ -346,10 +346,33 @@ function analyzeBranchIssues(
     ALL_BRANCHES.forEach(branch => {
       const branchOccRows = occByBranch[branch] || []
 
+      // 평일/주말 OCC & ADR 집계
+      let wdAvail = 0, wdSold = 0, wdRev = 0
+      let weAvail = 0, weSold = 0, weRev = 0
+      branchOccRows.forEach((row: any) => {
+        const day = new Date(row.date).getDay()
+        const isWeekend = day === 5 || day === 6 // 금,토
+        const avail = row.available_rooms || 0
+        const sold = row.sold_rooms || 0
+        const rev = row.revenue || 0
+        if (isWeekend) {
+          weAvail += avail; weSold += sold; weRev += rev
+        } else {
+          wdAvail += avail; wdSold += sold; wdRev += rev
+        }
+      })
+      const occAdr = {
+        weekday_occ: wdAvail > 0 ? Math.round((wdSold / wdAvail) * 1000) / 10 : 0,
+        weekend_occ: weAvail > 0 ? Math.round((weSold / weAvail) * 1000) / 10 : 0,
+        weekday_adr: wdSold > 0 ? Math.round(wdRev / wdSold) : 0,
+        weekend_adr: weSold > 0 ? Math.round(weRev / weSold) : 0,
+      }
+
       if (branchOccRows.length === 0) {
         issuesByBranch[branch].push({
           week: weekLabel,
           recommendations: [],
+          occ_adr: occAdr,
           summary: {
             price_down_count: 0,
             price_up_count: 0,
@@ -432,6 +455,7 @@ function analyzeBranchIssues(
       issuesByBranch[branch].push({
         week: weekLabel,
         recommendations,
+        occ_adr: occAdr,
         summary: {
           price_down_count: priceDownItems.length,
           price_up_count: priceUpItems.length,
