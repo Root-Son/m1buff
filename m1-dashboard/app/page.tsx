@@ -366,7 +366,7 @@ export default function Dashboard() {
                   const ch = channels[ctx.dataIndex]
                   const adr = new Intl.NumberFormat('ko-KR').format(ch.adr || 0)
                   const total = (ctx.dataset.data as number[]).reduce((a, b) => a + b, 0)
-                  const pct = ((ctx.parsed / total) * 100).toFixed(1)
+                  const pct = ((ctx.parsed / total) * 100).toFixed(0)
                   return `${ctx.label}: ADR ${adr}원 (${ch.count}건, ${pct}%)`
                 }
               }
@@ -536,7 +536,7 @@ export default function Dashboard() {
                 if (value === null || value === undefined) return label + 'N/A'
                 
                 if (context.dataset.yAxisID === 'y') {
-                  label += (value * 100).toFixed(1) + '%'
+                  label += (value * 100).toFixed(0) + '%'
                 } else {
                   label += new Intl.NumberFormat('ko-KR').format(value)
                 }
@@ -561,7 +561,7 @@ export default function Dashboard() {
                   Object.entries(dayData.channel_ratios)
                     .sort((a: any, b: any) => b[1] - a[1])
                     .forEach(([ch, ratio]: any) => {
-                      result.push(`${ch}: ${ratio.toFixed(1)}%`)
+                      result.push(`${ch}: ${ratio.toFixed(0)}%`)
                     })
                 }
                 
@@ -702,7 +702,7 @@ export default function Dashboard() {
               <span className="text-sm text-gray-500">
                 목표 {toplineData?.total_target?.toLocaleString('ko-KR')}
                 <span className={`ml-1 font-semibold ${(toplineData?.achievement_rate || 0) >= 100 ? 'text-green-600' : 'text-orange-600'}`}>
-                  ({(toplineData?.achievement_rate || 0).toFixed(1)}%)
+                  ({(toplineData?.achievement_rate || 0).toFixed(0)}%)
                 </span>
               </span>
             )}
@@ -729,10 +729,10 @@ export default function Dashboard() {
                         <tr>
                           <td className="text-gray-500 py-0.5">OCC</td>
                           <td className={`text-right font-semibold ${week.weekday_occ >= 80 ? 'text-red-600' : week.weekday_occ >= 60 ? 'text-orange-600' : 'text-green-600'}`}>
-                            {week.weekday_occ?.toFixed(1)}%
+                            {week.weekday_occ?.toFixed(0)}%
                           </td>
                           <td className={`text-right font-semibold ${week.weekend_occ >= 80 ? 'text-red-600' : week.weekend_occ >= 60 ? 'text-orange-600' : 'text-green-600'}`}>
-                            {week.weekend_occ?.toFixed(1)}%
+                            {week.weekend_occ?.toFixed(0)}%
                           </td>
                         </tr>
                         <tr>
@@ -910,7 +910,7 @@ export default function Dashboard() {
                 {dailyData?.pickup?.toLocaleString('ko-KR') || 0}
               </div>
               <div className={`text-sm mt-1 ${(dailyData?.pickup_dod || 0) >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                DoD {(dailyData?.pickup_dod || 0) >= 0 ? '+' : ''}{(dailyData?.pickup_dod || 0).toFixed(1)}%
+                DoD {(dailyData?.pickup_dod || 0) >= 0 ? '+' : ''}{(dailyData?.pickup_dod || 0).toFixed(0)}%
               </div>
             </div>
             <div className="bg-white p-6 rounded-lg shadow-sm border">
@@ -919,7 +919,7 @@ export default function Dashboard() {
                 {dailyData?.month1_ci?.toLocaleString('ko-KR') || 0}
               </div>
               <div className={`text-sm mt-1 ${(dailyData?.month1_ci_dod || 0) >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                DoD {(dailyData?.month1_ci_dod || 0) >= 0 ? '+' : ''}{(dailyData?.month1_ci_dod || 0).toFixed(1)}%
+                DoD {(dailyData?.month1_ci_dod || 0) >= 0 ? '+' : ''}{(dailyData?.month1_ci_dod || 0).toFixed(0)}%
               </div>
             </div>
             <div className="bg-white p-6 rounded-lg shadow-sm border">
@@ -928,7 +928,7 @@ export default function Dashboard() {
                 {dailyData?.month2_ci?.toLocaleString('ko-KR') || 0}
               </div>
               <div className={`text-sm mt-1 ${(dailyData?.month2_ci_dod || 0) >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                DoD {(dailyData?.month2_ci_dod || 0) >= 0 ? '+' : ''}{(dailyData?.month2_ci_dod || 0).toFixed(1)}%
+                DoD {(dailyData?.month2_ci_dod || 0) >= 0 ? '+' : ''}{(dailyData?.month2_ci_dod || 0).toFixed(0)}%
               </div>
             </div>
             <div className="bg-white p-6 rounded-lg shadow-sm border">
@@ -937,7 +937,7 @@ export default function Dashboard() {
                 {dailyData?.month3_ci?.toLocaleString('ko-KR') || 0}
               </div>
               <div className={`text-sm mt-1 ${(dailyData?.month3_ci_dod || 0) >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                DoD {(dailyData?.month3_ci_dod || 0) >= 0 ? '+' : ''}{(dailyData?.month3_ci_dod || 0).toFixed(1)}%
+                DoD {(dailyData?.month3_ci_dod || 0) >= 0 ? '+' : ''}{(dailyData?.month3_ci_dod || 0).toFixed(0)}%
               </div>
             </div>
           </div>
@@ -1004,7 +1004,7 @@ export default function Dashboard() {
                 {weeklyData?.total_pickup?.toLocaleString('ko-KR') || 0}
               </div>
               <div className={`text-sm mt-1 ${(weeklyData?.total_pickup_wow || 0) >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                WoW {(weeklyData?.total_pickup_wow || 0) >= 0 ? '+' : ''}{(weeklyData?.total_pickup_wow || 0).toFixed(1)}%
+                WoW {(weeklyData?.total_pickup_wow || 0) >= 0 ? '+' : ''}{(weeklyData?.total_pickup_wow || 0).toFixed(0)}%
               </div>
             </div>
             <div className="bg-white p-6 rounded-lg shadow-sm border">
@@ -1013,7 +1013,7 @@ export default function Dashboard() {
                 {weeklyData?.month1_ci?.toLocaleString('ko-KR') || 0}
               </div>
               <div className={`text-sm mt-1 ${(weeklyData?.month1_ci_wow || 0) >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                WoW {(weeklyData?.month1_ci_wow || 0) >= 0 ? '+' : ''}{(weeklyData?.month1_ci_wow || 0).toFixed(1)}%
+                WoW {(weeklyData?.month1_ci_wow || 0) >= 0 ? '+' : ''}{(weeklyData?.month1_ci_wow || 0).toFixed(0)}%
               </div>
             </div>
             <div className="bg-white p-6 rounded-lg shadow-sm border">
@@ -1022,7 +1022,7 @@ export default function Dashboard() {
                 {weeklyData?.month2_ci?.toLocaleString('ko-KR') || 0}
               </div>
               <div className={`text-sm mt-1 ${(weeklyData?.month2_ci_wow || 0) >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                WoW {(weeklyData?.month2_ci_wow || 0) >= 0 ? '+' : ''}{(weeklyData?.month2_ci_wow || 0).toFixed(1)}%
+                WoW {(weeklyData?.month2_ci_wow || 0) >= 0 ? '+' : ''}{(weeklyData?.month2_ci_wow || 0).toFixed(0)}%
               </div>
             </div>
             <div className="bg-white p-6 rounded-lg shadow-sm border">
@@ -1031,7 +1031,7 @@ export default function Dashboard() {
                 {weeklyData?.month3_ci?.toLocaleString('ko-KR') || 0}
               </div>
               <div className={`text-sm mt-1 ${(weeklyData?.month3_ci_wow || 0) >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                WoW {(weeklyData?.month3_ci_wow || 0) >= 0 ? '+' : ''}{(weeklyData?.month3_ci_wow || 0).toFixed(1)}%
+                WoW {(weeklyData?.month3_ci_wow || 0) >= 0 ? '+' : ''}{(weeklyData?.month3_ci_wow || 0).toFixed(0)}%
               </div>
             </div>
           </div>
@@ -1064,7 +1064,7 @@ export default function Dashboard() {
                 {monthlyData?.pickup?.toLocaleString('ko-KR') || '-'}
               </div>
               <div className={`text-sm mt-1 ${(monthlyData?.pickup_mom || 0) >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                MoM {(monthlyData?.pickup_mom || 0) >= 0 ? '+' : ''}{(monthlyData?.pickup_mom || 0).toFixed(1)}%
+                MoM {(monthlyData?.pickup_mom || 0) >= 0 ? '+' : ''}{(monthlyData?.pickup_mom || 0).toFixed(0)}%
               </div>
             </div>
             <div className="bg-white p-6 rounded-lg shadow-sm border">
@@ -1073,7 +1073,7 @@ export default function Dashboard() {
                 {monthlyData?.month1_ci?.toLocaleString('ko-KR') || '-'}
               </div>
               <div className={`text-sm mt-1 ${(monthlyData?.month1_ci_mom || 0) >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                MoM {(monthlyData?.month1_ci_mom || 0) >= 0 ? '+' : ''}{(monthlyData?.month1_ci_mom || 0).toFixed(1)}%
+                MoM {(monthlyData?.month1_ci_mom || 0) >= 0 ? '+' : ''}{(monthlyData?.month1_ci_mom || 0).toFixed(0)}%
               </div>
             </div>
             <div className="bg-white p-6 rounded-lg shadow-sm border">
@@ -1082,7 +1082,7 @@ export default function Dashboard() {
                 {monthlyData?.month2_ci?.toLocaleString('ko-KR') || '-'}
               </div>
               <div className={`text-sm mt-1 ${(monthlyData?.month2_ci_mom || 0) >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                MoM {(monthlyData?.month2_ci_mom || 0) >= 0 ? '+' : ''}{(monthlyData?.month2_ci_mom || 0).toFixed(1)}%
+                MoM {(monthlyData?.month2_ci_mom || 0) >= 0 ? '+' : ''}{(monthlyData?.month2_ci_mom || 0).toFixed(0)}%
               </div>
             </div>
             <div className="bg-white p-6 rounded-lg shadow-sm border">
@@ -1091,7 +1091,7 @@ export default function Dashboard() {
                 {monthlyData?.month3_ci?.toLocaleString('ko-KR') || '-'}
               </div>
               <div className={`text-sm mt-1 ${(monthlyData?.month3_ci_mom || 0) >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                MoM {(monthlyData?.month3_ci_mom || 0) >= 0 ? '+' : ''}{(monthlyData?.month3_ci_mom || 0).toFixed(1)}%
+                MoM {(monthlyData?.month3_ci_mom || 0) >= 0 ? '+' : ''}{(monthlyData?.month3_ci_mom || 0).toFixed(0)}%
               </div>
             </div>
           </div>
