@@ -2,6 +2,20 @@ import { NextRequest, NextResponse } from 'next/server'
 import { supabase } from '@/lib/supabase'
 import { normalizeBranchName } from '@/lib/pricing-engine'
 
+const CHANNEL_GROUPS: Record<string, string> = {
+  '야놀자(호텔)': 'OTA', '야놀자(모텔)': 'OTA', '아고다': 'OTA',
+  '여기어때': 'OTA', '씨트립': 'OTA', '부킹닷컴': 'OTA',
+  '익스피디아': 'OTA', '네이버': 'OTA', '트립토파즈': 'OTA',
+  '에어비앤비': '에어비앤비',
+  '내부채널_어스앱': '자사채널', '내부채널_어스(WEB)': '자사채널', '내부채널_직접예약': '자사채널',
+  '내부채널_단체': 'B2B', '내부채널_기업체': 'B2B', '내부채널_홀세일': 'B2B',
+  '내부채널_홀세일(선수금)': 'B2B', '내부채널_복지몰': 'B2B', '내부채널_부킹엔진': 'B2B',
+}
+
+function getChannelGroup(channel: string): string {
+  return CHANNEL_GROUPS[channel] || '기타'
+}
+
 // 해당 월의 일~토 기준 주차 생성 (월 범위 내로 클램핑)
 function getSunSatWeeks(year: number, month: number) {
   const firstDayStr = `${year}-${String(month).padStart(2, '0')}-01`
@@ -80,7 +94,7 @@ export async function GET(request: NextRequest) {
     while (true) {
       let ciQuery = supabase
         .from('raw_bookings')
-        .select('check_in_date, payment_amount, reservation_created_at')
+        .select('check_in_date, payment_amount, reservation_created_at, reservation_channel')
         .gte('check_in_date', monthStart)
         .lte('check_in_date', monthEnd)
       if (branch !== 'all') {
@@ -157,6 +171,25 @@ export async function GET(request: NextRequest) {
           pct: weekCI > 0 ? Math.round((amount as number) / weekCI * 1000) / 10 : 0,
         }))
 
+      // 채널 분포
+      const channelAmounts: Record<string, number> = {}
+      weekBookings.forEach(r => {
+        const group = getChannelGroup(r.reservation_channel || '')
+        channelAmounts[group] = (channelAmounts[group] || 0) + (r.payment_amount || 0)
+      })
+      const TARGET_CHANNELS = ['OTA', '에어비앤비', 'B2B', '자사채널', '기타']
+      const channelDist = TARGET_CHANNELS.map(ch => {
+        const amt = TARGET_CHANNELS.indexOf(ch) < 4
+          ? (channelAmounts[ch] || 0)
+          : Object.entries(channelAmounts)
+              .filter(([k]) => !['OTA', '에어비앤비', 'B2B', '자사채널'].includes(k))
+              .reduce((s, [, v]) => s + v, 0)
+        return {
+          channel: ch,
+          pct: weekCI > 0 ? Math.round(amt / weekCI * 1000) / 10 : 0,
+        }
+      }).filter(c => c.pct > 0)
+
       // OCC 조회
       let occQuery = supabase
         .from('branch_room_occ')
@@ -204,6 +237,7 @@ export async function GET(request: NextRequest) {
         weekday_adr: wdSold > 0 ? Math.round(wdRev / wdSold) : 0,
         weekend_adr: weSold > 0 ? Math.round(weRev / weSold) : 0,
         pickup_top5: pickupTop5,
+        channel_dist: channelDist,
       }
     }))
 

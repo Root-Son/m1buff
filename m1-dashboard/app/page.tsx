@@ -762,6 +762,19 @@ export default function Dashboard() {
                     </div>
                   </div>
                 )}
+                {week.channel_dist?.length > 0 && (
+                  <div className="mt-2 pt-2 border-t">
+                    <div className="text-xs text-gray-400 mb-1">채널</div>
+                    <div className="flex flex-wrap gap-x-3 gap-y-0.5">
+                      {week.channel_dist.map((c: any, i: number) => (
+                        <span key={i} className="text-xs">
+                          <span className="text-gray-500">{c.channel}</span>
+                          <span className="font-semibold text-gray-700 ml-1">{c.pct}%</span>
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
             ))}
           </div>
