@@ -331,7 +331,6 @@ export async function GET(request: NextRequest) {
       const curWeAdr = weNightsRb > 0 ? Math.round(weRevRb / weNightsRb) : 0
 
       // 채널별 YoY ADR
-      const MAIN_CHANNELS = ['OTA', '에어비앤비', 'B2B', '자사채널']
       const channelDistWithYoy = channelDist.map((c: any) => {
         let prevChData: { amount: number; nights: number } | undefined
         if (prev) {
