@@ -213,6 +213,16 @@ export async function GET(request: NextRequest) {
 
       const { data: occData } = await occQuery
 
+      // 평일/주말 일수 계산
+      let weekdayDays = 0, weekendDays = 0
+      const dc = new Date(startDate)
+      while (dc <= endDate) {
+        const dow = dc.getDay()
+        if (dow === 5 || dow === 6) weekendDays++
+        else weekdayDays++
+        dc.setDate(dc.getDate() + 1)
+      }
+
       // 평일/주말(금,토) 분리 집계
       let wdAvail = 0, wdSold = 0, wdRev = 0
       let weAvail = 0, weSold = 0, weRev = 0
@@ -242,6 +252,8 @@ export async function GET(request: NextRequest) {
         avg_occ: Math.round(avgOcc * 1000) / 10,
         total_available: totalAvailable,
         total_sold: totalSold,
+        weekday_days: weekdayDays,
+        weekend_days: weekendDays,
         weekday_occ: wdAvail > 0 ? Math.round((wdSold / wdAvail) * 1000) / 10 : 0,
         weekend_occ: weAvail > 0 ? Math.round((weSold / weAvail) * 1000) / 10 : 0,
         weekday_adr: wdSold > 0 ? Math.round(wdRev / wdSold) : 0,

@@ -721,8 +721,8 @@ export default function Dashboard() {
                       <thead>
                         <tr className="text-gray-400">
                           <th className="text-left font-normal"></th>
-                          <th className="text-right font-normal">평일</th>
-                          <th className="text-right font-normal">주말</th>
+                          <th className="text-right font-normal">평일({week.weekday_days})</th>
+                          <th className="text-right font-normal">주말({week.weekend_days})</th>
                         </tr>
                       </thead>
                       <tbody>
