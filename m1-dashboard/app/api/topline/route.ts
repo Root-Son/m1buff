@@ -97,7 +97,7 @@ export async function GET(request: NextRequest) {
     while (true) {
       let ciQuery = supabase
         .from('raw_bookings')
-        .select('check_in_date, payment_amount, reservation_created_at, reservation_channel, nights')
+        .select('check_in_date, check_out_date, payment_amount, reservation_created_at, reservation_channel, nights')
         .gte('check_in_date', monthStart)
         .lte('check_in_date', monthEnd)
       if (branch !== 'all') {
@@ -200,10 +200,10 @@ export async function GET(request: NextRequest) {
         }
       }).filter(c => c.pct > 0)
 
-      // OCC 조회
+      // OCC 조회 (available_rooms, sold_rooms만 사용)
       let occQuery = supabase
         .from('branch_room_occ')
-        .select('date, occ, available_rooms, sold_rooms, revenue')
+        .select('date, available_rooms, sold_rooms')
         .gte('date', week.start_date)
         .lte('date', week.end_date)
 
@@ -223,25 +223,48 @@ export async function GET(request: NextRequest) {
         dc.setDate(dc.getDate() + 1)
       }
 
-      // 평일/주말(금,토) 분리 집계
-      let wdAvail = 0, wdSold = 0, wdRev = 0
-      let weAvail = 0, weSold = 0, weRev = 0
+      // OCC: 평일/주말 분리 (branch_room_occ 기반)
+      let wdAvail = 0, wdSold = 0
+      let weAvail = 0, weSold = 0
       occData?.forEach((row: any) => {
         const day = new Date(row.date).getDay()
         const isWeekend = day === 5 || day === 6
         const avail = row.available_rooms || 0
         const sold = row.sold_rooms || 0
-        const rev = row.revenue || 0
         if (isWeekend) {
-          weAvail += avail; weSold += sold; weRev += rev
+          weAvail += avail; weSold += sold
         } else {
-          wdAvail += avail; wdSold += sold; wdRev += rev
+          wdAvail += avail; wdSold += sold
         }
       })
 
       const totalAvailable = wdAvail + weAvail
       const totalSold = wdSold + weSold
       const avgOcc = totalAvailable > 0 ? totalSold / totalAvailable : 0
+
+      // ADR: raw_bookings 기반 (1박 단가를 각 숙박일에 배분)
+      let wdRevRb = 0, wdNightsRb = 0
+      let weRevRb = 0, weNightsRb = 0
+      weekBookings.forEach(r => {
+        const nights = r.nights || 0
+        if (nights <= 0) return
+        const perNight = (r.payment_amount || 0) / nights
+        const ci = new Date(r.check_in_date)
+        for (let n = 0; n < nights; n++) {
+          const stayDate = new Date(ci)
+          stayDate.setDate(stayDate.getDate() + n)
+          const stayStr = fmt(stayDate)
+          // 이 주차 범위 내의 숙박일만 집계
+          if (stayStr >= week.start_date && stayStr <= week.end_date) {
+            const dow = stayDate.getDay()
+            if (dow === 5 || dow === 6) {
+              weRevRb += perNight; weNightsRb++
+            } else {
+              wdRevRb += perNight; wdNightsRb++
+            }
+          }
+        }
+      })
 
       return {
         week_num: week.week_num,
@@ -256,8 +279,8 @@ export async function GET(request: NextRequest) {
         weekend_days: weekendDays,
         weekday_occ: wdAvail > 0 ? Math.round((wdSold / wdAvail) * 1000) / 10 : 0,
         weekend_occ: weAvail > 0 ? Math.round((weSold / weAvail) * 1000) / 10 : 0,
-        weekday_adr: wdSold > 0 ? Math.round(wdRev / wdSold) : 0,
-        weekend_adr: weSold > 0 ? Math.round(weRev / weSold) : 0,
+        weekday_adr: wdNightsRb > 0 ? Math.round(wdRevRb / wdNightsRb) : 0,
+        weekend_adr: weNightsRb > 0 ? Math.round(weRevRb / weNightsRb) : 0,
         pickup_top5: pickupTop5,
         channel_dist: channelDist,
       }
