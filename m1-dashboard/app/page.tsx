@@ -714,9 +714,9 @@ export default function Dashboard() {
                 <div className="text-2xl font-bold text-gray-900 mt-2">
                   {week.ci_amount?.toLocaleString('ko-KR') || 0}
                 </div>
-                {week.avg_occ > 0 && (
+                {(week.avg_occ > 0 || week.weekday_adr > 0 || week.weekend_adr > 0) && (
                   <div className="mt-2 pt-2 border-t">
-                    <div className="text-xs text-gray-400 mb-1">잔여 {(week.total_available - week.total_sold).toLocaleString('ko-KR')}실</div>
+                    {week.total_available > 0 && <div className="text-xs text-gray-400 mb-1">잔여 {(week.total_available - week.total_sold).toLocaleString('ko-KR')}실</div>}
                     <table className="w-full text-xs">
                       <thead>
                         <tr className="text-gray-400">
