@@ -755,7 +755,10 @@ export default function Dashboard() {
                       {week.pickup_top5.map((p: any, i: number) => (
                         <div key={i} className="flex justify-between text-xs">
                           <span className="text-gray-500">{p.week}</span>
-                          <span className="font-semibold text-gray-700">{p.pct}%</span>
+                          <span className="text-gray-700">
+                            <span className="font-semibold">{p.pct}%</span>
+                            {p.adr > 0 && <span className="text-gray-400 ml-1">({(p.adr/10000).toFixed(1)}만)</span>}
+                          </span>
                         </div>
                       ))}
                     </div>
@@ -769,6 +772,7 @@ export default function Dashboard() {
                         <span key={i} className="text-xs">
                           <span className="text-gray-500">{c.channel}</span>
                           <span className="font-semibold text-gray-700 ml-1">{c.pct}%</span>
+                          {c.adr > 0 && <span className="text-gray-400 ml-0.5">({(c.adr/10000).toFixed(1)}만)</span>}
                         </span>
                       ))}
                     </div>

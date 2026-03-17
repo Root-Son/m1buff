@@ -97,7 +97,7 @@ export async function GET(request: NextRequest) {
     while (true) {
       let ciQuery = supabase
         .from('raw_bookings')
-        .select('check_in_date, payment_amount, reservation_created_at, reservation_channel')
+        .select('check_in_date, payment_amount, reservation_created_at, reservation_channel, nights')
         .gte('check_in_date', monthStart)
         .lte('check_in_date', monthEnd)
       if (branch !== 'all') {
@@ -151,11 +151,10 @@ export async function GET(request: NextRequest) {
       const weekBookings = allCiData.filter(r =>
         r.check_in_date >= week.start_date && r.check_in_date <= week.end_date
       )
-      const pickupByWeek: Record<string, number> = {}
+      const pickupByWeek: Record<string, { amount: number; nights: number }> = {}
       weekBookings.forEach(r => {
         const createdDate = r.reservation_created_at?.split(' ')[0] || r.reservation_created_at?.split('T')[0]
         if (!createdDate) return
-        // 픽업 날짜가 속한 일~토 주차 라벨 생성
         const cd = new Date(createdDate)
         const dow = cd.getDay()
         const sun = new Date(cd)
@@ -163,33 +162,41 @@ export async function GET(request: NextRequest) {
         const sat = new Date(sun)
         sat.setDate(sat.getDate() + 6)
         const weekLabel = `${sun.getMonth()+1}/${sun.getDate()}~${sat.getMonth()+1}/${sat.getDate()}`
-        pickupByWeek[weekLabel] = (pickupByWeek[weekLabel] || 0) + (r.payment_amount || 0)
+        if (!pickupByWeek[weekLabel]) pickupByWeek[weekLabel] = { amount: 0, nights: 0 }
+        pickupByWeek[weekLabel].amount += r.payment_amount || 0
+        pickupByWeek[weekLabel].nights += r.nights || 0
       })
-      // Top 5 픽업 주차
       const pickupTop5 = Object.entries(pickupByWeek)
-        .sort((a, b) => b[1] - a[1])
+        .sort((a, b) => b[1].amount - a[1].amount)
         .slice(0, 5)
-        .map(([label, amount]) => ({
+        .map(([label, d]) => ({
           week: label,
-          pct: weekCI > 0 ? Math.round((amount as number) / weekCI * 1000) / 10 : 0,
+          pct: weekCI > 0 ? Math.round(d.amount / weekCI * 1000) / 10 : 0,
+          adr: d.nights > 0 ? Math.round(d.amount / d.nights) : 0,
         }))
 
       // 채널 분포
-      const channelAmounts: Record<string, number> = {}
+      const channelData: Record<string, { amount: number; nights: number }> = {}
       weekBookings.forEach(r => {
         const group = getChannelGroup(r.reservation_channel || '')
-        channelAmounts[group] = (channelAmounts[group] || 0) + (r.payment_amount || 0)
+        if (!channelData[group]) channelData[group] = { amount: 0, nights: 0 }
+        channelData[group].amount += r.payment_amount || 0
+        channelData[group].nights += r.nights || 0
       })
-      const TARGET_CHANNELS = ['OTA', '에어비앤비', 'B2B', '자사채널', '기타']
-      const channelDist = TARGET_CHANNELS.map(ch => {
-        const amt = TARGET_CHANNELS.indexOf(ch) < 4
-          ? (channelAmounts[ch] || 0)
-          : Object.entries(channelAmounts)
-              .filter(([k]) => !['OTA', '에어비앤비', 'B2B', '자사채널'].includes(k))
-              .reduce((s, [, v]) => s + v, 0)
+      const MAIN_CHANNELS = ['OTA', '에어비앤비', 'B2B', '자사채널']
+      const channelDist = [...MAIN_CHANNELS, '기타'].map(ch => {
+        let d: { amount: number; nights: number }
+        if (ch === '기타') {
+          d = Object.entries(channelData)
+            .filter(([k]) => !MAIN_CHANNELS.includes(k))
+            .reduce((s, [, v]) => ({ amount: s.amount + v.amount, nights: s.nights + v.nights }), { amount: 0, nights: 0 })
+        } else {
+          d = channelData[ch] || { amount: 0, nights: 0 }
+        }
         return {
           channel: ch,
-          pct: weekCI > 0 ? Math.round(amt / weekCI * 1000) / 10 : 0,
+          pct: weekCI > 0 ? Math.round(d.amount / weekCI * 1000) / 10 : 0,
+          adr: d.nights > 0 ? Math.round(d.amount / d.nights) : 0,
         }
       }).filter(c => c.pct > 0)
 
