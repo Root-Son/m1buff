@@ -749,6 +749,19 @@ export default function Dashboard() {
                     </table>
                   </div>
                 )}
+                {week.pickup_top5?.length > 0 && (
+                  <div className="mt-2 pt-2 border-t">
+                    <div className="text-xs text-gray-400 mb-1">픽업 시점</div>
+                    <div className="space-y-0.5">
+                      {week.pickup_top5.map((p: any, i: number) => (
+                        <div key={i} className="flex justify-between text-xs">
+                          <span className="text-gray-500">{p.week}</span>
+                          <span className="font-semibold text-gray-700">{p.pct}%</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
             ))}
           </div>

@@ -74,21 +74,18 @@ export async function GET(request: NextRequest) {
 
     const totalCI = (rpcData || []).reduce((sum: number, week: any) => sum + (week.ci_amount || 0), 0)
 
-    // 일별 체크인 매출 조회 (주차 재그룹핑용)
-    let ciQuery = supabase
-      .from('raw_bookings')
-      .select('check_in_date, payment_amount')
-      .gte('check_in_date', monthStart)
-      .lte('check_in_date', monthEnd)
-
-    if (branch !== 'all') {
-      ciQuery = ciQuery.eq('branch_name', branch)
-    }
-
-    // 페이지네이션 (1000행 제한 우회)
+    // 체크인 매출 + 픽업 시점 조회
     let allCiData: any[] = []
     let page = 0
     while (true) {
+      let ciQuery = supabase
+        .from('raw_bookings')
+        .select('check_in_date, payment_amount, reservation_created_at')
+        .gte('check_in_date', monthStart)
+        .lte('check_in_date', monthEnd)
+      if (branch !== 'all') {
+        ciQuery = ciQuery.eq('branch_name', branch)
+      }
       const { data: pageData } = await ciQuery.range(page * 1000, (page + 1) * 1000 - 1)
       if (!pageData || pageData.length === 0) break
       allCiData = allCiData.concat(pageData)
@@ -125,13 +122,40 @@ export async function GET(request: NextRequest) {
       const startDate = new Date(week.start_date)
       const endDate = new Date(week.end_date)
 
-      // 주차별 CI 합산
+      // 주차별 CI 합산 + 픽업 주차 분석
       let weekCI = 0
       const cur = new Date(startDate)
       while (cur <= endDate) {
         weekCI += dailyCI[fmt(cur)] || 0
         cur.setDate(cur.getDate() + 1)
       }
+
+      // 이 주차 체크인 예약들의 픽업 시점 분석
+      const weekBookings = allCiData.filter(r =>
+        r.check_in_date >= week.start_date && r.check_in_date <= week.end_date
+      )
+      const pickupByWeek: Record<string, number> = {}
+      weekBookings.forEach(r => {
+        const createdDate = r.reservation_created_at?.split(' ')[0] || r.reservation_created_at?.split('T')[0]
+        if (!createdDate) return
+        // 픽업 날짜가 속한 일~토 주차 라벨 생성
+        const cd = new Date(createdDate)
+        const dow = cd.getDay()
+        const sun = new Date(cd)
+        sun.setDate(sun.getDate() - dow)
+        const sat = new Date(sun)
+        sat.setDate(sat.getDate() + 6)
+        const weekLabel = `${sun.getMonth()+1}/${sun.getDate()}~${sat.getMonth()+1}/${sat.getDate()}`
+        pickupByWeek[weekLabel] = (pickupByWeek[weekLabel] || 0) + (r.payment_amount || 0)
+      })
+      // Top 5 픽업 주차
+      const pickupTop5 = Object.entries(pickupByWeek)
+        .sort((a, b) => b[1] - a[1])
+        .slice(0, 5)
+        .map(([label, amount]) => ({
+          week: label,
+          pct: weekCI > 0 ? Math.round((amount as number) / weekCI * 1000) / 10 : 0,
+        }))
 
       // OCC 조회
       let occQuery = supabase
@@ -179,6 +203,7 @@ export async function GET(request: NextRequest) {
         weekend_occ: weAvail > 0 ? Math.round((weSold / weAvail) * 1000) / 10 : 0,
         weekday_adr: wdSold > 0 ? Math.round(wdRev / wdSold) : 0,
         weekend_adr: weSold > 0 ? Math.round(weRev / weSold) : 0,
+        pickup_top5: pickupTop5,
       }
     }))
 
