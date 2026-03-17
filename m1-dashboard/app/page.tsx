@@ -696,19 +696,18 @@ export default function Dashboard() {
               ))}
             </div>
           </div>
+          <div className="flex items-baseline gap-4 mb-3">
+            <span className="text-lg font-bold text-gray-900">{toplineData?.month || ''}월 C/I {toplineData?.total_ci?.toLocaleString('ko-KR') || 0}원</span>
+            {toplineData?.total_target > 0 && (
+              <span className="text-sm text-gray-500">
+                목표 {toplineData?.total_target?.toLocaleString('ko-KR')}
+                <span className={`ml-1 font-semibold ${(toplineData?.achievement_rate || 0) >= 100 ? 'text-green-600' : 'text-orange-600'}`}>
+                  ({(toplineData?.achievement_rate || 0).toFixed(1)}%)
+                </span>
+              </span>
+            )}
+          </div>
           <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
-            <div className="bg-white p-6 rounded-lg shadow-sm border">
-              <span className="text-sm font-medium text-gray-600">{toplineData?.month || ''}월 C/I 총합</span>
-              <div className="text-2xl font-bold text-gray-900 mt-2">
-                {toplineData?.total_ci?.toLocaleString('ko-KR') || 0}
-              </div>
-              <div className="text-sm text-gray-500 mt-1">
-                목표: {toplineData?.total_target?.toLocaleString('ko-KR') || 0}
-              </div>
-              <div className={`text-sm font-medium mt-1 ${(toplineData?.achievement_rate || 0) >= 100 ? 'text-green-600' : 'text-orange-600'}`}>
-                달성률 {(toplineData?.achievement_rate || 0).toFixed(1)}%
-              </div>
-            </div>
             {toplineData?.weeks?.map((week: any) => (
               <div key={week.week_num} className="bg-white p-6 rounded-lg shadow-sm border">
                 <span className="text-sm font-medium text-gray-600">W{week.week_num} ({week.label})</span>
