@@ -781,6 +781,43 @@ export default function Dashboard() {
               </div>
             ))}
           </div>
+
+          {/* 픽업 기준 탑라인 */}
+          {toplineData?.pickup_weeks && (
+            <>
+              <div className="flex items-baseline gap-4 mb-3 mt-4">
+                <span className="text-lg font-bold text-gray-900">{toplineData?.month || ''}월 픽업 {toplineData?.total_pickup?.toLocaleString('ko-KR') || 0}원</span>
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
+                {toplineData.pickup_weeks.map((week: any) => (
+                  <div key={week.week_num} className="bg-white p-6 rounded-lg shadow-sm border">
+                    <span className="text-sm font-medium text-gray-600">W{week.week_num} ({week.label})</span>
+                    <div className="text-2xl font-bold text-gray-900 mt-2">
+                      {week.pickup_amount?.toLocaleString('ko-KR') || 0}
+                    </div>
+                    <div className="flex gap-3 text-xs text-gray-500 mt-1">
+                      <span>{week.booking_count}건</span>
+                      {week.adr > 0 && <span>ADR {(week.adr/10000).toFixed(1)}만</span>}
+                    </div>
+                    {week.channel_dist?.length > 0 && (
+                      <div className="mt-2 pt-2 border-t">
+                        <div className="text-xs text-gray-400 mb-1">채널</div>
+                        <div className="flex flex-wrap gap-x-3 gap-y-0.5">
+                          {week.channel_dist.map((c: any, i: number) => (
+                            <span key={i} className="text-xs">
+                              <span className="text-gray-500">{c.channel}</span>
+                              <span className="font-semibold text-gray-700 ml-1">{c.pct}%</span>
+                              {c.adr > 0 && <span className="text-gray-400 ml-0.5">({(c.adr/10000).toFixed(1)}만)</span>}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </>
+          )}
         </div>
 
         {/* 일 실적 */}

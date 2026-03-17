@@ -263,6 +263,74 @@ export async function GET(request: NextRequest) {
       }
     }))
 
+    // 픽업 기준 탑라인 (reservation_created_at 기준)
+    let allPickupData: any[] = []
+    let pPage = 0
+    while (true) {
+      let pQuery = supabase
+        .from('raw_bookings')
+        .select('reservation_created_at, payment_amount, reservation_channel, nights')
+        .gte('reservation_created_at', monthStart + ' 00:00:00')
+        .lte('reservation_created_at', monthEnd + ' 23:59:59')
+      if (branch !== 'all') {
+        pQuery = pQuery.eq('branch_name', branch)
+      }
+      const { data: pData } = await pQuery.range(pPage * 1000, (pPage + 1) * 1000 - 1)
+      if (!pData || pData.length === 0) break
+      allPickupData = allPickupData.concat(pData)
+      if (pData.length < 1000) break
+      pPage++
+    }
+
+    const pickupWeeks = weeks.map(week => {
+      const startDate = new Date(week.start_date)
+      const endDate = new Date(week.end_date)
+
+      const wBookings = allPickupData.filter(r => {
+        const d = r.reservation_created_at?.split(' ')[0] || r.reservation_created_at?.split('T')[0]
+        return d >= week.start_date && d <= week.end_date
+      })
+
+      const totalAmount = wBookings.reduce((s: number, r: any) => s + (r.payment_amount || 0), 0)
+      const totalNights = wBookings.reduce((s: number, r: any) => s + (r.nights || 0), 0)
+
+      // 채널 분포
+      const chData: Record<string, { amount: number; nights: number }> = {}
+      wBookings.forEach((r: any) => {
+        const group = getChannelGroup(r.reservation_channel || '')
+        if (!chData[group]) chData[group] = { amount: 0, nights: 0 }
+        chData[group].amount += r.payment_amount || 0
+        chData[group].nights += r.nights || 0
+      })
+      const MAIN_CH = ['OTA', '에어비앤비', 'B2B', '자사채널']
+      const chDist = [...MAIN_CH, '기타'].map(ch => {
+        let d: { amount: number; nights: number }
+        if (ch === '기타') {
+          d = Object.entries(chData)
+            .filter(([k]) => !MAIN_CH.includes(k))
+            .reduce((s, [, v]) => ({ amount: s.amount + v.amount, nights: s.nights + v.nights }), { amount: 0, nights: 0 })
+        } else {
+          d = chData[ch] || { amount: 0, nights: 0 }
+        }
+        return {
+          channel: ch,
+          pct: totalAmount > 0 ? Math.round(d.amount / totalAmount * 1000) / 10 : 0,
+          adr: d.nights > 0 ? Math.round(d.amount / d.nights) : 0,
+        }
+      }).filter(c => c.pct > 0)
+
+      return {
+        week_num: week.week_num,
+        label: `${startDate.getDate()}~${endDate.getDate()}`,
+        pickup_amount: totalAmount,
+        booking_count: wBookings.length,
+        adr: totalNights > 0 ? Math.round(totalAmount / totalNights) : 0,
+        channel_dist: chDist,
+      }
+    })
+
+    const totalPickup = pickupWeeks.reduce((s, w) => s + w.pickup_amount, 0)
+
     return NextResponse.json({
       branch,
       month,
@@ -270,7 +338,9 @@ export async function GET(request: NextRequest) {
       total_ci: totalCI,
       total_target: totalTarget,
       achievement_rate: achievement,
-      weeks: weeksWithLabels
+      weeks: weeksWithLabels,
+      pickup_weeks: pickupWeeks,
+      total_pickup: totalPickup,
     })
   } catch (error: any) {
     console.error('Topline API Error:', error)
