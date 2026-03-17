@@ -739,9 +739,19 @@ export default function Dashboard() {
                           <td className="text-gray-500 py-0.5">ADR</td>
                           <td className="text-right font-semibold text-gray-700">
                             {(week.weekday_adr || 0).toLocaleString('ko-KR')}
+                            {week.weekday_adr_yoy != null && (
+                              <span className={`ml-0.5 text-[10px] font-medium ${week.weekday_adr_yoy >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                                {week.weekday_adr_yoy >= 0 ? '▲' : '▼'}{Math.abs(week.weekday_adr_yoy)}%
+                              </span>
+                            )}
                           </td>
                           <td className="text-right font-semibold text-gray-700">
                             {(week.weekend_adr || 0).toLocaleString('ko-KR')}
+                            {week.weekend_adr_yoy != null && (
+                              <span className={`ml-0.5 text-[10px] font-medium ${week.weekend_adr_yoy >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                                {week.weekend_adr_yoy >= 0 ? '▲' : '▼'}{Math.abs(week.weekend_adr_yoy)}%
+                              </span>
+                            )}
                           </td>
                         </tr>
                       </tbody>
@@ -772,7 +782,15 @@ export default function Dashboard() {
                         <span key={i} className="text-xs">
                           <span className="text-gray-500">{c.channel}</span>
                           <span className="font-semibold text-gray-700 ml-1">{c.pct}%</span>
-                          {c.adr > 0 && <span className="text-gray-400 ml-0.5">({(c.adr/10000).toFixed(1)}만)</span>}
+                          {c.adr > 0 && (
+                            <span className="text-gray-400 ml-0.5">
+                              ({(c.adr/10000).toFixed(1)}만{c.adr_yoy != null && (
+                                <span className={`ml-0.5 ${c.adr_yoy >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                                  {c.adr_yoy >= 0 ? '▲' : '▼'}{Math.abs(c.adr_yoy)}%
+                                </span>
+                              )})
+                            </span>
+                          )}
                         </span>
                       ))}
                     </div>

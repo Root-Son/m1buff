@@ -110,6 +110,63 @@ export async function GET(request: NextRequest) {
       page++
     }
 
+    // 전년 동기 데이터 (YoY ADR 비교용)
+    const prevYear = year - 1
+    const prevWeeks = getSunSatWeeks(prevYear, month)
+    const prevMonthStart = `${prevYear}-${String(month).padStart(2, '0')}-01`
+    const prevMonthEnd = fmt(new Date(prevYear, month, 0))
+
+    let prevYearData: any[] = []
+    let pYPage = 0
+    while (true) {
+      let pyQuery = supabase
+        .from('raw_bookings')
+        .select('check_in_date, payment_amount, reservation_channel, nights')
+        .gte('check_in_date', prevMonthStart)
+        .lte('check_in_date', prevMonthEnd)
+      if (branch !== 'all') {
+        pyQuery = pyQuery.eq('branch_name', branch)
+      }
+      const { data: pyData } = await pyQuery.range(pYPage * 1000, (pYPage + 1) * 1000 - 1)
+      if (!pyData || pyData.length === 0) break
+      prevYearData = prevYearData.concat(pyData)
+      if (pyData.length < 1000) break
+      pYPage++
+    }
+
+    // 전년 주차별 평일/주말 ADR + 채널 ADR 계산
+    const prevYearWeeklyAdr: Record<number, { wdRev: number; wdNights: number; weRev: number; weNights: number; channelData: Record<string, { amount: number; nights: number }> }> = {}
+    prevWeeks.forEach((pw, idx) => {
+      const wNum = pw.week_num
+      const wBookings = prevYearData.filter(r => r.check_in_date >= pw.start_date && r.check_in_date <= pw.end_date)
+      let wdRev = 0, wdNights = 0, weRev = 0, weNights = 0
+      const chData: Record<string, { amount: number; nights: number }> = {}
+
+      wBookings.forEach((r: any) => {
+        const nights = r.nights || 0
+        if (nights <= 0) return
+        const perNight = (r.payment_amount || 0) / nights
+        const ci = new Date(r.check_in_date)
+        for (let n = 0; n < nights; n++) {
+          const sd = new Date(ci)
+          sd.setDate(sd.getDate() + n)
+          const sStr = fmt(sd)
+          if (sStr >= pw.start_date && sStr <= pw.end_date) {
+            const dow = sd.getDay()
+            if (dow === 5 || dow === 6) { weRev += perNight; weNights++ }
+            else { wdRev += perNight; wdNights++ }
+          }
+        }
+        // 채널 집계
+        const group = getChannelGroup(r.reservation_channel || '')
+        if (!chData[group]) chData[group] = { amount: 0, nights: 0 }
+        chData[group].amount += r.payment_amount || 0
+        chData[group].nights += r.nights || 0
+      })
+
+      prevYearWeeklyAdr[wNum] = { wdRev, wdNights, weRev, weNights, channelData: chData }
+    })
+
     // 일별 매출 맵
     const dailyCI: Record<string, number> = {}
     allCiData.forEach(r => {
@@ -266,6 +323,33 @@ export async function GET(request: NextRequest) {
         }
       })
 
+      // YoY ADR 비교
+      const prev = prevYearWeeklyAdr[week.week_num]
+      const prevWdAdr = prev && prev.wdNights > 0 ? Math.round(prev.wdRev / prev.wdNights) : 0
+      const prevWeAdr = prev && prev.weNights > 0 ? Math.round(prev.weRev / prev.weNights) : 0
+      const curWdAdr = wdNightsRb > 0 ? Math.round(wdRevRb / wdNightsRb) : 0
+      const curWeAdr = weNightsRb > 0 ? Math.round(weRevRb / weNightsRb) : 0
+
+      // 채널별 YoY ADR
+      const MAIN_CHANNELS = ['OTA', '에어비앤비', 'B2B', '자사채널']
+      const channelDistWithYoy = channelDist.map((c: any) => {
+        let prevChData: { amount: number; nights: number } | undefined
+        if (prev) {
+          if (c.channel === '기타') {
+            prevChData = Object.entries(prev.channelData)
+              .filter(([k]) => !MAIN_CHANNELS.includes(k))
+              .reduce((s, [, v]) => ({ amount: s.amount + v.amount, nights: s.nights + v.nights }), { amount: 0, nights: 0 })
+          } else {
+            prevChData = prev.channelData[c.channel]
+          }
+        }
+        const prevAdr = prevChData && prevChData.nights > 0 ? Math.round(prevChData.amount / prevChData.nights) : 0
+        return {
+          ...c,
+          adr_yoy: prevAdr > 0 && c.adr > 0 ? Math.round((c.adr - prevAdr) / prevAdr * 1000) / 10 : null,
+        }
+      })
+
       return {
         week_num: week.week_num,
         start_date: week.start_date,
@@ -279,10 +363,12 @@ export async function GET(request: NextRequest) {
         weekend_days: weekendDays,
         weekday_occ: wdAvail > 0 ? Math.round((wdSold / wdAvail) * 1000) / 10 : 0,
         weekend_occ: weAvail > 0 ? Math.round((weSold / weAvail) * 1000) / 10 : 0,
-        weekday_adr: wdNightsRb > 0 ? Math.round(wdRevRb / wdNightsRb) : 0,
-        weekend_adr: weNightsRb > 0 ? Math.round(weRevRb / weNightsRb) : 0,
+        weekday_adr: curWdAdr,
+        weekend_adr: curWeAdr,
+        weekday_adr_yoy: prevWdAdr > 0 && curWdAdr > 0 ? Math.round((curWdAdr - prevWdAdr) / prevWdAdr * 1000) / 10 : null,
+        weekend_adr_yoy: prevWeAdr > 0 && curWeAdr > 0 ? Math.round((curWeAdr - prevWeAdr) / prevWeAdr * 1000) / 10 : null,
         pickup_top5: pickupTop5,
-        channel_dist: channelDist,
+        channel_dist: channelDistWithYoy,
       }
     }))
 
