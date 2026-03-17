@@ -228,7 +228,7 @@ export async function GET(request: NextRequest) {
         .slice(0, 5)
         .map(([label, d]) => ({
           week: label,
-          pct: weekCI > 0 ? Math.round(d.amount / weekCI * 1000) / 10 : 0,
+          pct: weekCI > 0 ? Math.round(d.amount / weekCI * 100) : 0,
           adr: d.nights > 0 ? Math.round(d.amount / d.nights) : 0,
         }))
 
@@ -252,7 +252,7 @@ export async function GET(request: NextRequest) {
         }
         return {
           channel: ch,
-          pct: weekCI > 0 ? Math.round(d.amount / weekCI * 1000) / 10 : 0,
+          pct: weekCI > 0 ? Math.round(d.amount / weekCI * 100) : 0,
           adr: d.nights > 0 ? Math.round(d.amount / d.nights) : 0,
         }
       }).filter(c => c.pct > 0)
@@ -345,7 +345,7 @@ export async function GET(request: NextRequest) {
         const prevAdr = prevChData && prevChData.nights > 0 ? Math.round(prevChData.amount / prevChData.nights) : 0
         return {
           ...c,
-          adr_yoy: prevAdr > 0 && c.adr > 0 ? Math.round((c.adr - prevAdr) / prevAdr * 1000) / 10 : null,
+          adr_yoy: prevAdr > 0 && c.adr > 0 ? Math.round((c.adr - prevAdr) / prevAdr * 100) : null,
         }
       })
 
@@ -355,17 +355,17 @@ export async function GET(request: NextRequest) {
         end_date: week.end_date,
         ci_amount: weekCI,
         label: `${startDate.getDate()}~${endDate.getDate()}`,
-        avg_occ: Math.round(avgOcc * 1000) / 10,
+        avg_occ: Math.round(avgOcc * 100),
         total_available: totalAvailable,
         total_sold: totalSold,
         weekday_days: weekdayDays,
         weekend_days: weekendDays,
-        weekday_occ: wdAvail > 0 ? Math.round((wdSold / wdAvail) * 1000) / 10 : 0,
-        weekend_occ: weAvail > 0 ? Math.round((weSold / weAvail) * 1000) / 10 : 0,
+        weekday_occ: wdAvail > 0 ? Math.round((wdSold / wdAvail) * 100) : 0,
+        weekend_occ: weAvail > 0 ? Math.round((weSold / weAvail) * 100) : 0,
         weekday_adr: curWdAdr,
         weekend_adr: curWeAdr,
-        weekday_adr_yoy: prevWdAdr > 0 && curWdAdr > 0 ? Math.round((curWdAdr - prevWdAdr) / prevWdAdr * 1000) / 10 : null,
-        weekend_adr_yoy: prevWeAdr > 0 && curWeAdr > 0 ? Math.round((curWeAdr - prevWeAdr) / prevWeAdr * 1000) / 10 : null,
+        weekday_adr_yoy: prevWdAdr > 0 && curWdAdr > 0 ? Math.round((curWdAdr - prevWdAdr) / prevWdAdr * 100) : null,
+        weekend_adr_yoy: prevWeAdr > 0 && curWeAdr > 0 ? Math.round((curWeAdr - prevWeAdr) / prevWeAdr * 100) : null,
         pickup_top5: pickupTop5,
         channel_dist: channelDistWithYoy,
       }
@@ -422,7 +422,7 @@ export async function GET(request: NextRequest) {
         }
         return {
           channel: ch,
-          pct: totalAmount > 0 ? Math.round(d.amount / totalAmount * 1000) / 10 : 0,
+          pct: totalAmount > 0 ? Math.round(d.amount / totalAmount * 100) : 0,
           adr: d.nights > 0 ? Math.round(d.amount / d.nights) : 0,
         }
       }).filter(c => c.pct > 0)
