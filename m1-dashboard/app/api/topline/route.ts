@@ -10,6 +10,7 @@ const CHANNEL_GROUPS: Record<string, string> = {
   '내부채널_어스앱': '자사채널', '내부채널_어스(WEB)': '자사채널', '내부채널_직접예약': '자사채널',
   '내부채널_단체': 'B2B', '내부채널_기업체': 'B2B', '내부채널_홀세일': 'B2B',
   '내부채널_홀세일(선수금)': 'B2B', '내부채널_복지몰': 'B2B', '내부채널_부킹엔진': 'B2B',
+  '내부채널_LS': 'LS', 'LS_직계약': 'LS', 'LS_리버스': 'LS', 'LS_제휴부동산': 'LS',
 }
 
 function getChannelGroup(channel: string): string {
@@ -240,7 +241,7 @@ export async function GET(request: NextRequest) {
         channelData[group].amount += r.payment_amount || 0
         channelData[group].nights += r.nights || 0
       })
-      const MAIN_CHANNELS = ['OTA', '에어비앤비', 'B2B', '자사채널']
+      const MAIN_CHANNELS = ['OTA', '에어비앤비', 'B2B', '자사채널', 'LS']
       const channelDist = [...MAIN_CHANNELS, '기타'].map(ch => {
         let d: { amount: number; nights: number }
         if (ch === '기타') {
@@ -410,7 +411,7 @@ export async function GET(request: NextRequest) {
         chData[group].amount += r.payment_amount || 0
         chData[group].nights += r.nights || 0
       })
-      const MAIN_CH = ['OTA', '에어비앤비', 'B2B', '자사채널']
+      const MAIN_CH = ['OTA', '에어비앤비', 'B2B', '자사채널', 'LS']
       const chDist = [...MAIN_CH, '기타'].map(ch => {
         let d: { amount: number; nights: number }
         if (ch === '기타') {
