@@ -234,27 +234,29 @@ export async function GET(request: NextRequest) {
         }))
 
       // 채널 분포
-      const channelData: Record<string, { amount: number; nights: number }> = {}
+      const channelData: Record<string, { amount: number; nights: number; count: number }> = {}
       weekBookings.forEach(r => {
         const group = getChannelGroup(r.reservation_channel || '')
-        if (!channelData[group]) channelData[group] = { amount: 0, nights: 0 }
+        if (!channelData[group]) channelData[group] = { amount: 0, nights: 0, count: 0 }
         channelData[group].amount += r.payment_amount || 0
         channelData[group].nights += r.nights || 0
+        channelData[group].count += 1
       })
       const MAIN_CHANNELS = ['OTA', '에어비앤비', 'B2B', '자사채널', 'LS']
       const channelDist = [...MAIN_CHANNELS, '기타'].map(ch => {
-        let d: { amount: number; nights: number }
+        let d: { amount: number; nights: number; count: number }
         if (ch === '기타') {
           d = Object.entries(channelData)
             .filter(([k]) => !MAIN_CHANNELS.includes(k))
-            .reduce((s, [, v]) => ({ amount: s.amount + v.amount, nights: s.nights + v.nights }), { amount: 0, nights: 0 })
+            .reduce((s, [, v]) => ({ amount: s.amount + v.amount, nights: s.nights + v.nights, count: s.count + v.count }), { amount: 0, nights: 0, count: 0 })
         } else {
-          d = channelData[ch] || { amount: 0, nights: 0 }
+          d = channelData[ch] || { amount: 0, nights: 0, count: 0 }
         }
         return {
           channel: ch,
           pct: weekCI > 0 ? Math.round(d.amount / weekCI * 100) : 0,
           adr: d.nights > 0 ? Math.round(d.amount / d.nights) : 0,
+          los: d.count > 0 ? Math.round(d.nights / d.count * 10) / 10 : 0,
         }
       }).filter(c => c.pct > 0)
 
@@ -404,27 +406,29 @@ export async function GET(request: NextRequest) {
       const totalNights = wBookings.reduce((s: number, r: any) => s + (r.nights || 0), 0)
 
       // 채널 분포
-      const chData: Record<string, { amount: number; nights: number }> = {}
+      const chData: Record<string, { amount: number; nights: number; count: number }> = {}
       wBookings.forEach((r: any) => {
         const group = getChannelGroup(r.reservation_channel || '')
-        if (!chData[group]) chData[group] = { amount: 0, nights: 0 }
+        if (!chData[group]) chData[group] = { amount: 0, nights: 0, count: 0 }
         chData[group].amount += r.payment_amount || 0
         chData[group].nights += r.nights || 0
+        chData[group].count += 1
       })
       const MAIN_CH = ['OTA', '에어비앤비', 'B2B', '자사채널', 'LS']
       const chDist = [...MAIN_CH, '기타'].map(ch => {
-        let d: { amount: number; nights: number }
+        let d: { amount: number; nights: number; count: number }
         if (ch === '기타') {
           d = Object.entries(chData)
             .filter(([k]) => !MAIN_CH.includes(k))
-            .reduce((s, [, v]) => ({ amount: s.amount + v.amount, nights: s.nights + v.nights }), { amount: 0, nights: 0 })
+            .reduce((s, [, v]) => ({ amount: s.amount + v.amount, nights: s.nights + v.nights, count: s.count + v.count }), { amount: 0, nights: 0, count: 0 })
         } else {
-          d = chData[ch] || { amount: 0, nights: 0 }
+          d = chData[ch] || { amount: 0, nights: 0, count: 0 }
         }
         return {
           channel: ch,
           pct: totalAmount > 0 ? Math.round(d.amount / totalAmount * 100) : 0,
           adr: d.nights > 0 ? Math.round(d.amount / d.nights) : 0,
+          los: d.count > 0 ? Math.round(d.nights / d.count * 10) / 10 : 0,
         }
       }).filter(c => c.pct > 0)
 

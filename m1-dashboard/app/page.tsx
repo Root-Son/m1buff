@@ -780,7 +780,7 @@ export default function Dashboard() {
                     <div className="flex flex-wrap gap-x-3 gap-y-0.5">
                       {week.channel_dist.map((c: any, i: number) => (
                         <span key={i} className="text-xs">
-                          <span className="text-gray-500">{c.channel}</span>
+                          <span className="text-gray-500">{c.channel}{c.los > 0 && <span className="text-gray-300 ml-0.5">{c.los}박</span>}</span>
                           <span className="font-semibold text-gray-700 ml-1">{c.pct}%</span>
                           {c.adr > 0 && (
                             <span className="text-gray-400 ml-0.5">
@@ -823,7 +823,7 @@ export default function Dashboard() {
                         <div className="flex flex-wrap gap-x-3 gap-y-0.5">
                           {week.channel_dist.map((c: any, i: number) => (
                             <span key={i} className="text-xs">
-                              <span className="text-gray-500">{c.channel}</span>
+                              <span className="text-gray-500">{c.channel}{c.los > 0 && <span className="text-gray-300 ml-0.5">{c.los}박</span>}</span>
                               <span className="font-semibold text-gray-700 ml-1">{c.pct}%</span>
                               {c.adr > 0 && <span className="text-gray-400 ml-0.5">({(c.adr/10000).toFixed(1)}만)</span>}
                             </span>
