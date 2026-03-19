@@ -226,7 +226,7 @@ export async function GET(request: NextRequest) {
       })
       const pickupTop5 = Object.entries(pickupByWeek)
         .sort((a, b) => b[1].amount - a[1].amount)
-        .slice(0, 5)
+        .slice(0, 8)
         .map(([label, d]) => ({
           week: label,
           pct: weekCI > 0 ? Math.round(d.amount / weekCI * 100) : 0,
