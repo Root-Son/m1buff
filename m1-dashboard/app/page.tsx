@@ -28,6 +28,7 @@ export default function Dashboard() {
   const [monthlySummaryData, setMonthlySummaryData] = useState<any>(null)
   const [channelData, setChannelData] = useState<any>(null)
   const [loading, setLoading] = useState(true)
+  const [toplineLoading, setToplineLoading] = useState(false)
   const [lastUpdated, setLastUpdated] = useState<string>('')
   const [selectedBranch, setSelectedBranch] = useState('전지점') // 디폴트 전지점
   const [selectedRoomType, setSelectedRoomType] = useState('')
@@ -88,7 +89,9 @@ export default function Dashboard() {
 
   // 일 실적: 지점, 날짜 변경 시만
   useEffect(() => {
-    fetchDailyData()
+    const controller = new AbortController()
+    fetchDailyData(controller.signal)
+    return () => controller.abort()
   }, [selectedBranch, selectedDate])
 
   // 월 실적: 지점, 월 변경 시만
@@ -104,7 +107,9 @@ export default function Dashboard() {
 
   // 탑라인: 지점, 탑라인 월 변경 시만
   useEffect(() => {
-    fetchToplineData()
+    const controller = new AbortController()
+    fetchToplineData(controller.signal)
+    return () => controller.abort()
   }, [selectedBranch, toplineMonth])
 
   useEffect(() => {
@@ -178,7 +183,7 @@ export default function Dashboard() {
     } catch {}
   }
 
-  const fetchDailyData = async () => {
+  const fetchDailyData = async (signal?: AbortSignal) => {
     setLoading(true)
     try {
       const branch = selectedBranch === '전지점' ? 'all' : selectedBranch
@@ -189,16 +194,20 @@ export default function Dashboard() {
       const prevDateStr = prevDate.toISOString().split('T')[0]
 
       const [daily, prevDaily] = await Promise.all([
-        fetch(`/api/daily?branch=${branch}${dateParam}`).then(r => r.json()),
-        fetch(`/api/daily?branch=${branch}&date=${prevDateStr}`).then(r => r.json()),
+        fetch(`/api/daily?branch=${branch}${dateParam}`, { signal }).then(r => r.json()),
+        fetch(`/api/daily?branch=${branch}&date=${prevDateStr}`, { signal }).then(r => r.json()),
       ])
-      setDailyData(daily)
-      setPrevDailyData(prevDaily)
-    } catch (error) {
-      console.error('일 실적 로드 실패:', error)
+      if (!signal?.aborted) {
+        setDailyData(daily)
+        setPrevDailyData(prevDaily)
+      }
+    } catch (error: any) {
+      if (error?.name !== 'AbortError') console.error('일 실적 로드 실패:', error)
     } finally {
-      setLoading(false)
-      fetchLastSyncTime()
+      if (!signal?.aborted) {
+        setLoading(false)
+        fetchLastSyncTime()
+      }
     }
   }
 
@@ -235,13 +244,16 @@ export default function Dashboard() {
     }
   }
 
-  const fetchToplineData = async () => {
+  const fetchToplineData = async (signal?: AbortSignal) => {
+    setToplineLoading(true)
     try {
       const branch = selectedBranch === '전지점' ? 'all' : selectedBranch
-      const data = await fetch(`/api/topline?branch=${branch}&month=${toplineMonth}`).then(r => r.json())
-      setToplineData(data)
-    } catch (error) {
-      console.error('탑라인 로드 실패:', error)
+      const data = await fetch(`/api/topline?branch=${branch}&month=${toplineMonth}`, { signal }).then(r => r.json())
+      if (!signal?.aborted) setToplineData(data)
+    } catch (error: any) {
+      if (error?.name !== 'AbortError') console.error('탑라인 로드 실패:', error)
+    } finally {
+      if (!signal?.aborted) setToplineLoading(false)
     }
   }
 
