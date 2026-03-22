@@ -136,7 +136,8 @@ export async function GET(request: NextRequest) {
       wBookings.forEach((r: any) => {
         const nights = r.nights || 0
         if (nights <= 0) return
-        const perNight = (r.payment_amount || 0) / nights
+        if (!r.payment_amount || r.payment_amount <= 0) return
+        const perNight = r.payment_amount / nights
         const ci = new Date(r.check_in_date)
         for (let n = 0; n < nights; n++) {
           const sd = new Date(ci); sd.setDate(sd.getDate() + n)
@@ -225,7 +226,8 @@ export async function GET(request: NextRequest) {
       weekBookings.forEach((r: any) => {
         const nights = r.nights || 0
         if (nights <= 0) return
-        const perNight = (r.payment_amount || 0) / nights
+        if (!r.payment_amount || r.payment_amount <= 0) return
+        const perNight = r.payment_amount / nights
         const ci = new Date(r.check_in_date)
         for (let n = 0; n < nights; n++) {
           const sd = new Date(ci); sd.setDate(sd.getDate() + n)
