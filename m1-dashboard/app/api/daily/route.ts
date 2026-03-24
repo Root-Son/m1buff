@@ -9,33 +9,40 @@ export async function GET(request: NextRequest) {
   try {
     const dateStr = dateParam || new Date().toISOString().split('T')[0]
 
-    const { data, error } = await supabase
-      .rpc('get_daily_stats_dynamic', {
-        p_branch: branch,
-        p_date: dateStr
-      })
+    // 전주 동요일 (7일 전)
+    const d = new Date(dateStr)
+    d.setDate(d.getDate() - 7)
+    const lastWeekStr = d.toISOString().split('T')[0]
 
-    if (error) {
-      console.error('RPC Error:', error)
-      throw error
-    }
+    // 오늘 + 전주 동요일 병렬 호출
+    const [todayResult, lastWeekResult] = await Promise.all([
+      supabase.rpc('get_daily_stats_dynamic', { p_branch: branch, p_date: dateStr }),
+      supabase.rpc('get_daily_stats_dynamic', { p_branch: branch, p_date: lastWeekStr }),
+    ])
 
-    const result = data?.[0]
+    if (todayResult.error) throw todayResult.error
+
+    const today = todayResult.data?.[0]
+    const lastWeek = lastWeekResult.data?.[0]
+
+    const wow = (cur: number, prev: number) =>
+      prev > 0 ? Math.round(((cur - prev) / prev) * 10000) / 100 : 0
 
     return NextResponse.json({
       date: dateStr,
+      compare_date: lastWeekStr,
       branch,
-      pickup: result?.pickup || 0,
-      pickup_dod: result?.pickup_dod || 0,
-      month1: result?.month1 || 0,
-      month1_ci: result?.month1_ci || 0,
-      month1_ci_dod: result?.month1_ci_dod || 0,
-      month2: result?.month2 || 0,
-      month2_ci: result?.month2_ci || 0,
-      month2_ci_dod: result?.month2_ci_dod || 0,
-      month3: result?.month3 || 0,
-      month3_ci: result?.month3_ci || 0,
-      month3_ci_dod: result?.month3_ci_dod || 0,
+      pickup: today?.pickup || 0,
+      pickup_wow: wow(today?.pickup || 0, lastWeek?.pickup || 0),
+      month1: today?.month1 || 0,
+      month1_ci: today?.month1_ci || 0,
+      month1_ci_wow: wow(today?.month1_ci || 0, lastWeek?.month1_ci || 0),
+      month2: today?.month2 || 0,
+      month2_ci: today?.month2_ci || 0,
+      month2_ci_wow: wow(today?.month2_ci || 0, lastWeek?.month2_ci || 0),
+      month3: today?.month3 || 0,
+      month3_ci: today?.month3_ci || 0,
+      month3_ci_wow: wow(today?.month3_ci || 0, lastWeek?.month3_ci || 0),
     })
   } catch (error: any) {
     console.error('Daily API Error:', error)

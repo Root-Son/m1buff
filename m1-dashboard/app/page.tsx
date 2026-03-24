@@ -921,8 +921,8 @@ export default function Dashboard() {
               <div className="text-2xl font-bold text-gray-900 mt-2">
                 {dailyData?.pickup?.toLocaleString('ko-KR') || 0}
               </div>
-              <div className={`text-sm mt-1 ${(dailyData?.pickup_dod || 0) >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                DoD {(dailyData?.pickup_dod || 0) >= 0 ? '+' : ''}{(dailyData?.pickup_dod || 0).toFixed(0)}%
+              <div className={`text-sm mt-1 ${(dailyData?.pickup_wow || 0) >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                전주 동요일 {(dailyData?.pickup_wow || 0) >= 0 ? '+' : ''}{(dailyData?.pickup_wow || 0).toFixed(0)}%
               </div>
             </div>
             <div className="bg-white p-6 rounded-lg shadow-sm border">
@@ -930,8 +930,8 @@ export default function Dashboard() {
               <div className="text-2xl font-bold text-gray-900 mt-2">
                 {dailyData?.month1_ci?.toLocaleString('ko-KR') || 0}
               </div>
-              <div className={`text-sm mt-1 ${(dailyData?.month1_ci_dod || 0) >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                DoD {(dailyData?.month1_ci_dod || 0) >= 0 ? '+' : ''}{(dailyData?.month1_ci_dod || 0).toFixed(0)}%
+              <div className={`text-sm mt-1 ${(dailyData?.month1_ci_wow || 0) >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                전주 동요일 {(dailyData?.month1_ci_wow || 0) >= 0 ? '+' : ''}{(dailyData?.month1_ci_wow || 0).toFixed(0)}%
               </div>
             </div>
             <div className="bg-white p-6 rounded-lg shadow-sm border">
@@ -939,8 +939,8 @@ export default function Dashboard() {
               <div className="text-2xl font-bold text-gray-900 mt-2">
                 {dailyData?.month2_ci?.toLocaleString('ko-KR') || 0}
               </div>
-              <div className={`text-sm mt-1 ${(dailyData?.month2_ci_dod || 0) >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                DoD {(dailyData?.month2_ci_dod || 0) >= 0 ? '+' : ''}{(dailyData?.month2_ci_dod || 0).toFixed(0)}%
+              <div className={`text-sm mt-1 ${(dailyData?.month2_ci_wow || 0) >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                전주 동요일 {(dailyData?.month2_ci_wow || 0) >= 0 ? '+' : ''}{(dailyData?.month2_ci_wow || 0).toFixed(0)}%
               </div>
             </div>
             <div className="bg-white p-6 rounded-lg shadow-sm border">
@@ -948,8 +948,8 @@ export default function Dashboard() {
               <div className="text-2xl font-bold text-gray-900 mt-2">
                 {dailyData?.month3_ci?.toLocaleString('ko-KR') || 0}
               </div>
-              <div className={`text-sm mt-1 ${(dailyData?.month3_ci_dod || 0) >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                DoD {(dailyData?.month3_ci_dod || 0) >= 0 ? '+' : ''}{(dailyData?.month3_ci_dod || 0).toFixed(0)}%
+              <div className={`text-sm mt-1 ${(dailyData?.month3_ci_wow || 0) >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                전주 동요일 {(dailyData?.month3_ci_wow || 0) >= 0 ? '+' : ''}{(dailyData?.month3_ci_wow || 0).toFixed(0)}%
               </div>
             </div>
           </div>
