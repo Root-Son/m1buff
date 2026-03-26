@@ -87,30 +87,43 @@ export default function Dashboard() {
     fetchLastSyncTime()
   }, [])
 
-  // 일 실적: 지점, 날짜 변경 시만
+  // ★ 탑라인 최우선 로딩 → 완료 후 나머지 lazy load
   useEffect(() => {
     const controller = new AbortController()
-    fetchDailyData(controller.signal)
+    fetchToplineData(controller.signal).then(() => {
+      // 탑라인 완료 후 나머지 로딩
+      fetchDailyData()
+      fetchMonthlyData()
+      fetchMonthlySummary()
+      fetchWeeklyAndChannelData()
+    })
     return () => controller.abort()
-  }, [selectedBranch, selectedDate])
+  }, [selectedBranch])
 
-  // 월 실적: 지점, 월 변경 시만
+  // 일 실적: 날짜 변경 시만 (지점 변경은 위에서 처리)
+  useEffect(() => {
+    if (!selectedDate) return
+    fetchDailyData()
+  }, [selectedDate])
+
+  // 월 실적: 월 변경 시만
   useEffect(() => {
     fetchMonthlyData()
     fetchMonthlySummary()
-  }, [selectedBranch, selectedMonth])
+  }, [selectedMonth])
 
-  // 주간 실적 + 채널 비중: 지점, 주차 변경 시만
+  // 주간 실적 + 채널 비중: 주차 변경 시만
   useEffect(() => {
     fetchWeeklyAndChannelData()
-  }, [selectedBranch, currentWeek])
+  }, [currentWeek])
 
-  // 탑라인: 지점, 탑라인 월 변경 시만
+  // 탑라인: 월 변경 시만
   useEffect(() => {
+    if (toplineMonth === 3) return // 초기값은 위에서 처리됨
     const controller = new AbortController()
     fetchToplineData(controller.signal)
     return () => controller.abort()
-  }, [selectedBranch, toplineMonth])
+  }, [toplineMonth])
 
   useEffect(() => {
     if (weeklyData) {

@@ -307,11 +307,14 @@ export async function GET(request: NextRequest) {
       }
     })
 
-    return NextResponse.json({
+    const response = NextResponse.json({
       branch, month, year, total_ci: totalCI, total_target: totalTarget, achievement_rate: achievement,
       weeks: weeksWithLabels, pickup_weeks: pickupWeeks,
       total_pickup: pickupWeeks.reduce((s, w) => s + w.pickup_amount, 0),
     })
+    // 5분 캐싱: 동기화는 하루 3~4회이므로 충분
+    response.headers.set('Cache-Control', 's-maxage=300, stale-while-revalidate=600')
+    return response
   } catch (error: any) {
     console.error('Topline API Error:', error)
     return NextResponse.json({ error: error.message }, { status: 500 })
