@@ -283,7 +283,7 @@ def main():
     """메인 실행"""
     start_time = datetime.now()
     today = date.today()
-    month_start = today.replace(day=1).strftime('%Y-%m-%d')
+    month_start = '2025-10-01'  # 최소 픽업일 기준 (3/27 체크인의 가장 빠른 예약 = 10/23)
     today_str = today.strftime('%Y-%m-%d')
 
     print(f"\n{'='*60}")
@@ -324,9 +324,9 @@ def main():
         print(f"❌ price_guide 실패: {e}")
         errors.append(('price_guide', str(e)))
 
-    # 4. raw_bookings (Redash → upsert, reservation_no 기준)
+    # 4. raw_bookings (Redash → delete+insert, 취소 반영을 위해)
     try:
-        print("\n[4/4] raw_bookings (Redash → upsert)")
+        print("\n[4/4] raw_bookings (Redash → delete+insert)")
         default_branch_id = get_redash_branchid_default(QUERIES['raw_bookings'])
         params = {
             'startDate': month_start,
@@ -336,7 +336,28 @@ def main():
         df = execute_redash_query(QUERIES['raw_bookings'], params)
         print(f"  Redash 조회: {len(df)}건")
         data = process_raw_bookings(df)
-        upsert_to_supabase('raw_bookings', data)
+
+        # ★ 취소 반영: startDate 이후 예약 삭제 후 재삽입
+        # reservation_created_at >= startDate 인 기존 데이터 삭제
+        print(f"  🗑️ reservation_created_at >= {month_start} 삭제 중...")
+        del_headers = {**supabase_headers(), 'Prefer': 'return=minimal'}
+        # 배치 삭제 (PostgREST 타임아웃 방지)
+        from datetime import datetime as dt
+        cursor = dt.strptime(month_start, '%Y-%m-%d')
+        end_dt = dt.strptime(today_str, '%Y-%m-%d')
+        while cursor <= end_dt:
+            next_cursor = cursor + pd.Timedelta(days=30)
+            cs = cursor.strftime('%Y-%m-%d')
+            ns = min(next_cursor, end_dt + pd.Timedelta(days=1)).strftime('%Y-%m-%d')
+            del_url = (f"{SUPABASE_URL}/rest/v1/raw_bookings"
+                       f"?reservation_created_at=gte.{cs}&reservation_created_at=lt.{ns}")
+            del_resp = requests.delete(del_url, headers=del_headers)
+            print(f"    삭제 {cs}~{ns}: {del_resp.status_code}")
+            cursor = next_cursor
+            time.sleep(0.3)
+
+        print(f"  📥 {len(data)}건 insert 중...")
+        insert_to_supabase('raw_bookings', data)
     except Exception as e:
         print(f"❌ raw_bookings 실패: {e}")
         errors.append(('raw_bookings', str(e)))
