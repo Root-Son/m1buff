@@ -337,7 +337,7 @@ export async function GET(request: NextRequest) {
       const cacheKey = `topline:all:${year}:${month}`
       supabase.from('dashboard_cache').upsert({
         cache_key: cacheKey, data: payload, updated_at: new Date().toISOString()
-      }, { onConflict: 'cache_key' }).then(() => {}).catch(() => {})
+      }, { onConflict: 'cache_key' }).then(() => {})
     }
 
     const response = NextResponse.json(payload)
