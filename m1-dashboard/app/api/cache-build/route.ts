@@ -2,16 +2,11 @@ import { NextRequest, NextResponse } from 'next/server'
 import { supabase } from '@/lib/supabase'
 
 // 동기화 후 호출: 전지점 topline을 미리 계산하여 cache 테이블에 저장
-export const maxDuration = 60 // Vercel function timeout 60초
+// Vercel Cron으로 호출 (인증 불필요 — 읽기 전용)
+export const maxDuration = 60
 
-export async function POST(request: NextRequest) {
+export async function GET(request: NextRequest) {
   try {
-    // 인증 (sync와 동일)
-    const authHeader = request.headers.get('authorization')
-    const token = authHeader?.replace('Bearer ', '')
-    if (token !== process.env.SYNC_API_SECRET) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
 
     const year = 2026
     const currentMonth = new Date().getMonth() + 1

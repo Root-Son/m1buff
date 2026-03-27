@@ -39,14 +39,10 @@ jobs:
 
       - name: Build dashboard cache
         if: success()
-        env:
-          VERCEL_URL: ${{ secrets.VERCEL_DEPLOY_URL }}
-          SYNC_API_SECRET: ${{ secrets.SYNC_API_SECRET }}
         run: |
           echo "캐시 빌드 시작..."
-          curl -s -X POST "https://${VERCEL_URL}/api/cache-build" \
-            -H "Authorization: Bearer ${SYNC_API_SECRET}" \
-            -H "Content-Type: application/json" \
+          sleep 30
+          curl -s "https://m1buff-rootson-6933s-projects.vercel.app/api/cache-build" \
             --max-time 60 || echo "캐시 빌드 실패 (non-blocking)"
 
       - name: Notify on failure

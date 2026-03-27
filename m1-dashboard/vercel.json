@@ -19,6 +19,22 @@
     {
       "path": "/api/cron/trigger-sync",
       "schedule": "30 14 * * *"
+    },
+    {
+      "path": "/api/cache-build",
+      "schedule": "45 21 * * *"
+    },
+    {
+      "path": "/api/cache-build",
+      "schedule": "45 4 * * *"
+    },
+    {
+      "path": "/api/cache-build",
+      "schedule": "45 8 * * *"
+    },
+    {
+      "path": "/api/cache-build",
+      "schedule": "45 14 * * *"
     }
   ]
 }
