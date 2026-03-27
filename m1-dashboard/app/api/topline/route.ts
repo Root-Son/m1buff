@@ -326,12 +326,21 @@ export async function GET(request: NextRequest) {
       }
     })
 
-    const response = NextResponse.json({
+    const payload = {
       branch, month, year, total_ci: totalCI, total_target: totalTarget, achievement_rate: achievement,
       weeks: weeksWithLabels, pickup_weeks: pickupWeeks,
       total_pickup: pickupWeeks.reduce((s, w) => s + w.pickup_amount, 0),
-    })
-    // 5분 캐싱: 동기화는 하루 3~4회이므로 충분
+    }
+
+    // ★ 전지점(all) 결과를 cache에 자동 저장 (다음 요청부터 캐시 히트)
+    if (branch === 'all') {
+      const cacheKey = `topline:all:${year}:${month}`
+      supabase.from('dashboard_cache').upsert({
+        cache_key: cacheKey, data: payload, updated_at: new Date().toISOString()
+      }, { onConflict: 'cache_key' }).then(() => {}).catch(() => {})
+    }
+
+    const response = NextResponse.json(payload)
     response.headers.set('Cache-Control', 's-maxage=300, stale-while-revalidate=600')
     return response
   } catch (error: any) {
