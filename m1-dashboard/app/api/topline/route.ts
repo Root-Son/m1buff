@@ -65,10 +65,29 @@ export async function GET(request: NextRequest) {
   const searchParams = request.nextUrl.searchParams
   const branch = searchParams.get('branch') || 'all'
   const monthParam = searchParams.get('month')
+  const noCache = searchParams.get('nocache') === '1'
 
   try {
     const month = monthParam ? parseInt(monthParam) : new Date().getMonth() + 1
     const year = 2026
+
+    // ★ 캐시 우선: dashboard_cache에서 읽기 (전지점 all만 캐시)
+    if (branch === 'all' && !noCache) {
+      const cacheKey = `topline:all:${year}:${month}`
+      const { data: cached } = await supabase
+        .from('dashboard_cache')
+        .select('data, updated_at')
+        .eq('cache_key', cacheKey)
+        .single()
+
+      if (cached?.data) {
+        const response = NextResponse.json({ ...cached.data, cached: true, cached_at: cached.updated_at })
+        response.headers.set('Cache-Control', 's-maxage=300, stale-while-revalidate=600')
+        return response
+      }
+    }
+
+    // 캐시 미스 → 기존 로직
     const weeks = getSunSatWeeks(year, month)
     const monthStart = `${year}-${String(month).padStart(2, '0')}-01`
     const monthEnd = fmt(new Date(year, month, 0))
