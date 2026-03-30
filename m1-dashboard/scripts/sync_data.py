@@ -389,5 +389,21 @@ def main():
         except Exception as e:
             print(f"  sync_logs 기록 실패 (무시): {e}")
 
+def invalidate_topline_cache():
+    """동기화 후 topline 캐시 삭제 → 다음 대시보드 접속 시 fresh 계산"""
+    try:
+        resp = requests.delete(
+            f"{SUPABASE_URL}/rest/v1/dashboard_cache?cache_key=like.topline*",
+            headers={
+                'apikey': SUPABASE_KEY,
+                'Authorization': f'Bearer {SUPABASE_KEY}',
+                'Prefer': 'return=minimal',
+            }
+        )
+        print(f"  캐시 무효화: {resp.status_code}")
+    except Exception as e:
+        print(f"  캐시 무효화 실패 (무시): {e}")
+
 if __name__ == '__main__':
     main()
+    invalidate_topline_cache()

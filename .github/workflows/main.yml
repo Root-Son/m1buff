@@ -37,14 +37,6 @@ jobs:
           SHEET_ID: ${{ secrets.SHEET_ID }}
         run: python scripts/sync_data.py
 
-      - name: Build dashboard cache
-        if: success()
-        run: |
-          echo "캐시 빌드 시작..."
-          sleep 30
-          curl -s "https://m1buff-rootson-6933s-projects.vercel.app/api/cache-build" \
-            --max-time 60 || echo "캐시 빌드 실패 (non-blocking)"
-
       - name: Notify on failure
         if: failure()
         run: echo "동기화 실패! 로그를 확인하세요."
