@@ -116,13 +116,32 @@ export async function GET(request: NextRequest) {
           .gte('check_in_date', prevMonthStart).lte('check_in_date', prevMonthEnd)
         return branchFilter(q).range(s, e)
       }),
-      // 4. OCC 월 전체 한번에
-      fetchAllPages(([s, e]) => {
-        let q = supabase.from('branch_room_occ')
-          .select('date, available_rooms, sold_rooms')
-          .gte('date', monthStart).lte('date', monthEnd)
-        return branchFilter(q).range(s, e)
-      }),
+      // 4. OCC: branch_room_occ 우선, 없으면 occ_daily fallback
+      (async () => {
+        const occData = await fetchAllPages(([s, e]) => {
+          let q = supabase.from('branch_room_occ')
+            .select('date, available_rooms, sold_rooms')
+            .gte('date', monthStart).lte('date', monthEnd)
+          return branchFilter(q).range(s, e)
+        })
+        if (occData.length > 0) return occData
+        // fallback: occ_daily → branch_room_occ 형식으로 변환
+        const occDaily = await fetchAllPages(([s, e]) => {
+          let q = supabase.from('occ_daily')
+            .select('date, branch_name, available, sold')
+            .gte('date', monthStart).lte('date', monthEnd)
+          return branchFilter(q).range(s, e)
+        })
+        // 날짜+지점별 합산하여 branch_room_occ 형식으로
+        const grouped: Record<string, { date: string; available_rooms: number; sold_rooms: number }> = {}
+        occDaily.forEach((r: any) => {
+          const key = branch !== 'all' ? r.date : `${r.date}|${r.branch_name}`
+          if (!grouped[key]) grouped[key] = { date: r.date, available_rooms: 0, sold_rooms: 0 }
+          grouped[key].available_rooms += r.available || 0
+          grouped[key].sold_rooms += r.sold || 0
+        })
+        return Object.values(grouped)
+      })(),
       // 5. 픽업 기준 raw_bookings
       fetchAllPages(([s, e]) => {
         let q = supabase.from('raw_bookings')
