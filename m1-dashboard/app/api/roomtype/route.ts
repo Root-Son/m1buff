@@ -171,7 +171,7 @@ export async function GET(request: Request) {
         FROM cur
         LEFT JOIN d7 ON d7.target_date = cur.target_date AND d7.roomtypeId = cur.roomtypeId
         LEFT JOIN d1_cte ON d1_cte.target_date = cur.target_date AND d1_cte.roomtypeId = cur.roomtypeId
-        LEFT JOIN avail a ON CAST(a.date AS VARCHAR) = cur.target_date AND a.roomtypeId = cur.roomtypeId
+        LEFT JOIN avail a ON a.date = CAST(cur.target_date AS DATE) AND a.roomtypeId = cur.roomtypeId
         ORDER BY cur.target_date, cur.rt_name
       `),
     ])
