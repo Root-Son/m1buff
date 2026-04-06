@@ -94,7 +94,7 @@ export async function GET(request: Request) {
       `),
       duckQuery(`
         SELECT
-          CAST(CAST(f.date AS DATE) + INTERVAL 7 DAY AS VARCHAR) as date,
+          STRFTIME(CAST(f.date AS DATE) + INTERVAL 7 DAY, '%Y-%m-%d') as date,
           f.rt_name as room_type,
           SUM(f.oc_rn) as sold,
           MAX(s.activeRooms) as activeRooms
@@ -105,11 +105,11 @@ export async function GET(request: Request) {
         WHERE f.event = '재실' AND f.isSales = true
           AND f.b_name = '${escapedBranch}'
           AND CAST(f.date AS VARCHAR) >= '${d7Mon.toISOString().split('T')[0]}' AND CAST(f.date AS VARCHAR) <= '${d7Sun.toISOString().split('T')[0]}'
-        GROUP BY CAST(CAST(f.date AS DATE) + INTERVAL 7 DAY AS VARCHAR), f.rt_name
+        GROUP BY STRFTIME(CAST(f.date AS DATE) + INTERVAL 7 DAY, '%Y-%m-%d'), f.rt_name
       `),
       duckQuery(`
         SELECT
-          CAST(CAST(f.date AS DATE) + INTERVAL 1 DAY AS VARCHAR) as date,
+          STRFTIME(CAST(f.date AS DATE) + INTERVAL 1 DAY, '%Y-%m-%d') as date,
           f.rt_name as room_type,
           SUM(f.oc_rn) as sold,
           MAX(s.activeRooms) as activeRooms
@@ -120,7 +120,7 @@ export async function GET(request: Request) {
         WHERE f.event = '재실' AND f.isSales = true
           AND f.b_name = '${escapedBranch}'
           AND CAST(f.date AS VARCHAR) >= '${d1Mon.toISOString().split('T')[0]}' AND CAST(f.date AS VARCHAR) <= '${d1Sun.toISOString().split('T')[0]}'
-        GROUP BY CAST(CAST(f.date AS DATE) + INTERVAL 1 DAY AS VARCHAR), f.rt_name
+        GROUP BY STRFTIME(CAST(f.date AS DATE) + INTERVAL 1 DAY, '%Y-%m-%d'), f.rt_name
       `),
     ])
 
