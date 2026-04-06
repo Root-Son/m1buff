@@ -152,9 +152,12 @@ export default function Dashboard() {
   const fetchRoomTypeData = async () => {
     try {
       const branch = selectedBranch === '전지점' ? 'all' : selectedBranch
+      const branch_param = branch === 'all' ? '' : branch
+      if (!branch_param) { setRoomTypeData(null); return }
       const response = await fetch(
-        `/api/roomtype?branch=${branch}&weekOffset=${roomTypeWeekOffset}&roomType=${selectedRoomType}`
+        `/api/roomtype?branch=${branch_param}&weekOffset=${roomTypeWeekOffset}&roomType=${selectedRoomType}`
       )
+      if (!response.ok) { setRoomTypeData(null); return }
       const data = await response.json()
       // 첫 로드 시 룸타입 미선택이면 첫 번째 룸타입 자동 선택
       if (!selectedRoomType && data.roomTypes?.length > 0) {
