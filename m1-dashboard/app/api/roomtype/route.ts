@@ -176,9 +176,10 @@ export async function GET(request: Request) {
       `),
     ])
 
-    const roomTypes = [...new Set(occResult.rows.map((r: any) => r.room_type).filter(Boolean))].sort() as string[]
+    const roomTypes = [...new Set(paceResult.rows.map((r: any) => r.room_type).filter(Boolean))].sort() as string[]
 
-    // D-7/D-1 lookup from pace query
+    // OCC/D-7/D-1 모두 paceResult(staging_reservation) 기준으로 통일
+    const occMap: Record<string, number> = {}
     const d7Map: Record<string, number> = {}
     const d1Map: Record<string, number> = {}
     paceResult.rows.forEach((r: any) => {
@@ -186,9 +187,18 @@ export async function GET(request: Request) {
       const key = `${d}_${r.room_type}`
       const active = r.activeRooms || 0
       if (active > 0) {
+        occMap[key] = Math.min(Math.round((r.cur_booked || 0) / active * 10000) / 10000, 1)
         d7Map[key] = Math.min(Math.round((r.d7_booked || 0) / active * 10000) / 10000, 1)
         d1Map[key] = Math.min(Math.round((r.d1_booked || 0) / active * 10000) / 10000, 1)
       }
+    })
+
+    // ADR은 재실(occResult)에서 가져오기
+    const adrMap: Record<string, number> = {}
+    occResult.rows.forEach((r: any) => {
+      const d = String(r.date).substring(0, 10)
+      const key = `${d}_${r.room_type}`
+      adrMap[key] = r.paidRn > 0 ? Math.round(r.revenue / r.paidRn) : 0
     })
 
     // 2. raw_bookings: LoS + 채널
@@ -250,12 +260,10 @@ export async function GET(request: Request) {
       })
     })
 
-    // 병합
-    const mergedData = occResult.rows.map((row: any) => {
-      const dateStr = String(row.date).split('T')[0].substring(0, 10)
+    // 병합 (paceResult 기준 — OCC/D-7/D-1 동일 소스)
+    const mergedData = paceResult.rows.map((row: any) => {
+      const dateStr = String(row.date).substring(0, 10)
       const key = `${dateStr}_${row.room_type}`
-      const occ = row.activeRooms > 0 ? Math.min(Math.round(row.sold / row.activeRooms * 10000) / 10000, 1) : 0
-      const adr = row.paidRn > 0 ? Math.round(row.revenue / row.paidRn) : 0
 
       const yolo = yoloData?.find((y: any) => y.date === dateStr && y.room_type === row.room_type)
       const guide = guideData?.find((g: any) => g.date === dateStr && g.room_type === row.room_type)
@@ -263,10 +271,10 @@ export async function GET(request: Request) {
       return {
         date: dateStr,
         room_type: row.room_type,
-        occ,
+        occ: occMap[key] ?? 0,
         occ_7d_ago: d7Map[key] ?? 0,
         occ_1d_ago: d1Map[key] ?? 0,
-        adr,
+        adr: adrMap[key] ?? 0,
         yolo_price: yolo?.price ? toDisplayPrice(branch!, yolo.price) : null,
         guardrail_price: guide?.min_price || null,
         avg_los: losAverages[key] || 0,
