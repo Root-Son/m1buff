@@ -126,14 +126,14 @@ export async function GET(request: Request) {
       const d7Str = d7.toISOString().split('T')[0]
       const d7Data = occByDateRt[`${d7Str}_${rt}`]
       if (d7Data && d7Data.activeRooms > 0) {
-        d7Map[`${d}_${rt}`] = Math.min(Math.round(d7Data.sold / d7Data.activeRooms * 100), 100)
+        d7Map[`${d}_${rt}`] = Math.min(Math.round(d7Data.sold / d7Data.activeRooms * 10000) / 10000, 1)
       }
       // 1일 전
       const d1 = new Date(d); d1.setDate(d1.getDate() - 1)
       const d1Str = d1.toISOString().split('T')[0]
       const d1Data = occByDateRt[`${d1Str}_${rt}`]
       if (d1Data && d1Data.activeRooms > 0) {
-        d1Map[`${d}_${rt}`] = Math.min(Math.round(d1Data.sold / d1Data.activeRooms * 100), 100)
+        d1Map[`${d}_${rt}`] = Math.min(Math.round(d1Data.sold / d1Data.activeRooms * 10000) / 10000, 1)
       }
     })
 
@@ -200,7 +200,7 @@ export async function GET(request: Request) {
     const mergedData = occResult.rows.map((row: any) => {
       const dateStr = String(row.date).split('T')[0].substring(0, 10)
       const key = `${dateStr}_${row.room_type}`
-      const occ = row.activeRooms > 0 ? Math.min(Math.round(row.sold / row.activeRooms * 100), 100) : 0
+      const occ = row.activeRooms > 0 ? Math.min(Math.round(row.sold / row.activeRooms * 10000) / 10000, 1) : 0
       const adr = row.paidRn > 0 ? Math.round(row.revenue / row.paidRn) : 0
 
       const yolo = yoloData?.find((y: any) => y.date === dateStr && y.room_type === row.room_type)
@@ -210,8 +210,8 @@ export async function GET(request: Request) {
         date: dateStr,
         room_type: row.room_type,
         occ,
-        occ_7d_ago: d7Map[key] ?? null,
-        occ_1d_ago: d1Map[key] ?? null,
+        occ_7d_ago: d7Map[key] ?? 0,
+        occ_1d_ago: d1Map[key] ?? 0,
         adr,
         yolo_price: yolo?.price ? toDisplayPrice(branch!, yolo.price) : null,
         guardrail_price: guide?.min_price || null,
