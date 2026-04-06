@@ -73,72 +73,68 @@ export async function GET(request: Request) {
 
     const escapedBranch = branch.replace(/'/g, "''")
 
-    // 1. Duck: OCC/ADR by roomtype (dynamic-pricing과 동일 쿼리)
-    const [occResult, d7Result, d1Result] = await Promise.all([
-      duckQuery(`
-        SELECT
-          CAST(f.date AS VARCHAR) as date,
-          f.rt_name as room_type,
-          SUM(f.oc_rn) as sold,
-          MAX(s.activeRooms) as activeRooms,
-          SUM(CASE WHEN f.oc_rv > 0 THEN f.oc_rv ELSE 0 END) as revenue,
-          SUM(CASE WHEN f.oc_rv > 0 THEN f.oc_rn ELSE 0 END) as paidRn
-        FROM fact_reservation_event f
-        LEFT JOIN staging_stat_daily s
-          ON CAST(f.date AS VARCHAR) = CAST(s.date AS VARCHAR)
-          AND f.branchId = s.branchId AND f.roomtypeId = s.roomtypeId
-        WHERE f.event = '재실' AND f.isSales = true
-          AND f.b_name = '${escapedBranch}'
-          AND CAST(f.date AS VARCHAR) >= '${startDate}' AND CAST(f.date AS VARCHAR) <= '${endDate}'
-        GROUP BY CAST(f.date AS VARCHAR), f.rt_name
-      `),
-      duckQuery(`
-        SELECT
-          STRFTIME(CAST(f.date AS DATE) + INTERVAL 7 DAY, '%Y-%m-%d') as date,
-          f.rt_name as room_type,
-          SUM(f.oc_rn) as sold,
-          MAX(s.activeRooms) as activeRooms
-        FROM fact_reservation_event f
-        LEFT JOIN staging_stat_daily s
-          ON CAST(f.date AS VARCHAR) = CAST(s.date AS VARCHAR)
-          AND f.branchId = s.branchId AND f.roomtypeId = s.roomtypeId
-        WHERE f.event = '재실' AND f.isSales = true
-          AND f.b_name = '${escapedBranch}'
-          AND CAST(f.date AS VARCHAR) >= '${d7Mon.toISOString().split('T')[0]}' AND CAST(f.date AS VARCHAR) <= '${d7Sun.toISOString().split('T')[0]}'
-        GROUP BY STRFTIME(CAST(f.date AS DATE) + INTERVAL 7 DAY, '%Y-%m-%d'), f.rt_name
-      `),
-      duckQuery(`
-        SELECT
-          STRFTIME(CAST(f.date AS DATE) + INTERVAL 1 DAY, '%Y-%m-%d') as date,
-          f.rt_name as room_type,
-          SUM(f.oc_rn) as sold,
-          MAX(s.activeRooms) as activeRooms
-        FROM fact_reservation_event f
-        LEFT JOIN staging_stat_daily s
-          ON CAST(f.date AS VARCHAR) = CAST(s.date AS VARCHAR)
-          AND f.branchId = s.branchId AND f.roomtypeId = s.roomtypeId
-        WHERE f.event = '재실' AND f.isSales = true
-          AND f.b_name = '${escapedBranch}'
-          AND CAST(f.date AS VARCHAR) >= '${d1Mon.toISOString().split('T')[0]}' AND CAST(f.date AS VARCHAR) <= '${d1Sun.toISOString().split('T')[0]}'
-        GROUP BY STRFTIME(CAST(f.date AS DATE) + INTERVAL 1 DAY, '%Y-%m-%d'), f.rt_name
-      `),
-    ])
+    // 1. Duck: 이번주 + D-7 + D-1 한방 쿼리 (날짜 범위 확장)
+    const allStart = d7Mon.toISOString().split('T')[0]  // 가장 과거
+    const allEnd = endDate  // 가장 미래
 
-    // 룸타입 목록
+    const allResult = await duckQuery(`
+      SELECT
+        CAST(f.date AS VARCHAR) as date,
+        f.rt_name as room_type,
+        SUM(f.oc_rn) as sold,
+        MAX(s.activeRooms) as activeRooms,
+        SUM(CASE WHEN f.oc_rv > 0 THEN f.oc_rv ELSE 0 END) as revenue,
+        SUM(CASE WHEN f.oc_rv > 0 THEN f.oc_rn ELSE 0 END) as paidRn
+      FROM fact_reservation_event f
+      LEFT JOIN staging_stat_daily s
+        ON CAST(f.date AS VARCHAR) = CAST(s.date AS VARCHAR)
+        AND f.branchId = s.branchId AND f.roomtypeId = s.roomtypeId
+      WHERE f.event = '재실' AND f.isSales = true
+        AND f.b_name = '${escapedBranch}'
+        AND CAST(f.date AS VARCHAR) >= '${allStart}' AND CAST(f.date AS VARCHAR) <= '${allEnd}'
+      GROUP BY CAST(f.date AS VARCHAR), f.rt_name
+    `)
+
+    // 날짜별 OCC map 구축
+    const occByDateRt: Record<string, { sold: number; activeRooms: number; revenue: number; paidRn: number }> = {}
+    allResult.rows.forEach((r: any) => {
+      const d = String(r.date).substring(0, 10)
+      occByDateRt[`${d}_${r.room_type}`] = {
+        sold: r.sold || 0,
+        activeRooms: r.activeRooms || 0,
+        revenue: r.revenue || 0,
+        paidRn: r.paidRn || 0,
+      }
+    })
+
+    // 이번주 데이터 필터
+    const occResult = { rows: allResult.rows.filter((r: any) => {
+      const d = String(r.date).substring(0, 10)
+      return d >= startDate && d <= endDate
+    })}
+
     const roomTypes = [...new Set(occResult.rows.map((r: any) => r.room_type).filter(Boolean))].sort() as string[]
 
-    // D-7, D-1 lookup
+    // D-7, D-1 lookup (JS에서 7일/1일 전 날짜로 매핑)
     const d7Map: Record<string, number> = {}
-    d7Result.rows.forEach((r: any) => {
-      const d = String(r.date).split('T')[0].substring(0, 10)
-      const occ = r.activeRooms > 0 ? Math.min(Math.round(r.sold / r.activeRooms * 100), 100) : 0
-      d7Map[`${d}_${r.room_type}`] = occ
-    })
     const d1Map: Record<string, number> = {}
-    d1Result.rows.forEach((r: any) => {
-      const d = String(r.date).split('T')[0].substring(0, 10)
-      const occ = r.activeRooms > 0 ? Math.min(Math.round(r.sold / r.activeRooms * 100), 100) : 0
-      d1Map[`${d}_${r.room_type}`] = occ
+    occResult.rows.forEach((r: any) => {
+      const d = String(r.date).substring(0, 10)
+      const rt = r.room_type
+      // 7일 전
+      const d7 = new Date(d); d7.setDate(d7.getDate() - 7)
+      const d7Str = d7.toISOString().split('T')[0]
+      const d7Data = occByDateRt[`${d7Str}_${rt}`]
+      if (d7Data && d7Data.activeRooms > 0) {
+        d7Map[`${d}_${rt}`] = Math.min(Math.round(d7Data.sold / d7Data.activeRooms * 100), 100)
+      }
+      // 1일 전
+      const d1 = new Date(d); d1.setDate(d1.getDate() - 1)
+      const d1Str = d1.toISOString().split('T')[0]
+      const d1Data = occByDateRt[`${d1Str}_${rt}`]
+      if (d1Data && d1Data.activeRooms > 0) {
+        d1Map[`${d}_${rt}`] = Math.min(Math.round(d1Data.sold / d1Data.activeRooms * 100), 100)
+      }
     })
 
     // 2. raw_bookings: LoS + 채널
