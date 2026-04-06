@@ -1,42 +1,37 @@
 // Duck API client for m1-dashboard
-// Keycloak service account auth → duck query
+// Keycloak service account (client_credentials) → duck query
 
 const DUCK_URL = process.env.DUCK_URL || 'https://duck.plott.co.kr'
-const KEYCLOAK_URL = process.env.KEYCLOAK_URL || 'https://auth.plott.co.kr'
-const KEYCLOAK_REALM = 'plott'
-const CLIENT_ID = 'plott-sandbox'
-const SA_USER = 'plott-sandbox-service-account'
-const SA_PASS = 'ShscGDeRHvrHz9mt3fxe4m5a7U0KQ0Lo'
+const KC_URL = process.env.KEYCLOAK_URL || 'https://auth.plott.co.kr'
+const KC_REALM = 'plott'
+const SA_CLIENT_ID = 'plott-sandbox-service-account'
+const SA_CLIENT_SECRET = 'ShscGDeRHvrHz9mt3fxe4m5a7U0KQ0Lo'
 
-let cachedToken: { token: string; expires: number } | null = null
+let cachedToken: { token: string; expiresAt: number } | null = null
 
 async function getServiceToken(): Promise<string> {
-  if (cachedToken && Date.now() < cachedToken.expires - 30000) {
+  if (cachedToken && cachedToken.expiresAt > Date.now() + 30000) {
     return cachedToken.token
   }
 
-  const tokenUrl = `${KEYCLOAK_URL}/realms/${KEYCLOAK_REALM}/protocol/openid-connect/token`
-  const body = new URLSearchParams({
-    grant_type: 'password',
-    client_id: CLIENT_ID,
-    username: SA_USER,
-    password: SA_PASS,
-  })
-
-  const res = await fetch(tokenUrl, {
+  const res = await fetch(`${KC_URL}/realms/${KC_REALM}/protocol/openid-connect/token`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-    body: body.toString(),
+    body: new URLSearchParams({
+      grant_type: 'client_credentials',
+      client_id: SA_CLIENT_ID,
+      client_secret: SA_CLIENT_SECRET,
+    }),
   })
 
   if (!res.ok) {
-    throw new Error(`Keycloak auth failed: ${res.status}`)
+    throw new Error(`SA token error ${res.status}`)
   }
 
   const data = await res.json()
   cachedToken = {
     token: data.access_token,
-    expires: Date.now() + data.expires_in * 1000,
+    expiresAt: Date.now() + (data.expires_in - 60) * 1000,
   }
   return cachedToken.token
 }
