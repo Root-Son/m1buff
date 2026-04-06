@@ -73,68 +73,121 @@ export async function GET(request: Request) {
 
     const escapedBranch = branch.replace(/'/g, "''")
 
-    // 1. Duck: 이번주 + D-7 + D-1 한방 쿼리 (날짜 범위 확장)
-    const allStart = d7Mon.toISOString().split('T')[0]  // 가장 과거
-    const allEnd = endDate  // 가장 미래
+    // 오늘 날짜
+    const today = new Date().toISOString().split('T')[0]
+    const todayTs = `${today} 23:59:59`
+    const d7Ts = (() => { const d = new Date(); d.setDate(d.getDate() - 7); return `${d.toISOString().split('T')[0]} 23:59:59` })()
+    const d1Ts = (() => { const d = new Date(); d.setDate(d.getDate() - 1); return `${d.toISOString().split('T')[0]} 23:59:59` })()
 
-    const allResult = await duckQuery(`
-      SELECT
-        CAST(f.date AS VARCHAR) as date,
-        f.rt_name as room_type,
-        SUM(f.oc_rn) as sold,
-        MAX(s.activeRooms) as activeRooms,
-        SUM(CASE WHEN f.oc_rv > 0 THEN f.oc_rv ELSE 0 END) as revenue,
-        SUM(CASE WHEN f.oc_rv > 0 THEN f.oc_rn ELSE 0 END) as paidRn
-      FROM fact_reservation_event f
-      LEFT JOIN staging_stat_daily s
-        ON CAST(f.date AS VARCHAR) = CAST(s.date AS VARCHAR)
-        AND f.branchId = s.branchId AND f.roomtypeId = s.roomtypeId
-      WHERE f.event = '재실' AND f.isSales = true
-        AND f.b_name = '${escapedBranch}'
-        AND CAST(f.date AS VARCHAR) >= '${allStart}' AND CAST(f.date AS VARCHAR) <= '${allEnd}'
-      GROUP BY CAST(f.date AS VARCHAR), f.rt_name
-      ORDER BY CAST(f.date AS VARCHAR), f.rt_name
-    `)
-
-    // 날짜별 OCC map 구축
-    const occByDateRt: Record<string, { sold: number; activeRooms: number; revenue: number; paidRn: number }> = {}
-    allResult.rows.forEach((r: any) => {
-      const d = String(r.date).substring(0, 10)
-      occByDateRt[`${d}_${r.room_type}`] = {
-        sold: r.sold || 0,
-        activeRooms: r.activeRooms || 0,
-        revenue: r.revenue || 0,
-        paidRn: r.paidRn || 0,
-      }
-    })
-
-    // 이번주 데이터 필터
-    const occResult = { rows: allResult.rows.filter((r: any) => {
-      const d = String(r.date).substring(0, 10)
-      return d >= startDate && d <= endDate
-    })}
+    // 1. Duck: 현재 OCC/ADR + D-7/D-1 (부킹 페이스 스냅샷) 한방 쿼리
+    const [occResult, paceResult] = await Promise.all([
+      // 현재 OCC (재실 기반)
+      duckQuery(`
+        SELECT
+          CAST(f.date AS VARCHAR) as date,
+          f.rt_name as room_type,
+          SUM(f.oc_rn) as sold,
+          MAX(s.activeRooms) as activeRooms,
+          SUM(CASE WHEN f.oc_rv > 0 THEN f.oc_rv ELSE 0 END) as revenue,
+          SUM(CASE WHEN f.oc_rv > 0 THEN f.oc_rn ELSE 0 END) as paidRn
+        FROM fact_reservation_event f
+        LEFT JOIN staging_stat_daily s
+          ON CAST(f.date AS VARCHAR) = CAST(s.date AS VARCHAR)
+          AND f.branchId = s.branchId AND f.roomtypeId = s.roomtypeId
+        WHERE f.event = '재실' AND f.isSales = true
+          AND f.b_name = '${escapedBranch}'
+          AND CAST(f.date AS VARCHAR) >= '${startDate}' AND CAST(f.date AS VARCHAR) <= '${endDate}'
+        GROUP BY CAST(f.date AS VARCHAR), f.rt_name
+        ORDER BY CAST(f.date AS VARCHAR), f.rt_name
+      `),
+      // D-7/D-1 부킹 페이스: staging_reservation으로 스냅샷
+      duckQuery(`
+        WITH dates AS (
+          SELECT UNNEST(generate_series(DATE '${startDate}', DATE '${endDate}', INTERVAL 1 DAY)) as target_date
+        ),
+        avail AS (
+          SELECT date, roomtypeId, SUM(activeRooms) as activeRooms
+          FROM staging_stat_daily
+          WHERE branchId = (SELECT id FROM dim_branch WHERE name = '${escapedBranch}' LIMIT 1)
+            AND roomtypeId <> '0'
+            AND date BETWEEN DATE '${startDate}' AND DATE '${endDate}'
+          GROUP BY date, roomtypeId
+        ),
+        cur AS (
+          SELECT
+            CAST(d.target_date AS VARCHAR) as target_date,
+            rt.name as rt_name,
+            r.roomtypeId,
+            COUNT(DISTINCT r.id) as booked
+          FROM dates d
+          JOIN staging_reservation r ON r.checkIn <= d.target_date AND r.checkOut > d.target_date
+          JOIN dim_branch b ON r.branchId = b.id
+          JOIN dim_roomtype rt ON r.roomtypeId = rt.id
+          WHERE b.name = '${escapedBranch}'
+            AND r.reservedAt <= TIMESTAMP '${todayTs}'
+            AND (r.canceledAt IS NULL OR r.canceledAt > TIMESTAMP '${todayTs}')
+            AND r.status IN ('settled', 'wait')
+          GROUP BY CAST(d.target_date AS VARCHAR), rt.name, r.roomtypeId
+        ),
+        d7 AS (
+          SELECT
+            CAST(d.target_date AS VARCHAR) as target_date,
+            rt.name as rt_name,
+            r.roomtypeId,
+            COUNT(DISTINCT r.id) as booked
+          FROM dates d
+          JOIN staging_reservation r ON r.checkIn <= d.target_date AND r.checkOut > d.target_date
+          JOIN dim_branch b ON r.branchId = b.id
+          JOIN dim_roomtype rt ON r.roomtypeId = rt.id
+          WHERE b.name = '${escapedBranch}'
+            AND r.reservedAt <= TIMESTAMP '${d7Ts}'
+            AND (r.canceledAt IS NULL OR r.canceledAt > TIMESTAMP '${d7Ts}')
+            AND r.status IN ('settled', 'wait')
+          GROUP BY CAST(d.target_date AS VARCHAR), rt.name, r.roomtypeId
+        ),
+        d1_cte AS (
+          SELECT
+            CAST(d.target_date AS VARCHAR) as target_date,
+            rt.name as rt_name,
+            r.roomtypeId,
+            COUNT(DISTINCT r.id) as booked
+          FROM dates d
+          JOIN staging_reservation r ON r.checkIn <= d.target_date AND r.checkOut > d.target_date
+          JOIN dim_branch b ON r.branchId = b.id
+          JOIN dim_roomtype rt ON r.roomtypeId = rt.id
+          WHERE b.name = '${escapedBranch}'
+            AND r.reservedAt <= TIMESTAMP '${d1Ts}'
+            AND (r.canceledAt IS NULL OR r.canceledAt > TIMESTAMP '${d1Ts}')
+            AND r.status IN ('settled', 'wait')
+          GROUP BY CAST(d.target_date AS VARCHAR), rt.name, r.roomtypeId
+        )
+        SELECT
+          cur.target_date as date,
+          cur.rt_name as room_type,
+          cur.booked as cur_booked,
+          d7.booked as d7_booked,
+          d1_cte.booked as d1_booked,
+          a.activeRooms
+        FROM cur
+        LEFT JOIN d7 ON d7.target_date = cur.target_date AND d7.roomtypeId = cur.roomtypeId
+        LEFT JOIN d1_cte ON d1_cte.target_date = cur.target_date AND d1_cte.roomtypeId = cur.roomtypeId
+        LEFT JOIN avail a ON CAST(a.date AS VARCHAR) = cur.target_date AND a.roomtypeId = cur.roomtypeId
+        ORDER BY cur.target_date, cur.rt_name
+      `),
+    ])
 
     const roomTypes = [...new Set(occResult.rows.map((r: any) => r.room_type).filter(Boolean))].sort() as string[]
 
-    // D-7, D-1 lookup (JS에서 7일/1일 전 날짜로 매핑)
+    // D-7/D-1 lookup from pace query
     const d7Map: Record<string, number> = {}
     const d1Map: Record<string, number> = {}
-    occResult.rows.forEach((r: any) => {
+    paceResult.rows.forEach((r: any) => {
       const d = String(r.date).substring(0, 10)
-      const rt = r.room_type
-      // 7일 전
-      const d7 = new Date(d); d7.setDate(d7.getDate() - 7)
-      const d7Str = d7.toISOString().split('T')[0]
-      const d7Data = occByDateRt[`${d7Str}_${rt}`]
-      if (d7Data && d7Data.activeRooms > 0) {
-        d7Map[`${d}_${rt}`] = Math.min(Math.round(d7Data.sold / d7Data.activeRooms * 10000) / 10000, 1)
-      }
-      // 1일 전
-      const d1 = new Date(d); d1.setDate(d1.getDate() - 1)
-      const d1Str = d1.toISOString().split('T')[0]
-      const d1Data = occByDateRt[`${d1Str}_${rt}`]
-      if (d1Data && d1Data.activeRooms > 0) {
-        d1Map[`${d}_${rt}`] = Math.min(Math.round(d1Data.sold / d1Data.activeRooms * 10000) / 10000, 1)
+      const key = `${d}_${r.room_type}`
+      const active = r.activeRooms || 0
+      if (active > 0) {
+        d7Map[key] = Math.min(Math.round((r.d7_booked || 0) / active * 10000) / 10000, 1)
+        d1Map[key] = Math.min(Math.round((r.d1_booked || 0) / active * 10000) / 10000, 1)
       }
     })
 
