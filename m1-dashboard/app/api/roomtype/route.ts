@@ -93,6 +93,7 @@ export async function GET(request: Request) {
         AND f.b_name = '${escapedBranch}'
         AND CAST(f.date AS VARCHAR) >= '${allStart}' AND CAST(f.date AS VARCHAR) <= '${allEnd}'
       GROUP BY CAST(f.date AS VARCHAR), f.rt_name
+      ORDER BY CAST(f.date AS VARCHAR), f.rt_name
     `)
 
     // 날짜별 OCC map 구축
@@ -220,9 +221,10 @@ export async function GET(request: Request) {
       }
     }).filter((r: any) => r.room_type)
 
-    const filteredData = roomType
+    const filteredData = (roomType
       ? mergedData.filter((d: any) => d.room_type === roomType)
       : mergedData
+    ).sort((a: any, b: any) => a.date.localeCompare(b.date))
 
     return NextResponse.json({ roomTypes, days: filteredData })
   } catch (error: any) {
