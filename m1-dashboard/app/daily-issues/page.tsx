@@ -192,7 +192,7 @@ function BranchDailyCard({ branchName, recommendations, summary }: {
                               {' | '}
                               {rec.sales_pace_detail || rec.sales_pace || '-'}
                               {rec.set_price != null && (
-                                <> | 셋팅가 {rec.set_price.toLocaleString()}원</>
+                                <> | 노출가 {rec.set_price.toLocaleString()}원</>
                               )}
                               {rec.guardrail_price != null && rec.price_diff_pct != null && (
                                 <> (가드레일 대비 {rec.price_diff_pct >= 0 ? '+' : ''}{rec.price_diff_pct.toFixed(0)}%)</>

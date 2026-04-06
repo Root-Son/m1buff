@@ -447,7 +447,7 @@ export default function Dashboard() {
         order: 3
       },
       {
-        label: '셋팅가',
+        label: '노출가',
         data: roomTypeData.days.map((d: any) => d.yolo_price),
         type: 'line',
         borderColor: 'rgba(245, 158, 11, 1)',

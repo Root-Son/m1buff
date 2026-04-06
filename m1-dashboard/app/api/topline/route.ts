@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { supabase } from '@/lib/supabase'
 import { normalizeBranchName } from '@/lib/pricing-engine'
+import { duckQuery } from '@/lib/duck'
 
 const CHANNEL_GROUPS: Record<string, string> = {
   '야놀자(호텔)': 'OTA', '야놀자(모텔)': 'OTA', '아고다': 'OTA',
@@ -116,7 +117,7 @@ export async function GET(request: NextRequest) {
           .gte('check_in_date', prevMonthStart).lte('check_in_date', prevMonthEnd)
         return branchFilter(q).range(s, e)
       }),
-      // 4. OCC: branch_room_occ 우선, 없으면 occ_daily fallback
+      // 4. OCC: branch_room_occ 우선, 없으면 duck fallback
       (async () => {
         const occData = await fetchAllPages(([s, e]) => {
           let q = supabase.from('branch_room_occ')
@@ -125,22 +126,41 @@ export async function GET(request: NextRequest) {
           return branchFilter(q).range(s, e)
         })
         if (occData.length > 0) return occData
-        // fallback: occ_daily → branch_room_occ 형식으로 변환
-        const occDaily = await fetchAllPages(([s, e]) => {
-          let q = supabase.from('occ_daily')
-            .select('date, branch_name, available, sold')
-            .gte('date', monthStart).lte('date', monthEnd)
-          return branchFilter(q).range(s, e)
-        })
-        // 날짜+지점별 합산하여 branch_room_occ 형식으로
-        const grouped: Record<string, { date: string; available_rooms: number; sold_rooms: number }> = {}
-        occDaily.forEach((r: any) => {
-          const key = branch !== 'all' ? r.date : `${r.date}|${r.branch_name}`
-          if (!grouped[key]) grouped[key] = { date: r.date, available_rooms: 0, sold_rooms: 0 }
-          grouped[key].available_rooms += r.available || 0
-          grouped[key].sold_rooms += r.sold || 0
-        })
-        return Object.values(grouped)
+        // fallback: duck에서 OCC 가져오기
+        try {
+          const branchFilter_sql = branch !== 'all' ? `AND f.branchId = (SELECT id FROM dim_branch WHERE name = '${branch.replace(/'/g, "''")}')` : ''
+          const branchFilter_avail = branch !== 'all' ? `AND branchId = (SELECT id FROM dim_branch WHERE name = '${branch.replace(/'/g, "''")}')` : ''
+          const duckResult = await duckQuery(`
+            WITH fact_daily AS (
+              SELECT date, SUM(oc_rn) AS sold
+              FROM fact_reservation_event
+              WHERE event = '재실' AND isSales = true
+                AND date BETWEEN '${monthStart}' AND '${monthEnd}'
+                ${branchFilter_sql}
+              GROUP BY date
+            ),
+            avail_daily AS (
+              SELECT date, SUM(activeRooms - stops) AS avail
+              FROM staging_stat_daily
+              WHERE roomtypeId = '0'
+                AND date BETWEEN '${monthStart}' AND '${monthEnd}'
+                ${branchFilter_avail}
+              GROUP BY date
+            )
+            SELECT a.date, a.avail AS available_rooms, COALESCE(f.sold, 0) AS sold_rooms
+            FROM avail_daily a
+            LEFT JOIN fact_daily f ON f.date = a.date
+            ORDER BY a.date
+          `)
+          return duckResult.rows.map((r: any) => ({
+            date: String(r.date).split('T')[0],
+            available_rooms: r.available_rooms || 0,
+            sold_rooms: r.sold_rooms || 0,
+          }))
+        } catch (e) {
+          console.error('Duck OCC fallback failed:', e)
+          return []
+        }
       })(),
       // 5. 픽업 기준 raw_bookings
       fetchAllPages(([s, e]) => {
