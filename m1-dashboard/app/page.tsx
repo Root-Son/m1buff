@@ -24,6 +24,7 @@ export default function Dashboard() {
   const [weeklyData, setWeeklyData] = useState<any>(null)
   const [prevWeeklyData, setPrevWeeklyData] = useState<any>(null)
   const [toplineData, setToplineData] = useState<any>(null)
+  const toplineCache = useRef<Record<string, any>>({})
   const [roomTypeData, setRoomTypeData] = useState<any>(null)
   const [monthlySummaryData, setMonthlySummaryData] = useState<any>(null)
   const [channelData, setChannelData] = useState<any>(null)
@@ -261,11 +262,34 @@ export default function Dashboard() {
   }
 
   const fetchToplineData = async (signal?: AbortSignal) => {
+    const branch = selectedBranch === '전지점' ? 'all' : selectedBranch
+    const cacheKey = `${branch}:${toplineMonth}`
+
+    // 캐시 히트 → 즉시 표시
+    if (toplineCache.current[cacheKey]) {
+      setToplineData(toplineCache.current[cacheKey])
+      return
+    }
+
     setToplineLoading(true)
     try {
-      const branch = selectedBranch === '전지점' ? 'all' : selectedBranch
       const data = await fetch(`/api/topline?branch=${branch}&month=${toplineMonth}`, { signal }).then(r => r.json())
-      if (!signal?.aborted) setToplineData(data)
+      if (!signal?.aborted) {
+        toplineCache.current[cacheKey] = data
+        setToplineData(data)
+
+        // 인접 월 백그라운드 프리페치 (±1)
+        const adjacent = [toplineMonth - 1, toplineMonth + 1].filter(m => m >= 1 && m <= 12)
+        adjacent.forEach(m => {
+          const adjKey = `${branch}:${m}`
+          if (!toplineCache.current[adjKey]) {
+            fetch(`/api/topline?branch=${branch}&month=${m}`)
+              .then(r => r.json())
+              .then(d => { toplineCache.current[adjKey] = d })
+              .catch(() => {})
+          }
+        })
+      }
     } catch (error: any) {
       if (error?.name !== 'AbortError') console.error('탑라인 로드 실패:', error)
     } finally {
@@ -689,7 +713,7 @@ export default function Dashboard() {
             {BRANCHES.map((branch) => (
               <button
                 key={branch}
-                onClick={() => setSelectedBranch(branch)}
+                onClick={() => { toplineCache.current = {}; setSelectedBranch(branch) }}
                 className={`px-4 py-2 text-sm font-medium rounded-lg ${
                   branch === selectedBranch
                     ? 'bg-blue-600 text-white'
