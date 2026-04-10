@@ -1,5 +1,6 @@
 import type { Metadata } from 'next'
 import './globals.css'
+import { AuthWrapper } from './auth-wrapper'
 
 export const metadata: Metadata = {
   title: 'M1버프 현황판',
@@ -13,7 +14,9 @@ export default function RootLayout({
 }) {
   return (
     <html lang="ko">
-      <body>{children}</body>
+      <body>
+        <AuthWrapper>{children}</AuthWrapper>
+      </body>
     </html>
   )
 }
