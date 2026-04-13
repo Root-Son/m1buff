@@ -35,9 +35,12 @@ export async function GET(request: NextRequest) {
       .eq('month', month)
       .eq('year', year)
 
+    const EXCLUDE = ['동탄점(호텔)', '웨이브파크_펜트']
     const targetMap: Record<string, number> = {}
     ;(targets || []).forEach((t: any) => {
-      targetMap[t.branch_name] = t.target_amount || 0
+      if (!EXCLUDE.includes(t.branch_name)) {
+        targetMap[t.branch_name] = t.target_amount || 0
+      }
     })
 
     // 2. raw_bookings 체크인 매출
