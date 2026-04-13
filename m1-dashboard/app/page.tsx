@@ -995,7 +995,11 @@ export default function Dashboard() {
           </div>
         </div>
 
-        {/* 주간 실적 */}
+        {/* 목표 달성 현황 */}
+        <AchievementSection branch={selectedBranch} toplineMonth={toplineMonth} />
+
+        {/* === 아래 섹션 삭제됨 === */}
+        {/* 주간 실적 — REMOVED */}
         <div className="mb-6">
           <div className="flex items-center justify-between mb-3">
             <h2 className="text-sm font-semibold text-gray-500 uppercase">주간 실적</h2>
@@ -1297,6 +1301,145 @@ export default function Dashboard() {
         </div>
 
       </main>
+    </div>
+  )
+}
+
+// ── 목표 달성 현황 컴포넌트 ──
+function AchievementSection({ branch, toplineMonth }: { branch: string; toplineMonth: number }) {
+  const [data, setData] = useState<any>(null)
+  const chartRef = useRef<HTMLCanvasElement>(null)
+  const chartInstance = useRef<Chart | null>(null)
+
+  const branchParam = branch === '전지점' ? 'all' : branch
+
+  useEffect(() => {
+    fetch(`/api/achievement?branch=${encodeURIComponent(branchParam)}&month=${toplineMonth}`)
+      .then(r => r.json())
+      .then(setData)
+      .catch(() => {})
+  }, [branchParam, toplineMonth])
+
+  // 개별 지점: 차트 렌더
+  useEffect(() => {
+    if (!data || data.type !== 'branch' || !chartRef.current) return
+    chartInstance.current?.destroy()
+
+    const days = data.days || []
+    const labels = days.map((d: any) => {
+      const dt = new Date(d.date)
+      return `${dt.getMonth()+1}/${dt.getDate()}`
+    })
+
+    chartInstance.current = new Chart(chartRef.current, {
+      type: 'bar',
+      data: {
+        labels,
+        datasets: [
+          {
+            type: 'bar',
+            label: '일매출',
+            data: days.map((d: any) => d.daily),
+            backgroundColor: 'rgba(59, 130, 246, 0.5)',
+            yAxisID: 'y',
+          },
+          {
+            type: 'line',
+            label: '달성률',
+            data: days.map((d: any) => d.rate),
+            borderColor: '#10B981',
+            backgroundColor: '#10B981',
+            tension: 0.3,
+            yAxisID: 'y1',
+            pointRadius: 3,
+          },
+        ],
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          datalabels: { display: false },
+          tooltip: {
+            callbacks: {
+              label: (ctx) => {
+                if (ctx.dataset.label === '달성률') return `${ctx.parsed.y}%`
+                return `${(ctx.parsed.y / 1e6).toFixed(0)}백만`
+              }
+            }
+          }
+        },
+        scales: {
+          y: { position: 'left', title: { display: true, text: '일매출' }, ticks: { callback: (v) => `${(Number(v)/1e6).toFixed(0)}M` } },
+          y1: { position: 'right', title: { display: true, text: '달성률 (%)' }, min: 0, grid: { drawOnChartArea: false } },
+        }
+      }
+    })
+
+    return () => { chartInstance.current?.destroy() }
+  }, [data])
+
+  if (!data) return null
+
+  // 전지점: 테이블
+  if (data.type === 'all') {
+    const sorted = [...(data.branches || [])].sort((a: any, b: any) => b.rate - a.rate)
+    return (
+      <div className="mb-6">
+        <h2 className="text-sm font-semibold text-gray-500 uppercase mb-3">
+          {toplineMonth}월 지점별 목표 달성 현황
+        </h2>
+        <div className="bg-white rounded-lg shadow-sm border p-4 mb-2">
+          <div className="flex justify-between items-center mb-4">
+            <span className="text-lg font-bold">{data.total.rate}% 달성</span>
+            <span className="text-sm text-gray-500">
+              {(data.total.revenue / 1e8).toFixed(1)}억 / {(data.total.target / 1e8).toFixed(1)}억
+            </span>
+          </div>
+          <div className="w-full bg-gray-200 rounded-full h-3 mb-4">
+            <div className="bg-blue-600 h-3 rounded-full" style={{ width: `${Math.min(data.total.rate, 100)}%` }} />
+          </div>
+        </div>
+        <div className="grid grid-cols-1 gap-1">
+          {sorted.map((b: any) => (
+            <div key={b.branch} className="bg-white rounded border px-4 py-2 flex items-center justify-between">
+              <span className="text-sm font-medium w-40 truncate">{b.branch}</span>
+              <div className="flex-1 mx-4">
+                <div className="w-full bg-gray-100 rounded-full h-2">
+                  <div
+                    className={`h-2 rounded-full ${b.rate >= 100 ? 'bg-green-500' : b.rate >= 80 ? 'bg-blue-500' : b.rate >= 50 ? 'bg-yellow-500' : 'bg-red-400'}`}
+                    style={{ width: `${Math.min(b.rate, 100)}%` }}
+                  />
+                </div>
+              </div>
+              <span className={`text-sm font-bold w-16 text-right ${b.rate >= 100 ? 'text-green-600' : b.rate >= 80 ? 'text-blue-600' : 'text-gray-600'}`}>
+                {b.rate}%
+              </span>
+              <span className="text-xs text-gray-400 w-24 text-right">
+                {(b.revenue / 1e6).toFixed(0)}백 / {(b.target / 1e6).toFixed(0)}백
+              </span>
+            </div>
+          ))}
+        </div>
+      </div>
+    )
+  }
+
+  // 개별 지점: 차트
+  return (
+    <div className="mb-6">
+      <h2 className="text-sm font-semibold text-gray-500 uppercase mb-3">
+        {branch} {toplineMonth}월 목표 달성 추이
+        <span className="ml-2 text-xs text-gray-400">
+          목표 {data.target ? `${(data.target / 1e8).toFixed(1)}억` : '-'}
+          {data.days?.length > 0 && ` | 현재 ${data.days[data.days.length - 1].rate}%`}
+        </span>
+      </h2>
+      <div className="bg-white rounded-lg shadow-sm border p-4">
+        <div className="h-72">
+          <canvas ref={chartRef}></canvas>
+        </div>
+      </div>
     </div>
   )
 }
