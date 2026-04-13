@@ -1,6 +1,21 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { supabase } from '@/lib/supabase'
-import { duckQuery } from '@/lib/duck'
+
+// raw_bookings 기준 (topline과 동일 소스)
+
+async function fetchAllPages(queryFn: (range: [number, number]) => any): Promise<any[]> {
+  const PAGE = 1000
+  let all: any[] = []
+  let page = 0
+  while (true) {
+    const { data } = await queryFn([page * PAGE, (page + 1) * PAGE - 1])
+    if (!data || data.length === 0) break
+    all = all.concat(data)
+    if (data.length < PAGE) break
+    page++
+  }
+  return all
+}
 
 export async function GET(request: NextRequest) {
   const searchParams = request.nextUrl.searchParams
@@ -8,6 +23,9 @@ export async function GET(request: NextRequest) {
   const monthParam = searchParams.get('month')
   const month = monthParam ? parseInt(monthParam) : new Date().getMonth() + 1
   const year = 2026
+
+  const monthStart = `${year}-${String(month).padStart(2, '0')}-01`
+  const monthEnd = `${year}-${String(month).padStart(2, '0')}-${new Date(year, month, 0).getDate()}`
 
   try {
     // 1. targets
@@ -22,24 +40,27 @@ export async function GET(request: NextRequest) {
       targetMap[t.branch_name] = t.target_amount || 0
     })
 
+    // 2. raw_bookings 체크인 매출
+    const allBookings = await fetchAllPages(([s, e]) => {
+      let q = supabase
+        .from('raw_bookings')
+        .select('branch_name, check_in_date, payment_amount')
+        .gte('check_in_date', monthStart)
+        .lte('check_in_date', monthEnd)
+      if (branch !== 'all') q = q.eq('branch_name', branch)
+      return q.range(s, e)
+    })
+
     if (branch === 'all') {
       // 전지점: 지점별 달성 현황
-      const duckResult = await duckQuery(`
-        SELECT
-          b_name,
-          SUM(ci_rv) as revenue
-        FROM fact_reservation_event
-        WHERE event = '체크인'
-          AND EXTRACT(MONTH FROM date) = ${month}
-          AND EXTRACT(YEAR FROM date) = ${year}
-        GROUP BY b_name
-        ORDER BY b_name
-      `)
+      const branchRev: Record<string, number> = {}
+      allBookings.forEach((r: any) => {
+        branchRev[r.branch_name] = (branchRev[r.branch_name] || 0) + (r.payment_amount || 0)
+      })
 
       const branches = Object.keys(targetMap).sort()
       const rows = branches.map(b => {
-        const duck = duckResult.rows.find((r: any) => r.b_name === b)
-        const revenue = duck?.revenue || 0
+        const revenue = branchRev[b] || 0
         const target = targetMap[b] || 0
         return {
           branch: b,
@@ -60,30 +81,22 @@ export async function GET(request: NextRequest) {
         branches: rows,
       })
     } else {
-      // 개별 지점: 최근 14일 날짜별 누적 달성률
+      // 개별 지점: 날짜별 누적 달성률
       const target = targetMap[branch] || 0
-      const monthStart = `${year}-${String(month).padStart(2, '0')}-01`
 
-      const duckResult = await duckQuery(`
-        SELECT
-          CAST(date AS VARCHAR) as date,
-          SUM(ci_rv) as daily_revenue
-        FROM fact_reservation_event
-        WHERE event = '체크인'
-          AND b_name = '${branch.replace(/'/g, "''")}'
-          AND EXTRACT(MONTH FROM date) = ${month}
-          AND EXTRACT(YEAR FROM date) = ${year}
-        GROUP BY CAST(date AS VARCHAR)
-        ORDER BY CAST(date AS VARCHAR)
-      `)
+      const dailyRev: Record<string, number> = {}
+      allBookings.forEach((r: any) => {
+        const d = String(r.check_in_date).substring(0, 10)
+        dailyRev[d] = (dailyRev[d] || 0) + (r.payment_amount || 0)
+      })
 
-      // 누적 계산
+      const sortedDates = Object.keys(dailyRev).sort()
       let cumulative = 0
-      const days = duckResult.rows.map((r: any) => {
-        cumulative += r.daily_revenue || 0
+      const days = sortedDates.map(d => {
+        cumulative += dailyRev[d] || 0
         return {
-          date: String(r.date).substring(0, 10),
-          daily: r.daily_revenue || 0,
+          date: d,
+          daily: dailyRev[d] || 0,
           cumulative,
           rate: target > 0 ? Math.round(cumulative / target * 1000) / 10 : 0,
         }
