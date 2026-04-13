@@ -34,7 +34,7 @@ export default function Dashboard() {
   const [selectedBranch, setSelectedBranch] = useState('전지점') // 디폴트 전지점
   const [selectedRoomType, setSelectedRoomType] = useState('')
   const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth() + 1)
-  const [toplineMonth, setToplineMonth] = useState(3) // Topline 월 필터
+  const [toplineMonth, setToplineMonth] = useState(new Date().getMonth() + 1) // Topline 월 필터 (현재 월)
   const [currentWeek, setCurrentWeek] = useState(0) // 0 = 이번주
   const [roomTypeWeekOffset, setRoomTypeWeekOffset] = useState<number | null>(0) // 0 = 이번주 디폴트
   const [selectedDate, setSelectedDate] = useState<string>('') // 일 실적 날짜 선택
@@ -1012,11 +1012,14 @@ function AchievementSection({ branch, toplineMonth }: { branch: string; toplineM
 
   const branchParam = branch === '전지점' ? 'all' : branch
 
+  const [achLoading, setAchLoading] = useState(true)
+
   useEffect(() => {
+    setAchLoading(true)
     fetch(`/api/achievement?branch=${encodeURIComponent(branchParam)}&month=${toplineMonth}`)
       .then(r => r.json())
-      .then(setData)
-      .catch(() => {})
+      .then(d => { setData(d); setAchLoading(false) })
+      .catch(() => setAchLoading(false))
   }, [branchParam, toplineMonth])
 
   // 개별 지점: 차트 렌더
@@ -1078,7 +1081,8 @@ function AchievementSection({ branch, toplineMonth }: { branch: string; toplineM
     return () => { chartInstance.current?.destroy() }
   }, [data])
 
-  if (!data) return null
+  if (achLoading) return <div className="mb-6 p-4 text-gray-400 text-sm">목표 달성 현황 로딩 중...</div>
+  if (!data) return <div className="mb-6 p-4 text-red-400 text-sm">목표 달성 데이터 없음</div>
 
   // 전지점: 테이블
   if (data.type === 'all') {
