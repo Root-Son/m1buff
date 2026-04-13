@@ -1062,8 +1062,8 @@ function AchievementSection({ branch, toplineMonth }: { branch: string; toplineM
           tooltip: {
             callbacks: {
               label: (ctx) => {
-                if (ctx.dataset.label === '달성률') return `${ctx.parsed.y}%`
-                return `${(ctx.parsed.y / 1e6).toFixed(0)}백만`
+                if (ctx.dataset.label === '달성률') return `${(ctx.parsed.y ?? 0)}%`
+                return `${((ctx.parsed.y ?? 0) / 1e6).toFixed(0)}백만`
               }
             }
           }
