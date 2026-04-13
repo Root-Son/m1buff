@@ -998,9 +998,8 @@ export default function Dashboard() {
         {/* 목표 달성 현황 */}
         <AchievementSection branch={selectedBranch} toplineMonth={toplineMonth} />
 
-        {/* === 아래 섹션 삭제됨 === */}
-        {/* 주간 실적 — REMOVED */}
-        <div className="mb-6">
+        {/* 주간실적 이하 삭제 시작 — CUTOFF */}
+        {false && <div className="mb-6">
           <div className="flex items-center justify-between mb-3">
             <h2 className="text-sm font-semibold text-gray-500 uppercase">주간 실적</h2>
             <div className="flex items-center gap-2">
@@ -1299,6 +1298,8 @@ export default function Dashboard() {
             <canvas ref={roomTypeChartRef}></canvas>
           </div>
         </div>
+        </div>}
+        {/* 주간실적 이하 삭제 끝 — CUTOFF */}
 
       </main>
     </div>
