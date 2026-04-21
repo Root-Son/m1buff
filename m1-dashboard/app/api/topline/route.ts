@@ -112,7 +112,7 @@ export async function GET(request: NextRequest) {
                c_name as reservation_channel,
                MIN(CAST(reservedAt AS VARCHAR)) as reservation_created_at
         FROM fact_reservation_event
-        WHERE event = '체크인' AND isSales = true
+        WHERE event = '체크인' AND isSales = true AND c_name NOT LIKE 'LS_%' AND c_name != '내부채널_LS'
           AND date BETWEEN '${monthStart}' AND '${monthEnd}'
           ${branchFilter_sql}
         GROUP BY CAST(date AS VARCHAR), c_name
@@ -123,7 +123,7 @@ export async function GET(request: NextRequest) {
                SUM(ci_rv) as payment_amount, SUM(ci_rn) as nights,
                c_name as reservation_channel
         FROM fact_reservation_event
-        WHERE event = '체크인' AND isSales = true
+        WHERE event = '체크인' AND isSales = true AND c_name NOT LIKE 'LS_%' AND c_name != '내부채널_LS'
           AND date BETWEEN '${prevMonthStart}' AND '${prevMonthEnd}'
           ${branchFilter_sql}
         GROUP BY CAST(date AS VARCHAR), c_name
@@ -133,7 +133,7 @@ export async function GET(request: NextRequest) {
         WITH fact_daily AS (
           SELECT date, SUM(oc_rn) AS sold
           FROM fact_reservation_event
-          WHERE event = '재실' AND isSales = true
+          WHERE event = '재실' AND isSales = true AND c_name NOT LIKE 'LS_%' AND c_name != '내부채널_LS'
             AND date BETWEEN '${monthStart}' AND '${monthEnd}'
             ${branchFilter_sql}
           GROUP BY date

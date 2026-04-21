@@ -94,7 +94,7 @@ export async function GET(request: Request) {
         LEFT JOIN staging_stat_daily s
           ON CAST(f.date AS VARCHAR) = CAST(s.date AS VARCHAR)
           AND f.branchId = s.branchId AND f.roomtypeId = s.roomtypeId
-        WHERE f.event = '재실' AND f.isSales = true
+        WHERE f.event = '재실' AND f.isSales = true AND f.c_name NOT LIKE 'LS_%' AND f.c_name != '내부채널_LS'
           AND f.b_name = '${escapedBranch}'
           AND CAST(f.date AS VARCHAR) >= '${startDate}' AND CAST(f.date AS VARCHAR) <= '${endDate}'
         GROUP BY CAST(f.date AS VARCHAR), f.rt_name

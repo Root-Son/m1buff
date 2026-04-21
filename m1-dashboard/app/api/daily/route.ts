@@ -32,7 +32,7 @@ export async function GET(request: NextRequest) {
           COALESCE(SUM(CASE WHEN event = '체크인' AND EXTRACT(MONTH FROM date) = ${m2} AND EXTRACT(YEAR FROM date) = ${y2} THEN ci_rv END), 0) as month2_ci,
           COALESCE(SUM(CASE WHEN event = '체크인' AND EXTRACT(MONTH FROM date) = ${m3} AND EXTRACT(YEAR FROM date) = ${y3} THEN ci_rv END), 0) as month3_ci
         FROM fact_reservation_event
-        WHERE isSales = true ${branchFilter}
+        WHERE isSales = true AND c_name NOT LIKE 'LS_%' AND c_name != '내부채널_LS' ${branchFilter}
       `),
       duckQuery(`
         SELECT
@@ -41,7 +41,7 @@ export async function GET(request: NextRequest) {
           COALESCE(SUM(CASE WHEN event = '체크인' AND EXTRACT(MONTH FROM date) = ${m2} AND EXTRACT(YEAR FROM date) = ${y2} THEN ci_rv END), 0) as month2_ci,
           COALESCE(SUM(CASE WHEN event = '체크인' AND EXTRACT(MONTH FROM date) = ${m3} AND EXTRACT(YEAR FROM date) = ${y3} THEN ci_rv END), 0) as month3_ci
         FROM fact_reservation_event
-        WHERE isSales = true ${branchFilter}
+        WHERE isSales = true AND c_name NOT LIKE 'LS_%' AND c_name != '내부채널_LS' ${branchFilter}
       `),
     ])
 

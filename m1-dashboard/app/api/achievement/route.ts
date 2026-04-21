@@ -36,7 +36,7 @@ export async function GET(request: NextRequest) {
           SUM(ci_rv) as revenue
         FROM fact_reservation_event
         WHERE event = '체크인'
-          AND isSales = true
+          AND isSales = true AND c_name NOT LIKE 'LS_%' AND c_name != '내부채널_LS'
           AND EXTRACT(MONTH FROM date) = ${month}
           AND EXTRACT(YEAR FROM date) = ${year}
         GROUP BY b_name
@@ -74,7 +74,7 @@ export async function GET(request: NextRequest) {
           SUM(ci_rv) as daily_revenue
         FROM fact_reservation_event
         WHERE event = '체크인'
-          AND isSales = true
+          AND isSales = true AND c_name NOT LIKE 'LS_%' AND c_name != '내부채널_LS'
           AND b_name = '${escapedBranch}'
           AND EXTRACT(MONTH FROM date) = ${month}
           AND EXTRACT(YEAR FROM date) = ${year}
