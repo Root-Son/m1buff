@@ -1,29 +1,52 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { supabase } from '@/lib/supabase'
+import { duckQuery } from '@/lib/duck'
 
 export async function GET(request: NextRequest) {
   const searchParams = request.nextUrl.searchParams
   const branch = searchParams.get('branch') || 'all'
   const dateParam = searchParams.get('date')
-  
+
   try {
     const dateStr = dateParam || new Date().toISOString().split('T')[0]
-
-    // 전주 동요일 (7일 전)
     const d = new Date(dateStr)
     d.setDate(d.getDate() - 7)
     const lastWeekStr = d.toISOString().split('T')[0]
 
-    // 오늘 + 전주 동요일 병렬 호출
+    const escapedBranch = branch.replace(/'/g, "''")
+    const branchFilter = branch !== 'all' ? `AND b_name = '${escapedBranch}'` : ''
+
+    // 당일 + 전주 동요일 — 픽업 매출 + 월별 CI 매출
+    const curDate = new Date(dateStr)
+    const m1 = curDate.getMonth() + 1
+    const m2 = m1 < 12 ? m1 + 1 : 1
+    const m3 = m2 < 12 ? m2 + 1 : 1
+    const year = curDate.getFullYear()
+    const y2 = m2 < m1 ? year + 1 : year
+    const y3 = m3 < m2 ? year + 1 : year
+
     const [todayResult, lastWeekResult] = await Promise.all([
-      supabase.rpc('get_daily_stats_dynamic', { p_branch: branch, p_date: dateStr }),
-      supabase.rpc('get_daily_stats_dynamic', { p_branch: branch, p_date: lastWeekStr }),
+      duckQuery(`
+        SELECT
+          COALESCE(SUM(CASE WHEN event = '픽업' AND CAST(date AS VARCHAR) = '${dateStr}' THEN pk_rv END), 0) as pickup,
+          COALESCE(SUM(CASE WHEN event = '체크인' AND EXTRACT(MONTH FROM date) = ${m1} AND EXTRACT(YEAR FROM date) = ${year} THEN ci_rv END), 0) as month1_ci,
+          COALESCE(SUM(CASE WHEN event = '체크인' AND EXTRACT(MONTH FROM date) = ${m2} AND EXTRACT(YEAR FROM date) = ${y2} THEN ci_rv END), 0) as month2_ci,
+          COALESCE(SUM(CASE WHEN event = '체크인' AND EXTRACT(MONTH FROM date) = ${m3} AND EXTRACT(YEAR FROM date) = ${y3} THEN ci_rv END), 0) as month3_ci
+        FROM fact_reservation_event
+        WHERE isSales = true ${branchFilter}
+      `),
+      duckQuery(`
+        SELECT
+          COALESCE(SUM(CASE WHEN event = '픽업' AND CAST(date AS VARCHAR) = '${lastWeekStr}' THEN pk_rv END), 0) as pickup,
+          COALESCE(SUM(CASE WHEN event = '체크인' AND EXTRACT(MONTH FROM date) = ${m1} AND EXTRACT(YEAR FROM date) = ${year} THEN ci_rv END), 0) as month1_ci,
+          COALESCE(SUM(CASE WHEN event = '체크인' AND EXTRACT(MONTH FROM date) = ${m2} AND EXTRACT(YEAR FROM date) = ${y2} THEN ci_rv END), 0) as month2_ci,
+          COALESCE(SUM(CASE WHEN event = '체크인' AND EXTRACT(MONTH FROM date) = ${m3} AND EXTRACT(YEAR FROM date) = ${y3} THEN ci_rv END), 0) as month3_ci
+        FROM fact_reservation_event
+        WHERE isSales = true ${branchFilter}
+      `),
     ])
 
-    if (todayResult.error) throw todayResult.error
-
-    const today = todayResult.data?.[0]
-    const lastWeek = lastWeekResult.data?.[0]
+    const today = todayResult.rows[0] || {}
+    const lastWeek = lastWeekResult.rows[0] || {}
 
     const wow = (cur: number, prev: number) =>
       prev > 0 ? Math.round(((cur - prev) / prev) * 10000) / 100 : 0
@@ -32,17 +55,17 @@ export async function GET(request: NextRequest) {
       date: dateStr,
       compare_date: lastWeekStr,
       branch,
-      pickup: today?.pickup || 0,
-      pickup_wow: wow(today?.pickup || 0, lastWeek?.pickup || 0),
-      month1: today?.month1 || 0,
-      month1_ci: today?.month1_ci || 0,
-      month1_ci_wow: wow(today?.month1_ci || 0, lastWeek?.month1_ci || 0),
-      month2: today?.month2 || 0,
-      month2_ci: today?.month2_ci || 0,
-      month2_ci_wow: wow(today?.month2_ci || 0, lastWeek?.month2_ci || 0),
-      month3: today?.month3 || 0,
-      month3_ci: today?.month3_ci || 0,
-      month3_ci_wow: wow(today?.month3_ci || 0, lastWeek?.month3_ci || 0),
+      pickup: today.pickup || 0,
+      pickup_wow: wow(today.pickup || 0, lastWeek.pickup || 0),
+      month1: m1,
+      month1_ci: today.month1_ci || 0,
+      month1_ci_wow: wow(today.month1_ci || 0, lastWeek.month1_ci || 0),
+      month2: m2,
+      month2_ci: today.month2_ci || 0,
+      month2_ci_wow: wow(today.month2_ci || 0, lastWeek.month2_ci || 0),
+      month3: m3,
+      month3_ci: today.month3_ci || 0,
+      month3_ci_wow: wow(today.month3_ci || 0, lastWeek.month3_ci || 0),
     })
   } catch (error: any) {
     console.error('Daily API Error:', error)

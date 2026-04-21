@@ -99,85 +99,104 @@ export async function GET(request: NextRequest) {
 
     const branchFilter = (q: any) => branch !== 'all' ? q.eq('branch_name', branch) : q
 
-    // ★ 모든 데이터를 병렬로 가져오기
-    const [rpcResult, allCiData, prevYearData, allOccData, allPickupData, targetData] = await Promise.all([
-      // 1. RPC (CI 합계)
-      supabase.rpc('get_topline_weekly_checkin', { p_branch: branch, p_month: month, p_year: year }),
-      // 2. 올해 체크인 raw_bookings
-      fetchAllPages(([s, e]) => {
-        let q = supabase.from('raw_bookings')
-          .select('check_in_date, check_out_date, payment_amount, reservation_created_at, reservation_channel, nights')
-          .gte('check_in_date', monthStart).lte('check_in_date', monthEnd)
-        return branchFilter(q).range(s, e)
-      }),
-      // 3. 전년 체크인 raw_bookings
-      fetchAllPages(([s, e]) => {
-        let q = supabase.from('raw_bookings')
-          .select('check_in_date, payment_amount, reservation_channel, nights')
-          .gte('check_in_date', prevMonthStart).lte('check_in_date', prevMonthEnd)
-        return branchFilter(q).range(s, e)
-      }),
-      // 4. OCC: branch_room_occ 우선, 없으면 duck fallback
-      (async () => {
-        const occData = await fetchAllPages(([s, e]) => {
-          let q = supabase.from('branch_room_occ')
-            .select('date, available_rooms, sold_rooms')
-            .gte('date', monthStart).lte('date', monthEnd)
-          return branchFilter(q).range(s, e)
-        })
-        if (occData.length > 0) return occData
-        // fallback: duck에서 OCC 가져오기
-        try {
-          const branchFilter_sql = branch !== 'all' ? `AND f.branchId = (SELECT id FROM dim_branch WHERE name = '${branch.replace(/'/g, "''")}')` : ''
-          const branchFilter_avail = branch !== 'all' ? `AND branchId = (SELECT id FROM dim_branch WHERE name = '${branch.replace(/'/g, "''")}')` : ''
-          const duckResult = await duckQuery(`
-            WITH fact_daily AS (
-              SELECT date, SUM(oc_rn) AS sold
-              FROM fact_reservation_event
-              WHERE event = '재실' AND isSales = true
-                AND date BETWEEN '${monthStart}' AND '${monthEnd}'
-                ${branchFilter_sql}
-              GROUP BY date
-            ),
-            avail_daily AS (
-              SELECT date, SUM(activeRooms - stops) AS avail
-              FROM staging_stat_daily
-              WHERE roomtypeId = '0'
-                AND date BETWEEN '${monthStart}' AND '${monthEnd}'
-                ${branchFilter_avail}
-              GROUP BY date
-            )
-            SELECT a.date, a.avail AS available_rooms, COALESCE(f.sold, 0) AS sold_rooms
-            FROM avail_daily a
-            LEFT JOIN fact_daily f ON f.date = a.date
-            ORDER BY a.date
-          `)
-          return duckResult.rows.map((r: any) => ({
-            date: String(r.date).split('T')[0],
-            available_rooms: r.available_rooms || 0,
-            sold_rooms: r.sold_rooms || 0,
-          }))
-        } catch (e) {
-          console.error('Duck OCC fallback failed:', e)
-          return []
-        }
-      })(),
-      // 5. 픽업 기준 raw_bookings
-      fetchAllPages(([s, e]) => {
-        let q = supabase.from('raw_bookings')
-          .select('reservation_created_at, payment_amount, reservation_channel, nights')
-          .gte('reservation_created_at', monthStart + ' 00:00:00')
-          .lte('reservation_created_at', monthEnd + ' 23:59:59')
-        return branchFilter(q).range(s, e)
-      }),
-      // 6. 목표
+    const escapedBranch = branch.replace(/'/g, "''")
+    const branchFilter_sql = branch !== 'all' ? `AND b_name = '${escapedBranch}'` : ''
+    const branchFilter_avail = branch !== 'all' ? `AND branchId = (SELECT id FROM dim_branch WHERE name = '${escapedBranch}' LIMIT 1)` : ''
+
+    // ★ duck + Supabase(targets만) 병렬 로드
+    const [duckCi, duckPrevYear, duckOcc, duckPickup, targetData] = await Promise.all([
+      // 1+2. 올해 체크인 데이터 (CI 합계 + 상세)
+      duckQuery(`
+        SELECT CAST(date AS VARCHAR) as check_in_date,
+               SUM(ci_rv) as payment_amount, SUM(ci_rn) as nights,
+               c_name as reservation_channel,
+               MIN(CAST(reservedAt AS VARCHAR)) as reservation_created_at
+        FROM fact_reservation_event
+        WHERE event = '체크인' AND isSales = true
+          AND date BETWEEN '${monthStart}' AND '${monthEnd}'
+          ${branchFilter_sql}
+        GROUP BY CAST(date AS VARCHAR), c_name
+      `),
+      // 3. 전년 체크인
+      duckQuery(`
+        SELECT CAST(date AS VARCHAR) as check_in_date,
+               SUM(ci_rv) as payment_amount, SUM(ci_rn) as nights,
+               c_name as reservation_channel
+        FROM fact_reservation_event
+        WHERE event = '체크인' AND isSales = true
+          AND date BETWEEN '${prevMonthStart}' AND '${prevMonthEnd}'
+          ${branchFilter_sql}
+        GROUP BY CAST(date AS VARCHAR), c_name
+      `),
+      // 4. OCC (duck only)
+      duckQuery(`
+        WITH fact_daily AS (
+          SELECT date, SUM(oc_rn) AS sold
+          FROM fact_reservation_event
+          WHERE event = '재실' AND isSales = true
+            AND date BETWEEN '${monthStart}' AND '${monthEnd}'
+            ${branchFilter_sql}
+          GROUP BY date
+        ),
+        avail_daily AS (
+          SELECT date, SUM(activeRooms - stops) AS avail
+          FROM staging_stat_daily
+          WHERE roomtypeId = '0'
+            AND date BETWEEN '${monthStart}' AND '${monthEnd}'
+            ${branchFilter_avail}
+          GROUP BY date
+        )
+        SELECT CAST(a.date AS VARCHAR) as date, a.avail AS available_rooms, COALESCE(f.sold, 0) AS sold_rooms
+        FROM avail_daily a
+        LEFT JOIN fact_daily f ON f.date = a.date
+        ORDER BY a.date
+      `),
+      // 5. 픽업 기준
+      duckQuery(`
+        SELECT CAST(date AS VARCHAR) as reservation_created_at,
+               SUM(pk_rv) as payment_amount, SUM(pk_rn) as nights,
+               c_name as reservation_channel
+        FROM fact_reservation_event
+        WHERE event = '픽업'
+          AND date BETWEEN '${monthStart}' AND '${monthEnd}'
+          ${branchFilter_sql}
+        GROUP BY CAST(date AS VARCHAR), c_name
+      `),
+      // 6. 목표 (Supabase 유지)
       supabase.from('targets').select('branch_name, target_amount')
         .eq('month', month).eq('year', year).neq('branch_name', '전지점'),
     ])
 
-    if (rpcResult.error) throw rpcResult.error
+    // duck 결과를 기존 형식으로 변환
+    const rpcResult = { data: [] as any[], error: null }
+    const allCiData = duckCi.rows.map((r: any) => ({
+      check_in_date: String(r.check_in_date).substring(0, 10),
+      check_out_date: String(r.check_in_date).substring(0, 10),
+      payment_amount: r.payment_amount || 0,
+      nights: r.nights || 0,
+      reservation_channel: r.reservation_channel || '',
+      reservation_created_at: r.reservation_created_at || '',
+    }))
+    const prevYearData = duckPrevYear.rows.map((r: any) => ({
+      check_in_date: String(r.check_in_date).substring(0, 10),
+      payment_amount: r.payment_amount || 0,
+      nights: r.nights || 0,
+      reservation_channel: r.reservation_channel || '',
+    }))
+    const allOccData = duckOcc.rows.map((r: any) => ({
+      date: String(r.date).substring(0, 10),
+      available_rooms: r.available_rooms || 0,
+      sold_rooms: r.sold_rooms || 0,
+    }))
+    const allPickupData = duckPickup.rows.map((r: any) => ({
+      reservation_created_at: String(r.reservation_created_at).substring(0, 10),
+      payment_amount: r.payment_amount || 0,
+      nights: r.nights || 0,
+      reservation_channel: r.reservation_channel || '',
+    }))
 
-    const totalCI = (rpcResult.data || []).reduce((sum: number, w: any) => sum + (w.ci_amount || 0), 0)
+    // totalCI = duck CI 매출 합계
+    const totalCI = allCiData.reduce((sum: number, r: any) => sum + (r.payment_amount || 0), 0)
 
     const totalTarget = (targetData.data || [])
       .filter((row: any) => branch === 'all' || normalizeBranchName(row.branch_name) === branch)
