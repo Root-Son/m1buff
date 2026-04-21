@@ -366,8 +366,15 @@ def main():
     duration = (end_time - start_time).total_seconds()
 
     print(f"\n{'='*60}")
-    if errors:
-        print(f"⚠️ 동기화 일부 실패 ({len(errors)}/4): {[e[0] for e in errors]}")
+    # raw_bookings 실패 여부 확인
+    rb_failed = any(e[0] == 'raw_bookings' for e in errors)
+    non_rb_errors = [e for e in errors if e[0] != 'raw_bookings']
+
+    if non_rb_errors:
+        print(f"⚠️ 일부 테이블 실패 (non-critical): {[e[0] for e in non_rb_errors]}")
+
+    if rb_failed:
+        print(f"❌ raw_bookings 동기화 실패!")
         print(f"소요시간: {duration:.1f}초 = {duration/60:.1f}분")
         print(f"{'='*60}\n")
         raise Exception(f"동기화 실패: {errors}")
