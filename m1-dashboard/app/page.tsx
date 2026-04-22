@@ -118,9 +118,8 @@ export default function Dashboard() {
     fetchWeeklyAndChannelData()
   }, [currentWeek])
 
-  // 탑라인: 월 변경 시만
+  // 탑라인: 월 변경 시
   useEffect(() => {
-    if (toplineMonth === 3) return // 초기값은 위에서 처리됨
     const controller = new AbortController()
     fetchToplineData(controller.signal)
     return () => controller.abort()
