@@ -105,28 +105,26 @@ export async function GET(request: NextRequest) {
 
     // ★ duck + Supabase(targets만) 병렬 로드
     const [duckCi, duckPrevYear, duckOcc, duckPickup, targetData] = await Promise.all([
-      // 1+2. 올해 체크인 데이터 (CI 합계 + 상세)
+      // 1+2. 올해 체크인 데이터 (개별 예약 — 픽업 시점 분석용)
       duckQuery(`
         SELECT CAST(date AS VARCHAR) as check_in_date,
-               SUM(ci_rv) as payment_amount, SUM(ci_rn) as nights,
+               ci_rv as payment_amount, ci_rn as nights,
                c_name as reservation_channel,
-               MIN(CAST(reservedAt AS VARCHAR)) as reservation_created_at
+               CAST(reservedAt AS VARCHAR) as reservation_created_at
         FROM fact_reservation_event
         WHERE event = '체크인' AND isSales = true AND c_name NOT LIKE 'LS_%' AND c_name != '내부채널_LS'
           AND date BETWEEN '${monthStart}' AND '${monthEnd}'
           ${branchFilter_sql}
-        GROUP BY CAST(date AS VARCHAR), c_name
       `),
       // 3. 전년 체크인
       duckQuery(`
         SELECT CAST(date AS VARCHAR) as check_in_date,
-               SUM(ci_rv) as payment_amount, SUM(ci_rn) as nights,
+               ci_rv as payment_amount, ci_rn as nights,
                c_name as reservation_channel
         FROM fact_reservation_event
         WHERE event = '체크인' AND isSales = true AND c_name NOT LIKE 'LS_%' AND c_name != '내부채널_LS'
           AND date BETWEEN '${prevMonthStart}' AND '${prevMonthEnd}'
           ${branchFilter_sql}
-        GROUP BY CAST(date AS VARCHAR), c_name
       `),
       // 4. OCC (duck only)
       duckQuery(`
