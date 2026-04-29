@@ -112,7 +112,7 @@ export async function GET(request: NextRequest) {
                c_name as reservation_channel,
                CAST(reservedAt AS VARCHAR) as reservation_created_at
         FROM fact_reservation_event
-        WHERE event = '체크인' AND isSales = true AND c_name NOT LIKE 'LS_%' AND c_name != '내부채널_LS'
+        WHERE event = '체크인' AND isSales = true
           AND date BETWEEN '${monthStart}' AND '${monthEnd}'
           ${branchFilter_sql}
       `),
@@ -122,7 +122,7 @@ export async function GET(request: NextRequest) {
                ci_rv as payment_amount, ci_rn as nights,
                c_name as reservation_channel
         FROM fact_reservation_event
-        WHERE event = '체크인' AND isSales = true AND c_name NOT LIKE 'LS_%' AND c_name != '내부채널_LS'
+        WHERE event = '체크인' AND isSales = true
           AND date BETWEEN '${prevMonthStart}' AND '${prevMonthEnd}'
           ${branchFilter_sql}
       `),

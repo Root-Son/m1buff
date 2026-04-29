@@ -34,7 +34,7 @@ export async function GET(request: NextRequest) {
       FROM fact_reservation_event
       WHERE event = '픽업'
         AND isSales = true
-        AND c_name NOT LIKE 'LS_%' AND c_name != '내부채널_LS'
+       
         AND CAST(date AS VARCHAR) = '${pickupDate}'
         ${branchFilter}
     `
