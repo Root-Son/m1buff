@@ -890,8 +890,11 @@ export default function Dashboard() {
           )}
         </div>
 
-        {/* 일 실적 */}
-        <div className="mb-6">
+        {/* 픽업 코호트 */}
+        <PickupCohort branch={selectedBranch} toplineMonth={toplineMonth} />
+
+        {/* 일 실적 — REMOVED, 코호트로 대체 */}
+        {false && <div className="mb-6">
           <div className="flex items-center justify-between mb-3">
             <h2 className="text-sm font-semibold text-gray-500 uppercase">일 실적</h2>
             <div className="flex items-center gap-2">
@@ -995,6 +998,7 @@ export default function Dashboard() {
           </div>
         </div>
 
+        }
         {/* 목표 달성 현황 */}
         <AchievementSection branch={selectedBranch} toplineMonth={toplineMonth} />
 
@@ -1142,6 +1146,84 @@ function AchievementSection({ branch, toplineMonth }: { branch: string; toplineM
         <div className="h-72">
           <canvas ref={chartRef}></canvas>
         </div>
+      </div>
+    </div>
+  )
+}
+
+// ── 픽업 코호트 ──
+function PickupCohort({ branch, toplineMonth }: { branch: string; toplineMonth: number }) {
+  const [data, setData] = useState<any>(null)
+  const branchParam = branch === '전지점' ? 'all' : branch
+
+  useEffect(() => {
+    fetch(`/api/pickup-cohort?branch=${encodeURIComponent(branchParam)}&month=${toplineMonth}`)
+      .then(r => r.json())
+      .then(setData)
+      .catch(() => {})
+  }, [branchParam, toplineMonth])
+
+  if (!data || !data.rows?.length) return null
+
+  const weeks: string[] = data.weeks || []
+  const rows: { date: string; total: number; cells: number[] }[] = data.rows || []
+
+  // 히트맵 색상: 값 크기에 따라
+  const allValues = rows.flatMap(r => r.cells).filter(v => v > 0)
+  const maxVal = Math.max(...allValues, 1)
+
+  const cellColor = (v: number) => {
+    if (v === 0) return ''
+    const intensity = Math.min(v / maxVal, 1)
+    const alpha = 0.1 + intensity * 0.6
+    return `rgba(34, 139, 34, ${alpha})`
+  }
+
+  const fmt = (v: number) => {
+    if (v === 0) return ''
+    if (v >= 1e8) return `${(v / 1e8).toFixed(1)}억`
+    if (v >= 1e6) return `${(v / 1e6).toFixed(0)}백`
+    if (v >= 1e4) return `${(v / 1e4).toFixed(0)}만`
+    return v.toLocaleString()
+  }
+
+  const dow = ['일', '월', '화', '수', '목', '금', '토']
+
+  return (
+    <div className="mb-6">
+      <h2 className="text-sm font-semibold text-gray-500 uppercase mb-3">
+        {toplineMonth}월 픽업 코호트
+        <span className="ml-2 text-xs text-gray-400 font-normal">예약일(행) × 체크인 주차(열)</span>
+      </h2>
+      <div className="bg-white rounded-lg shadow-sm border overflow-x-auto">
+        <table className="text-xs w-full">
+          <thead>
+            <tr className="bg-gray-50">
+              <th className="sticky left-0 bg-gray-50 px-2 py-1.5 text-left font-medium text-gray-500 border-r">예약일</th>
+              <th className="px-2 py-1.5 text-right font-medium text-gray-500 border-r">총합계</th>
+              {weeks.map(w => (
+                <th key={w} className="px-2 py-1.5 text-right font-medium text-gray-500 whitespace-nowrap">{w}</th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map(row => {
+              const d = new Date(row.date)
+              const dayLabel = `${d.getMonth()+1}/${d.getDate()}(${dow[d.getDay()]})`
+              return (
+                <tr key={row.date} className="border-t hover:bg-gray-50">
+                  <td className="sticky left-0 bg-white px-2 py-1 font-medium text-gray-700 border-r whitespace-nowrap">{dayLabel}</td>
+                  <td className="px-2 py-1 text-right font-semibold text-gray-800 border-r">{fmt(row.total)}</td>
+                  {row.cells.map((v, i) => (
+                    <td key={i} className="px-2 py-1 text-right text-gray-700" style={{ backgroundColor: cellColor(v) }}>
+                      {fmt(v)}
+                    </td>
+                  ))}
+                </tr>
+              )
+            })}
+          </tbody>
+        </table>
       </div>
     </div>
   )
