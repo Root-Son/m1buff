@@ -26,6 +26,7 @@ export async function GET(request: NextRequest) {
         AND EXTRACT(MONTH FROM date) = ${month}
         AND EXTRACT(YEAR FROM date) = ${year}
         AND CAST(checkIn AS DATE) >= DATE '${year}-${String(month).padStart(2,'0')}-01'
+        AND CAST(checkIn AS DATE) < DATE '${month + 3 <= 12 ? year : year + 1}-${String((month + 3 - 1) % 12 + 1).padStart(2,'0')}-01'
         ${branchFilter}
       GROUP BY CAST(date AS VARCHAR), CAST(checkIn AS VARCHAR)
       ORDER BY CAST(date AS VARCHAR), CAST(checkIn AS VARCHAR)
