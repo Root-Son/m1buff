@@ -25,7 +25,7 @@ export async function GET(request: NextRequest) {
         AND isSales = true
         AND EXTRACT(MONTH FROM date) = ${month}
         AND EXTRACT(YEAR FROM date) = ${year}
-        AND checkIn >= date
+        AND CAST(checkIn AS DATE) >= DATE '${year}-${String(month).padStart(2,'0')}-01'
         ${branchFilter}
       GROUP BY CAST(date AS VARCHAR), CAST(checkIn AS VARCHAR)
       ORDER BY CAST(date AS VARCHAR), CAST(checkIn AS VARCHAR)
