@@ -25,6 +25,7 @@ export async function GET(request: NextRequest) {
         AND isSales = true
         AND EXTRACT(MONTH FROM date) = ${month}
         AND EXTRACT(YEAR FROM date) = ${year}
+        AND checkIn >= date
         ${branchFilter}
       GROUP BY CAST(date AS VARCHAR), CAST(checkIn AS VARCHAR)
       ORDER BY CAST(date AS VARCHAR), CAST(checkIn AS VARCHAR)
