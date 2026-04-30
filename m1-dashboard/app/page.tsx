@@ -1065,7 +1065,7 @@ function AchievementSection({ branch, toplineMonth }: { branch: string; toplineM
           <div className="flex justify-between items-center mb-4">
             <span className="text-lg font-bold">{data.total.rate}% 달성</span>
             <span className="text-sm text-gray-500">
-              {(data.total.revenue / 1e8).toFixed(1)}억 / {(data.total.target / 1e8).toFixed(1)}억
+              {data.total.revenue.toLocaleString('ko-KR')}원 / {data.total.target.toLocaleString('ko-KR')}원
             </span>
           </div>
           <div className="w-full bg-gray-200 rounded-full h-3 mb-4">
@@ -1088,7 +1088,7 @@ function AchievementSection({ branch, toplineMonth }: { branch: string; toplineM
                 {b.rate}%
               </span>
               <span className="text-xs text-gray-400 w-24 text-right">
-                {(b.revenue / 1e6).toFixed(0)}백 / {(b.target / 1e6).toFixed(0)}백
+                {b.revenue.toLocaleString('ko-KR')} / {b.target.toLocaleString('ko-KR')}
               </span>
             </div>
           ))}
@@ -1103,7 +1103,7 @@ function AchievementSection({ branch, toplineMonth }: { branch: string; toplineM
       <h2 className="text-sm font-semibold text-gray-500 uppercase mb-3">
         {branch} {toplineMonth}월 목표 달성 추이
         <span className="ml-2 text-xs text-gray-400">
-          목표 {data.target ? `${(data.target / 1e8).toFixed(1)}억` : '-'}
+          목표 {data.target ? `${data.target.toLocaleString('ko-KR')}원` : '-'}
           {data.days?.length > 0 && ` | 현재 ${data.days[data.days.length - 1].rate}%`}
         </span>
       </h2>
@@ -1146,10 +1146,7 @@ function PickupCohort({ branch, toplineMonth }: { branch: string; toplineMonth: 
 
   const fmt = (v: number) => {
     if (v === 0) return ''
-    if (v >= 1e8) return `${(v / 1e8).toFixed(1)}억`
-    if (v >= 1e6) return `${(v / 1e6).toFixed(0)}백`
-    if (v >= 1e4) return `${(v / 1e4).toFixed(0)}만`
-    return v.toLocaleString()
+    return v.toLocaleString('ko-KR')
   }
 
   const dow = ['일', '월', '화', '수', '목', '금', '토']
