@@ -1119,14 +1119,15 @@ function AchievementSection({ branch, toplineMonth }: { branch: string; toplineM
 // ── 픽업 코호트 ──
 function PickupCohort({ branch, toplineMonth }: { branch: string; toplineMonth: number }) {
   const [data, setData] = useState<any>(null)
+  const [channelFilter, setChannelFilter] = useState<'all' | 'ota'>('all')
   const branchParam = branch === '전지점' ? 'all' : branch
 
   useEffect(() => {
-    fetch(`/api/pickup-cohort?branch=${encodeURIComponent(branchParam)}&month=${toplineMonth}`)
+    fetch(`/api/pickup-cohort?branch=${encodeURIComponent(branchParam)}&month=${toplineMonth}&channel=${channelFilter}`)
       .then(r => r.json())
       .then(setData)
       .catch(() => {})
-  }, [branchParam, toplineMonth])
+  }, [branchParam, toplineMonth, channelFilter])
 
   if (!data || !data.rows?.length) return null
 
@@ -1153,10 +1154,25 @@ function PickupCohort({ branch, toplineMonth }: { branch: string; toplineMonth: 
 
   return (
     <div className="mb-6">
-      <h2 className="text-sm font-semibold text-gray-500 uppercase mb-3">
-        {toplineMonth}월 픽업 코호트
-        <span className="ml-2 text-xs text-gray-400 font-normal">예약일(행) × 체크인 주차(열)</span>
-      </h2>
+      <div className="flex items-center justify-between mb-3">
+        <h2 className="text-sm font-semibold text-gray-500 uppercase">
+          {toplineMonth}월 픽업 코호트
+          <span className="ml-2 text-xs text-gray-400 font-normal">예약일(행) × 체크인 주차(열)</span>
+        </h2>
+        <div className="flex gap-1">
+          {(['all', 'ota'] as const).map(ch => (
+            <button
+              key={ch}
+              onClick={() => setChannelFilter(ch)}
+              className={`px-3 py-1 text-xs font-medium rounded-lg ${
+                channelFilter === ch ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+              }`}
+            >
+              {ch === 'all' ? '전체채널' : 'OTA'}
+            </button>
+          ))}
+        </div>
+      </div>
       <div className="bg-white rounded-lg shadow-sm border overflow-x-auto">
         <table className="text-xs w-full">
           <thead>

@@ -11,10 +11,14 @@ export async function GET(request: NextRequest) {
 
   try {
     const escapedBranch = branch.replace(/'/g, "''")
+    const channel = searchParams.get('channel') || 'all' // 'all' or 'ota'
     const branchFilter = branch !== 'all' ? `AND b_name = '${escapedBranch}'` : ''
+    const OTA_CHANNELS = ['야놀자(호텔)', '야놀자(모텔)', '아고다', '여기어때', '씨트립', '부킹닷컴', '익스피디아', '네이버', '트립토파즈']
+    const channelFilter = channel === 'ota' ? `AND c_name IN (${OTA_CHANNELS.map(c => `'${c}'`).join(',')})` : ''
 
-    // 해당 월의 픽업 데이터: 픽업일(date) × 체크인일(checkIn) → 매출
-    // 체크인은 향후 10주까지
+    const endMonth = (month + 3 - 1) % 12 + 1
+    const endYear = month + 3 <= 12 ? year : year + 1
+
     const result = await duckQuery(`
       SELECT
         CAST(date AS VARCHAR) as pickup_date,
@@ -26,8 +30,9 @@ export async function GET(request: NextRequest) {
         AND EXTRACT(MONTH FROM date) = ${month}
         AND EXTRACT(YEAR FROM date) = ${year}
         AND CAST(checkIn AS DATE) >= DATE '${year}-${String(month).padStart(2,'0')}-01'
-        AND CAST(checkIn AS DATE) < DATE '${month + 3 <= 12 ? year : year + 1}-${String((month + 3 - 1) % 12 + 1).padStart(2,'0')}-01'
+        AND CAST(checkIn AS DATE) < DATE '${endYear}-${String(endMonth).padStart(2,'0')}-01'
         ${branchFilter}
+        ${channelFilter}
       GROUP BY CAST(date AS VARCHAR), CAST(checkIn AS VARCHAR)
       ORDER BY CAST(date AS VARCHAR), CAST(checkIn AS VARCHAR)
     `)
