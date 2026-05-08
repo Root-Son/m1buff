@@ -1147,7 +1147,7 @@ function PickupCohort({ branch, toplineMonth }: { branch: string; toplineMonth: 
 
   const fmt = (v: number) => {
     if (v === 0) return ''
-    return v.toLocaleString('ko-KR')
+    return Math.round(v / 1000).toLocaleString('ko-KR')
   }
 
   const dow = ['일', '월', '화', '수', '목', '금', '토']
