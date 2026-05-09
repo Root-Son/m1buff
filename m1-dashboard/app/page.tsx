@@ -1157,7 +1157,7 @@ function PickupCohort({ branch, toplineMonth }: { branch: string; toplineMonth: 
       <div className="flex items-center justify-between mb-3">
         <h2 className="text-sm font-semibold text-gray-500 uppercase">
           {toplineMonth}월 픽업 코호트
-          <span className="ml-2 text-xs text-gray-400 font-normal">예약일(행) × 체크인 주차(열)</span>
+          <span className="ml-2 text-xs text-gray-400 font-normal">예약일(행) × 체크인 주차(열) | 단위: 천원</span>
         </h2>
         <div className="flex gap-1">
           {(['all', 'ota'] as const).map(ch => (
