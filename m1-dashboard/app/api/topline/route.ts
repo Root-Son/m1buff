@@ -139,7 +139,7 @@ export async function GET(request: NextRequest) {
           GROUP BY date
         ),
         avail_daily AS (
-          SELECT date, SUM(activeRooms - stops) AS avail
+          SELECT date, SUM(activeRooms) AS avail
           FROM staging_stat_daily
           WHERE roomtypeId = '0'
             AND date BETWEEN '${monthStart}' AND '${monthEnd}'
@@ -343,8 +343,8 @@ export async function GET(request: NextRequest) {
         avg_occ: totalAvailable > 0 ? Math.round(totalSold / totalAvailable * 100) : 0,
         total_available: totalAvailable, total_sold: totalSold,
         weekday_days: weekdayDays, weekend_days: weekendDays,
-        weekday_occ: wdAvail > 0 ? Math.round(wdSold / wdAvail * 100) : 0,
-        weekend_occ: weAvail > 0 ? Math.round(weSold / weAvail * 100) : 0,
+        weekday_occ: wdAvail > 0 ? Math.min(Math.round(wdSold / wdAvail * 100), 100) : 0,
+        weekend_occ: weAvail > 0 ? Math.min(Math.round(weSold / weAvail * 100), 100) : 0,
         weekday_adr: curWdAdr, weekend_adr: curWeAdr,
         weekday_adr_yoy: prevWdAdr > 0 && curWdAdr > 0 ? Math.round((curWdAdr - prevWdAdr) / prevWdAdr * 100) : null,
         weekend_adr_yoy: prevWeAdr > 0 && curWeAdr > 0 ? Math.round((curWeAdr - prevWeAdr) / prevWeAdr * 100) : null,
