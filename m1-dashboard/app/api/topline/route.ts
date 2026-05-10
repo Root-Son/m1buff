@@ -195,8 +195,9 @@ export async function GET(request: NextRequest) {
       reservation_channel: r.reservation_channel || '',
     }))
 
-    // totalCI = duck CI 매출 합계
+    // totalCI = duck CI 매출 합계, totalRN = CI RN 합계
     const totalCI = allCiData.reduce((sum: number, r: any) => sum + (r.payment_amount || 0), 0)
+    const totalRN = allCiData.reduce((sum: number, r: any) => sum + (r.nights || 0), 0)
 
     const totalTarget = (targetData.data || [])
       .filter((row: any) => branch === 'all' || normalizeBranchName(row.branch_name) === branch)
@@ -385,7 +386,7 @@ export async function GET(request: NextRequest) {
     })
 
     const payload = {
-      branch, month, year, total_ci: totalCI, total_target: totalTarget, achievement_rate: achievement,
+      branch, month, year, total_ci: totalCI, total_rn: totalRN, total_target: totalTarget, achievement_rate: achievement,
       weeks: weeksWithLabels, pickup_weeks: pickupWeeks,
       total_pickup: pickupWeeks.reduce((s, w) => s + w.pickup_amount, 0),
     }

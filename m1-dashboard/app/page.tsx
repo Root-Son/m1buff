@@ -748,7 +748,7 @@ export default function Dashboard() {
               ))}
             </div>
           </div>
-          <div className="flex items-baseline gap-4 mb-3">
+          <div className="flex items-baseline gap-4 mb-3 flex-wrap">
             <span className="text-lg font-bold text-gray-900">{toplineData?.month || ''}월 C/I {toplineData?.total_ci?.toLocaleString('ko-KR') || 0}원</span>
             {toplineData?.total_target > 0 && (
               <span className="text-sm text-gray-500">
@@ -758,6 +758,20 @@ export default function Dashboard() {
                 </span>
               </span>
             )}
+            {toplineData?.weeks && (() => {
+              const totalAvail = toplineData.weeks.reduce((s: number, w: any) => s + (w.total_available || 0), 0)
+              const totalSold = toplineData.weeks.reduce((s: number, w: any) => s + (w.total_sold || 0), 0)
+              const occ = totalAvail > 0 ? Math.round(totalSold / totalAvail * 100) : 0
+              const rn = toplineData.total_rn || 0
+              const adr = rn > 0 ? Math.round(toplineData.total_ci / rn) : 0
+              return (
+                <span className="text-sm text-gray-500 flex gap-3">
+                  <span>OCC <span className="font-semibold text-gray-700">{occ}%</span></span>
+                  <span>ADR <span className="font-semibold text-gray-700">{adr.toLocaleString('ko-KR')}</span></span>
+                  <span>RN <span className="font-semibold text-gray-700">{rn.toLocaleString('ko-KR')}</span></span>
+                </span>
+              )
+            })()}
           </div>
           <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
             {toplineData?.weeks?.map((week: any) => (
