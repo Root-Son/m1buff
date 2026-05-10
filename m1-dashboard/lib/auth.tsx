@@ -31,6 +31,22 @@ export function useAuth() {
 
 let kcInstance: Keycloak | null = null;
 
+const KC_TOKEN_KEY = "kc_token";
+const KC_REFRESH_KEY = "kc_refresh_token";
+const KC_ID_KEY = "kc_id_token";
+
+function saveTokens(kc: Keycloak) {
+  if (kc.token) localStorage.setItem(KC_TOKEN_KEY, kc.token);
+  if (kc.refreshToken) localStorage.setItem(KC_REFRESH_KEY, kc.refreshToken);
+  if (kc.idToken) localStorage.setItem(KC_ID_KEY, kc.idToken);
+}
+
+function clearTokens() {
+  localStorage.removeItem(KC_TOKEN_KEY);
+  localStorage.removeItem(KC_REFRESH_KEY);
+  localStorage.removeItem(KC_ID_KEY);
+}
+
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [authenticated, setAuthenticated] = useState(false);
   const [user, setUser] = useState<AuthContextType["user"]>(null);
@@ -43,26 +59,47 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const kc = new Keycloak(keycloakConfig);
     kcInstance = kc;
 
+    // localStorage에서 저장된 토큰 복원
+    const savedToken = localStorage.getItem(KC_TOKEN_KEY) || undefined;
+    const savedRefresh = localStorage.getItem(KC_REFRESH_KEY) || undefined;
+    const savedId = localStorage.getItem(KC_ID_KEY) || undefined;
+
     kc.init({
       onLoad: "login-required",
       checkLoginIframe: false,
       pkceMethod: "S256",
+      token: savedToken,
+      refreshToken: savedRefresh,
+      idToken: savedId,
     }).then((auth) => {
       if (auth) {
-        setAuthenticated(true);
-        setToken(kc.token || null);
+        // 저장된 토큰으로 복원된 경우 즉시 갱신 시도
+        kc.updateToken(300).then(() => {
+          saveTokens(kc);
+          setAuthenticated(true);
+          setToken(kc.token || null);
 
-        const profile = kc.tokenParsed as any;
-        setUser({
-          name: profile?.name || profile?.preferred_username || "",
-          email: profile?.email || "",
-          roles: profile?.realm_access?.roles || [],
+          const profile = kc.tokenParsed as any;
+          setUser({
+            name: profile?.name || profile?.preferred_username || "",
+            email: profile?.email || "",
+            roles: profile?.realm_access?.roles || [],
+          });
+          setLoading(false);
+        }).catch(() => {
+          // refresh token도 만료 → 재로그인
+          clearTokens();
+          kc.login();
         });
 
         const refreshToken = () => {
           kc.updateToken(120).then((refreshed) => {
-            if (refreshed) setToken(kc.token || null);
+            if (refreshed) {
+              saveTokens(kc);
+              setToken(kc.token || null);
+            }
           }).catch(() => {
+            clearTokens();
             kc.login();
           });
         };
@@ -77,15 +114,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         document.addEventListener("visibilitychange", () => {
           if (document.visibilityState === "visible") refreshToken();
         });
+      } else {
+        setLoading(false);
       }
-      setLoading(false);
     }).catch((err) => {
       console.error("Keycloak init failed:", err);
+      clearTokens();
       setLoading(false);
     });
   }, []);
 
   const logout = useCallback(() => {
+    clearTokens();
     kcInstance?.logout({ redirectUri: window.location.origin });
   }, []);
 
