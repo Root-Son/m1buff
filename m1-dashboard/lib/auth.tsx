@@ -59,12 +59,24 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           roles: profile?.realm_access?.roles || [],
         });
 
-        // 토큰 자동 갱신 (만료 60초 전)
-        setInterval(() => {
-          kc.updateToken(60).catch(() => {
+        const refreshToken = () => {
+          kc.updateToken(120).then((refreshed) => {
+            if (refreshed) setToken(kc.token || null);
+          }).catch(() => {
             kc.login();
           });
-        }, 30000);
+        };
+
+        // 토큰 만료 이벤트 핸들러
+        kc.onTokenExpired = refreshToken;
+
+        // 주기적 갱신 (만료 120초 전)
+        setInterval(refreshToken, 30000);
+
+        // 탭 복귀 시 즉시 갱신
+        document.addEventListener("visibilitychange", () => {
+          if (document.visibilityState === "visible") refreshToken();
+        });
       }
       setLoading(false);
     }).catch((err) => {
