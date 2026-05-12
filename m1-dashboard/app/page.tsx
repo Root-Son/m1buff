@@ -1168,6 +1168,38 @@ function PickupCohort({ branch, toplineMonth }: { branch: string; toplineMonth: 
 
   const dow = ['일', '월', '화', '수', '목', '금', '토']
 
+  // 예약주 계산 (Sun-Sat 주차)
+  const getReservationWeek = (dateStr: string) => {
+    const d = new Date(dateStr)
+    const m = d.getMonth() + 1
+    const year = d.getFullYear()
+    const firstDay = new Date(year, d.getMonth(), 1)
+    const firstDow = firstDay.getDay()
+    const cursor = new Date(firstDay)
+    if (firstDow !== 0) cursor.setDate(cursor.getDate() - firstDow)
+    let weekNum = 1
+    while (true) {
+      const weekEnd = new Date(cursor)
+      weekEnd.setDate(weekEnd.getDate() + 6)
+      if (d >= cursor && d <= weekEnd) return `${m}월W${weekNum}`
+      weekNum++
+      cursor.setDate(cursor.getDate() + 7)
+      if (weekNum > 10) break
+    }
+    return `${m}월W?`
+  }
+
+  // 각 행에 예약주 라벨 + rowSpan 계산
+  const rowsWithWeek = rows.map(row => ({ ...row, weekLabel: getReservationWeek(row.date) }))
+  const weekSpans: Record<number, number> = {}
+  for (let i = 0; i < rowsWithWeek.length; i++) {
+    const label = rowsWithWeek[i].weekLabel
+    let span = 1
+    while (i + span < rowsWithWeek.length && rowsWithWeek[i + span].weekLabel === label) span++
+    weekSpans[i] = span
+    for (let j = 1; j < span; j++) weekSpans[i + j] = 0
+  }
+
   return (
     <div className="mb-6">
       <div className="flex items-center justify-between mb-3">
@@ -1193,7 +1225,8 @@ function PickupCohort({ branch, toplineMonth }: { branch: string; toplineMonth: 
         <table className="text-xs w-full">
           <thead>
             <tr className="bg-gray-50">
-              <th className="sticky left-0 bg-gray-50 px-2 py-1.5 text-left font-medium text-gray-500 border-r">예약일</th>
+              <th className="sticky left-0 bg-gray-50 px-2 py-1.5 text-left font-medium text-gray-500 border-r z-10">예약주</th>
+              <th className="sticky left-[52px] bg-gray-50 px-2 py-1.5 text-left font-medium text-gray-500 border-r z-10">예약일</th>
               <th className="px-2 py-1.5 text-right font-medium text-gray-500 border-r">총합계</th>
               {weeks.map(w => (
                 <th key={w} className="px-2 py-1.5 text-right font-medium text-gray-500 whitespace-nowrap">{w}</th>
@@ -1201,12 +1234,21 @@ function PickupCohort({ branch, toplineMonth }: { branch: string; toplineMonth: 
             </tr>
           </thead>
           <tbody>
-            {rows.map(row => {
+            {rowsWithWeek.map((row, idx) => {
               const d = new Date(row.date)
               const dayLabel = `${d.getMonth()+1}/${d.getDate()}(${dow[d.getDay()]})`
+              const span = weekSpans[idx]
               return (
                 <tr key={row.date} className="border-t hover:bg-gray-50">
-                  <td className="sticky left-0 bg-white px-2 py-1 font-medium text-gray-700 border-r whitespace-nowrap">{dayLabel}</td>
+                  {span > 0 && (
+                    <td
+                      rowSpan={span}
+                      className="sticky left-0 bg-gray-50 px-2 py-1 font-medium text-gray-500 border-r text-center whitespace-nowrap align-middle z-10"
+                    >
+                      {row.weekLabel}
+                    </td>
+                  )}
+                  <td className="sticky left-[52px] bg-white px-2 py-1 font-medium text-gray-700 border-r whitespace-nowrap z-10">{dayLabel}</td>
                   <td className="px-2 py-1 text-right font-semibold text-gray-800 border-r">{fmt(row.total)}</td>
                   {row.cells.map((v, i) => (
                     <td key={i} className="px-2 py-1 text-right text-gray-700" style={{ backgroundColor: cellColor(v) }}>
