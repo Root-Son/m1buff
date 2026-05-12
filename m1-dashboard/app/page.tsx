@@ -26,6 +26,7 @@ export default function Dashboard() {
   const [prevWeeklyData, setPrevWeeklyData] = useState<any>(null)
   const [toplineData, setToplineData] = useState<any>(null)
   const toplineCache = useRef<Record<string, any>>({})
+  const wantedToplineKey = useRef('')
   const [roomTypeData, setRoomTypeData] = useState<any>(null)
   const [monthlySummaryData, setMonthlySummaryData] = useState<any>(null)
   const [channelData, setChannelData] = useState<any>(null)
@@ -264,6 +265,7 @@ export default function Dashboard() {
   const fetchToplineData = async (signal?: AbortSignal) => {
     const branch = selectedBranch === '전지점' ? 'all' : selectedBranch
     const cacheKey = `${branch}:${toplineMonth}`
+    wantedToplineKey.current = cacheKey
 
     // 캐시 히트 → 즉시 표시
     if (toplineCache.current[cacheKey]) {
@@ -274,7 +276,7 @@ export default function Dashboard() {
     setToplineLoading(true)
     try {
       const data = await fetch(`/api/topline?branch=${branch}&month=${toplineMonth}`, { signal }).then(r => r.json())
-      if (!signal?.aborted) {
+      if (!signal?.aborted && wantedToplineKey.current === cacheKey) {
         toplineCache.current[cacheKey] = data
         setToplineData(data)
 
