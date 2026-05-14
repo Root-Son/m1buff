@@ -1168,25 +1168,17 @@ function PickupCohort({ branch, toplineMonth }: { branch: string; toplineMonth: 
 
   const dow = ['일', '월', '화', '수', '목', '금', '토']
 
-  // 예약주 계산 (Sun-Sat 주차)
+  // 예약주 계산 (Sun-Sat 주차, topline과 동일 기준)
   const getReservationWeek = (dateStr: string) => {
-    const d = new Date(dateStr)
-    const m = d.getMonth() + 1
-    const year = d.getFullYear()
-    const firstDay = new Date(year, d.getMonth(), 1)
-    const firstDow = firstDay.getDay()
-    const cursor = new Date(firstDay)
-    if (firstDow !== 0) cursor.setDate(cursor.getDate() - firstDow)
-    let weekNum = 1
-    while (true) {
-      const weekEnd = new Date(cursor)
-      weekEnd.setDate(weekEnd.getDate() + 6)
-      if (d >= cursor && d <= weekEnd) return `${m}월W${weekNum}`
-      weekNum++
-      cursor.setDate(cursor.getDate() + 7)
-      if (weekNum > 10) break
-    }
-    return `${m}월W?`
+    const [y, mo, da] = dateStr.split('-').map(Number)
+    const m = mo
+    const firstDow = new Date(y, mo - 1, 1).getDay()
+    // W1 시작일 = 1일이 속한 주의 일요일 (이전 달일 수 있음)
+    const w1Start = 1 - firstDow // 일요일 기준 시작 (음수면 이전달)
+    // day가 몇 번째 주에 속하는지
+    const dayOffset = da - w1Start
+    const weekNum = Math.floor(dayOffset / 7) + 1
+    return `${m}월W${weekNum}`
   }
 
   return (
