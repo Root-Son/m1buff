@@ -133,7 +133,7 @@ export async function GET(request: NextRequest) {
         WITH fact_daily AS (
           SELECT date, SUM(oc_rn) AS sold
           FROM fact_reservation_event
-          WHERE event = '재실' AND isSales = true AND c_name NOT LIKE 'LS_%' AND c_name != '내부채널_LS'
+          WHERE event = '재실' AND isSales = true
             AND date BETWEEN '${monthStart}' AND '${monthEnd}'
             ${branchFilter_sql}
           GROUP BY date
