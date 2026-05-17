@@ -139,7 +139,8 @@ export async function GET(request: NextRequest) {
           GROUP BY date
         ),
         avail_daily AS (
-          SELECT date, SUM(activeRooms) AS avail
+          SELECT date,
+            SUM(CASE WHEN date < CURRENT_DATE THEN GREATEST(activeRooms - stops, 0) ELSE activeRooms END) AS avail
           FROM staging_stat_daily
           WHERE roomtypeId = '0'
             AND date BETWEEN '${monthStart}' AND '${monthEnd}'
