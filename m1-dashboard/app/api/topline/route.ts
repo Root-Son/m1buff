@@ -128,10 +128,12 @@ export async function GET(request: NextRequest) {
           ${branchFilter_sql}
         GROUP BY CAST(date AS VARCHAR), c_name
       `),
-      // 4. OCC (duck only)
+      // 4. OCC (duck only) — LS 제외: 분자(sold)·분모(avail) 모두에서 LS 점유분 차감
       duckQuery(`
         WITH fact_daily AS (
-          SELECT date, SUM(oc_rn) AS sold
+          SELECT date,
+            SUM(oc_rn) AS sold_all,
+            SUM(CASE WHEN c_name LIKE 'LS_%' OR c_name = '내부채널_LS' THEN oc_rn ELSE 0 END) AS sold_ls
           FROM fact_reservation_event
           WHERE event = '재실' AND isSales = true
             AND date BETWEEN '${monthStart}' AND '${monthEnd}'
@@ -147,7 +149,9 @@ export async function GET(request: NextRequest) {
             ${branchFilter_avail}
           GROUP BY date
         )
-        SELECT CAST(a.date AS VARCHAR) as date, a.avail AS available_rooms, COALESCE(f.sold, 0) AS sold_rooms
+        SELECT CAST(a.date AS VARCHAR) as date,
+          GREATEST(a.avail - COALESCE(f.sold_ls, 0), 1) AS available_rooms,
+          COALESCE(f.sold_all, 0) - COALESCE(f.sold_ls, 0) AS sold_rooms
         FROM avail_daily a
         LEFT JOIN fact_daily f ON f.date = a.date
         ORDER BY a.date
