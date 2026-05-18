@@ -58,11 +58,13 @@ export async function GET(request: NextRequest) {
       const totalRev = rows.reduce((s, r) => s + r.revenue, 0)
       const totalTarget = rows.reduce((s, r) => s + r.target, 0)
 
-      return NextResponse.json({
+      const response = NextResponse.json({
         type: 'all', month, year,
         total: { revenue: totalRev, target: totalTarget, rate: totalTarget > 0 ? Math.round(totalRev / totalTarget * 1000) / 10 : 0 },
         branches: rows,
       })
+      response.headers.set('Cache-Control', 'no-store')
+      return response
     } else {
       // 개별 지점: 날짜별 누적 달성률
       const target = targetMap[branch] || 0
@@ -93,7 +95,9 @@ export async function GET(request: NextRequest) {
         }
       })
 
-      return NextResponse.json({ type: 'branch', branch, month, year, target, days })
+      const response = NextResponse.json({ type: 'branch', branch, month, year, target, days })
+      response.headers.set('Cache-Control', 'no-store')
+      return response
     }
   } catch (error: any) {
     console.error('Achievement API Error:', error)
